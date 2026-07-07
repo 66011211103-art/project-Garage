@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiResult {
@@ -111,11 +112,12 @@ class ApiService {
     }
   }
 
-  // ===== UPLOAD AVATAR ===== ✅ เพิ่มตรงนี้
+  // ===== UPLOAD AVATAR ===== ✅ รองรับทั้ง Web และมือถือด้วย bytes
   static Future<ApiResult> uploadAvatar({
     required int userId,
     required String userType,
-    required String filePath,
+    required Uint8List fileBytes,
+    required String fileName,
   }) async {
     try {
       final request = http.MultipartRequest(
@@ -124,7 +126,9 @@ class ApiService {
       );
       request.fields['userId'] = userId.toString();
       request.fields['userType'] = userType;
-      request.files.add(await http.MultipartFile.fromPath('avatar', filePath));
+      request.files.add(
+        http.MultipartFile.fromBytes('avatar', fileBytes, filename: fileName),
+      );
 
       final response = await request.send().timeout(const Duration(seconds: 30));
       final body = jsonDecode(await response.stream.bytesToString());

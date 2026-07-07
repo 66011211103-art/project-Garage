@@ -4,8 +4,9 @@ import 'api_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
+  final void Function(Map<String, dynamic> newUserData)? onUserDataChanged; // ✅ callback บอกหน้าแม่ว่าข้อมูลเปลี่ยน
 
-  const ProfilePage({super.key, required this.userData});
+  const ProfilePage({super.key, required this.userData, this.onUserDataChanged});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -36,7 +37,9 @@ class _ProfilePageState extends State<ProfilePage> {
       userType: _userData['userType'] ?? 'customer',
     );
     if (result.success && result.data != null) {
-      setState(() => _userData = result.data!['user']);
+      final updatedUser = result.data!['user'];
+      setState(() => _userData = updatedUser);
+      widget.onUserDataChanged?.call(updatedUser); // ✅ แจ้งหน้าแม่ (HomePage/GarageDashboard) ให้อัปเดตด้วย
     }
   }
 

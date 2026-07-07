@@ -14,14 +14,29 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int currentIndex = 0;
+  late Map<String, dynamic> _userData; // ✅ เก็บ userData เป็น state ของหน้านี้เอง
+
+  @override
+  void initState() {
+    super.initState();
+    _userData = widget.userData;
+  }
+
+  // ✅ เรียกจาก ProfilePage เมื่อข้อมูลถูกแก้ไข เพื่ออัปเดตทุกหน้าพร้อมกันทันที
+  void _handleUserDataUpdated(Map<String, dynamic> newUserData) {
+    setState(() => _userData = newUserData);
+  }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      HomeContent(userData: widget.userData), // ✅ ส่งไปที่ HomeContent
+      HomeContent(userData: _userData), // ✅ ใช้ _userData แทน widget.userData
       const Center(child: Text("ประวัติ", style: TextStyle(fontSize: 24))),
       const ChatScreen(),
-      ProfilePage(userData: widget.userData), // ✅ ส่งไปที่ ProfilePage
+      ProfilePage(
+        userData: _userData,
+        onUserDataChanged: _handleUserDataUpdated, // ✅ ส่ง callback ไปให้
+      ),
     ];
 
     return Scaffold(

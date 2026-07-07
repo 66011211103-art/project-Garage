@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
@@ -20,7 +20,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _emailController;
 
   bool _isLoading = false;
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes; // ✅ ใช้ bytes แทน File เพื่อรองรับทั้ง Web และมือถือ
+  String? _selectedImageName;
 
   @override
   void initState() {
@@ -73,7 +74,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   imageQuality: 80,
                 );
                 if (picked != null) {
-                  setState(() => _selectedImage = File(picked.path));
+                  final bytes = await picked.readAsBytes(); // ✅ ใช้ได้ทั้ง Web และมือถือ
+                  setState(() {
+                    _selectedImageBytes = bytes;
+                    _selectedImageName = picked.name;
+                  });
                 }
               },
             ),
@@ -88,7 +93,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   imageQuality: 80,
                 );
                 if (picked != null) {
-                  setState(() => _selectedImage = File(picked.path));
+                  final bytes = await picked.readAsBytes(); // ✅ ใช้ได้ทั้ง Web และมือถือ
+                  setState(() {
+                    _selectedImageBytes = bytes;
+                    _selectedImageName = picked.name;
+                  });
                 }
               },
             ),
@@ -102,12 +111,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    if (_selectedImage != null) {
-      await ApiService.uploadAvatar(
+    if (_selectedImageBytes != null) {
+      final avatarResult = await ApiService.uploadAvatar(
         userId: widget.userData['id'],
         userType: widget.userData['userType'] ?? 'customer',
-        filePath: _selectedImage!.path,
+        fileBytes: _selectedImageBytes!,
+        fileName: _selectedImageName ?? 'avatar.jpg',
       );
+
+      if (!avatarResult.success) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('อัปโหลดรูปไม่สำเร็จ: ${avatarResult.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return; // หยุดตรงนี้ ไม่ต้องไปต่อ updateProfile ถ้ารูปพัง
+      }
     }
 
     final result = await ApiService.updateProfile(
@@ -146,9 +168,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  // ✅ กำหนด backgroundImage ให้ถูกต้อง
+  // ✅ กำหนด backgroundImage ให้ถูกต้อง (รองรับทั้ง Web และมือถือ)
   ImageProvider? get _avatarImage {
-    if (_selectedImage != null) return FileImage(_selectedImage!);
+    if (_selectedImageBytes != null) return MemoryImage(_selectedImageBytes!);
     final avatarUrl = widget.userData['avatar'];
     if (avatarUrl != null && avatarUrl.toString().isNotEmpty) {
       return NetworkImage(avatarUrl);

@@ -12,6 +12,18 @@ class GarageDashboard extends StatefulWidget {
 
 class _GarageDashboardState extends State<GarageDashboard> {
   int currentIndex = 0;
+  late Map<String, dynamic> _userData; // ✅ เก็บ userData เป็น state ของหน้านี้เอง
+
+  @override
+  void initState() {
+    super.initState();
+    _userData = widget.userData;
+  }
+
+  // ✅ เรียกจาก ProfilePage เมื่อข้อมูลถูกแก้ไข เพื่ออัปเดตทุกหน้าพร้อมกันทันที
+  void _handleUserDataUpdated(Map<String, dynamic> newUserData) {
+    setState(() => _userData = newUserData);
+  }
 
   final List<Map<String, dynamic>> _requests = [
     {
@@ -34,14 +46,17 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final shopName = widget.userData['shop_name'] ?? 'อู่ซ่อมรถ';
+    final shopName = _userData['shop_name'] ?? 'อู่ซ่อมรถ';
 
     final List<Widget> pages = [
       _buildDashboard(shopName),
       const Center(child: Text("งาน", style: TextStyle(fontSize: 24))),
       const Center(child: Text("ประวัติ", style: TextStyle(fontSize: 24))),
       const Center(child: Text("รีวิว", style: TextStyle(fontSize: 24))),
-      ProfilePage(userData: widget.userData),
+      ProfilePage(
+        userData: _userData,
+        onUserDataChanged: _handleUserDataUpdated, // ✅ ส่ง callback ไปให้
+      ),
     ];
 
     return Scaffold(
