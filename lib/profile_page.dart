@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_goodgarage/editprofile_page.dart';
 import 'api_service.dart';
+import ' myCarPage.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -179,7 +180,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       },
                     ),
                     _menuItem(Icons.history, "ประวัติการซ่อม"),
-                    if (!isRepair) _menuItem(Icons.directions_car, "รถของฉัน"),
+                    if (!isRepair)
+                      _menuItem(
+                        Icons.directions_car,
+                        "รถของฉัน",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MyCarPage(userId: _userData['id']),
+                            ),
+                          );
+                        },
+                      ),
                     _menuItem(Icons.settings, "ตั้งค่า"),
                     _menuItem(Icons.help_outline, "ช่วยเหลือ"),
                   ],

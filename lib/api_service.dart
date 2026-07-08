@@ -163,4 +163,110 @@ static Future<ApiResult> getProfile({
   }
 }
 
+  // ===== GET CARS =====
+  static Future<ApiResult> getCars({required int userId}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/cars?userId=$userId'))
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลรถได้');
+    }
+  }
+
+  // ===== ADD CAR =====
+  static Future<ApiResult> addCar({
+    required int userId,
+    required String carModel,
+    required String carPlate,
+    String? carBrand,
+    String? carColor,
+    int? carYear,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cars'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'userId': userId,
+              'carModel': carModel,
+              'carPlate': carPlate,
+              'carBrand': carBrand,
+              'carColor': carColor,
+              'carYear': carYear,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== UPDATE CAR =====
+  static Future<ApiResult> updateCar({
+    required int carId,
+    required String carModel,
+    required String carPlate,
+    String? carBrand,
+    String? carColor,
+    int? carYear,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/cars/$carId'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'carModel': carModel,
+              'carPlate': carPlate,
+              'carBrand': carBrand,
+              'carColor': carColor,
+              'carYear': carYear,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== DELETE CAR =====
+  static Future<ApiResult> deleteCar({required int carId}) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/cars/$carId'))
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
 }
