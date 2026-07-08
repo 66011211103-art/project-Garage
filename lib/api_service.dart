@@ -162,33 +162,5 @@ static Future<ApiResult> getProfile({
     return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลได้');
   }
 }
-static Future<ApiResult> updateGarageProfile({
-  required int userId,
-  required String shopName,
-  required String ownerName,
-  required String phone,
-  required String address,
-  required String openTime,
-  required String closeTime,
-}) async {
-  try {
-    final response = await http.put(
-      Uri.parse('$baseUrl/garage/update'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'userId': userId,
-        'shopName': shopName,
-        'ownerName': ownerName,
-        'phone': phone,
-        'address': address,
-        'openTime': openTime,
-        'closeTime': closeTime,
-      }),
-    ).timeout(const Duration(seconds: 15));
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    return ApiResult(success: body['success'] == true, message: body['message'] ?? '');
-  } catch (e) {
-    return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
-  }
-}
+
 }

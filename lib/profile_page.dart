@@ -170,7 +170,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         final updated = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EditCustomerProfilePage(userData: _userData),
+                            builder: (context) => EditProfilePage(userData: _userData),
                           ),
                         );
                         if (updated == true) {

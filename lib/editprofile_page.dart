@@ -3,70 +3,54 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
 
-class EditCustomerProfilePage extends StatefulWidget {
+class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
 
-  const EditCustomerProfilePage({super.key, required this.userData});
+  const EditProfilePage({super.key, required this.userData});
 
   @override
-  State<EditCustomerProfilePage> createState() => _EditCustomerProfilePageState();
+  State<EditProfilePage> createState() => _EditProfilePageState();
 }
 
-class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
+class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _firstNameController;
-  late TextEditingController _lastNameController;
+  late TextEditingController _shopNameController; // ใช้เมื่อเป็นอู่ (repair)
+  late TextEditingController _firstNameController; // ใช้เมื่อเป็นลูกค้า
+  late TextEditingController _lastNameController; // ใช้เมื่อเป็นลูกค้า
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  late TextEditingController _addressController;
-  late TextEditingController _carModelController;
-  late TextEditingController _carPlateController;
 
   bool _isLoading = false;
-  Uint8List? _selectedImageBytes;
+  Uint8List? _selectedImageBytes; // ✅ ใช้ bytes แทน File เพื่อรองรับทั้ง Web และมือถือ
   String? _selectedImageName;
 
   @override
   void initState() {
     super.initState();
     final u = widget.userData;
+    _shopNameController = TextEditingController(text: u['shop_name'] ?? '');
     _firstNameController = TextEditingController(text: u['first_name'] ?? '');
     _lastNameController = TextEditingController(text: u['last_name'] ?? '');
     _phoneController = TextEditingController(text: u['phone'] ?? '');
     _emailController = TextEditingController(text: u['email'] ?? '');
-    _addressController = TextEditingController(text: u['address'] ?? '');
-    _carModelController = TextEditingController(text: u['car_model'] ?? '');
-    _carPlateController = TextEditingController(text: u['car_plate'] ?? '');
   }
 
   @override
   void dispose() {
+    _shopNameController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _addressController.dispose();
-    _carModelController.dispose();
-    _carPlateController.dispose();
     super.dispose();
   }
 
   String get _displayInitial {
-    final name = _firstNameController.text;
+    final isRepair = widget.userData['userType'] == 'repair';
+    final name = isRepair ? _shopNameController.text : _firstNameController.text;
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
-
-  ImageProvider? get _avatarImage {
-    if (_selectedImageBytes != null) return MemoryImage(_selectedImageBytes!);
-    final avatarUrl = widget.userData['avatar'];
-    if (avatarUrl != null && avatarUrl.toString().isNotEmpty) {
-      return NetworkImage(avatarUrl);
-    }
-    return null;
-  }
-
-  bool get _hasImage => _avatarImage != null;
 
   Future<void> _pickImage() async {
     showModalBottomSheet(
@@ -87,10 +71,13 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
               title: const Text('เลือกจากคลังรูป'),
               onTap: () async {
                 Navigator.pop(context);
-                final picked = await ImagePicker().pickImage(
-                  source: ImageSource.gallery, imageQuality: 80);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 80,
+                );
                 if (picked != null) {
-                  final bytes = await picked.readAsBytes();
+                  final bytes = await picked.readAsBytes(); // ✅ ใช้ได้ทั้ง Web และมือถือ
                   setState(() {
                     _selectedImageBytes = bytes;
                     _selectedImageName = picked.name;
@@ -103,10 +90,13 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
               title: const Text('ถ่ายรูป'),
               onTap: () async {
                 Navigator.pop(context);
-                final picked = await ImagePicker().pickImage(
-                  source: ImageSource.camera, imageQuality: 80);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 80,
+                );
                 if (picked != null) {
-                  final bytes = await picked.readAsBytes();
+                  final bytes = await picked.readAsBytes(); // ✅ ใช้ได้ทั้ง Web และมือถือ
                   setState(() {
                     _selectedImageBytes = bytes;
                     _selectedImageName = picked.name;
@@ -127,30 +117,37 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
     if (_selectedImageBytes != null) {
       final avatarResult = await ApiService.uploadAvatar(
         userId: widget.userData['id'],
-        userType: 'customer',
+        userType: widget.userData['userType'] ?? 'customer',
         fileBytes: _selectedImageBytes!,
         fileName: _selectedImageName ?? 'avatar.jpg',
       );
+
       if (!avatarResult.success) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('อัปโหลดรูปไม่สำเร็จ: ${avatarResult.message}'),
-              backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('อัปโหลดรูปไม่สำเร็จ: ${avatarResult.message}'),
+            backgroundColor: Colors.red,
+          ),
         );
-        return;
+        return; // หยุดตรงนี้ ไม่ต้องไปต่อ updateProfile ถ้ารูปพัง
       }
     }
 
-    final name = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+    final isRepair = widget.userData['userType'] == 'repair';
+    final nameToSend = isRepair
+        ? _shopNameController.text.trim()
+        : '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim();
+
     final result = await ApiService.updateProfile(
       userId: widget.userData['id'],
-      name: name,
+      name: nameToSend,
       phone: _phoneController.text.trim(),
-      address: _addressController.text.trim(),
-      carModel: _carModelController.text.trim(),
-      carPlate: _carPlateController.text.trim(),
-      userType: 'customer',
+      address: '',
+      carModel: '',
+      carPlate: '',
+      userType: widget.userData['userType'] ?? 'customer',
     );
 
     if (!mounted) return;
@@ -179,13 +176,27 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
     );
   }
 
+  // ✅ กำหนด backgroundImage ให้ถูกต้อง (รองรับทั้ง Web และมือถือ)
+  ImageProvider? get _avatarImage {
+    if (_selectedImageBytes != null) return MemoryImage(_selectedImageBytes!);
+    final avatarUrl = widget.userData['avatar'];
+    if (avatarUrl != null && avatarUrl.toString().isNotEmpty) {
+      return NetworkImage(avatarUrl);
+    }
+    return null;
+  }
+
+  bool get _hasImage => _avatarImage != null;
+
   @override
   Widget build(BuildContext context) {
+    final isRepair = widget.userData['userType'] == 'repair';
+
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แก้ไขข้อมูลส่วนตัว', style: TextStyle(color: Colors.white)),
+        title: const Text('แก้ไขโปรไฟล์', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -207,7 +218,7 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
 
-                // รูปโปรไฟล์
+                // ===== รูปโปรไฟล์ =====
                 Center(
                   child: Column(
                     children: [
@@ -218,17 +229,27 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
                             CircleAvatar(
                               radius: 50,
                               backgroundColor: const Color(0xff2196F3),
-                              backgroundImage: _avatarImage,
+                              backgroundImage: _avatarImage, // ✅ แสดงรูปเดิมหรือรูปที่เลือกใหม่
                               child: !_hasImage
-                                  ? Text(_displayInitial,
-                                      style: const TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.bold))
+                                  ? Text(
+                                      _displayInitial,
+                                      style: const TextStyle(
+                                        fontSize: 40,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
                                   : null,
                             ),
                             Positioned(
-                              bottom: 0, right: 0,
+                              bottom: 0,
+                              right: 0,
                               child: Container(
                                 padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(color: Color(0xff1976D2), shape: BoxShape.circle),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xff1976D2),
+                                  shape: BoxShape.circle,
+                                ),
                                 child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
                               ),
                             ),
@@ -236,95 +257,95 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('เปลี่ยนรูปโปรไฟล์', style: TextStyle(color: Color(0xff2196F3), fontSize: 14)),
+                      const Text(
+                        'เปลี่ยนรูปโปรไฟล์',
+                        style: TextStyle(color: Color(0xff2196F3), fontSize: 14),
+                      ),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // ชื่อ - นามสกุล
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('ชื่อ'),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _firstNameController,
-                            onChanged: (_) => setState(() {}),
-                            decoration: _inputDeco(hint: 'ชื่อ', icon: Icons.person_outline),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อ' : null,
-                          ),
-                        ],
+                if (isRepair) ...[
+                  const Text('ชื่อร้านอู่ซ่อมรถ'),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _shopNameController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: _inputDeco(hint: 'ชื่อร้าน', icon: Icons.store_outlined),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อร้าน' : null,
+                  ),
+                ] else ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('ชื่อ'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _firstNameController,
+                              onChanged: (_) => setState(() {}),
+                              decoration: _inputDeco(hint: 'ชื่อ', icon: Icons.person_outline),
+                              validator: (v) =>
+                                  v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อ' : null,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('นามสกุล'),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _lastNameController,
-                            decoration: _inputDeco(hint: 'นามสกุล', icon: Icons.person_outline),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกนามสกุล' : null,
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('นามสกุล'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _lastNameController,
+                              decoration: _inputDeco(hint: 'นามสกุล', icon: Icons.person_outline),
+                              validator: (v) =>
+                                  v == null || v.trim().isEmpty ? 'กรุณากรอกนามสกุล' : null,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
 
                 const SizedBox(height: 16),
+
                 const Text('เบอร์โทรศัพท์'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: _inputDeco(hint: '089-123-4567', icon: Icons.phone_outlined),
+                  decoration:
+                      _inputDeco(hint: '089-123-4567', icon: Icons.phone_outlined),
                 ),
 
                 const SizedBox(height: 16),
+
                 const Text('อีเมล'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
                   readOnly: true,
-                  decoration: _inputDeco(hint: 'example@email.com', icon: Icons.email_outlined)
-                      .copyWith(fillColor: const Color(0xFFEEEEEE),
-                          suffixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 18)),
-                ),
-
-                const SizedBox(height: 16),
-                const Text('ที่อยู่'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _addressController,
-                  maxLines: 2,
-                  decoration: _inputDeco(hint: '123 ถนน...', icon: Icons.location_on_outlined),
-                ),
-
-                const SizedBox(height: 16),
-                const Text('รุ่นรถ (ไม่บังคับ)'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _carModelController,
-                  decoration: _inputDeco(hint: 'Honda Civic', icon: Icons.directions_car_outlined),
-                ),
-
-                const SizedBox(height: 16),
-                const Text('ทะเบียนรถ (ไม่บังคับ)'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _carPlateController,
-                  decoration: _inputDeco(hint: 'กก-1234 กรุงเทพฯ', icon: Icons.card_membership_outlined),
+                  decoration: _inputDeco(
+                    hint: 'example@email.com',
+                    icon: Icons.email_outlined,
+                  ).copyWith(
+                    fillColor: const Color(0xFFEEEEEE),
+                    suffixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+                  ),
                 ),
 
                 const SizedBox(height: 32),
+
                 Row(
                   children: [
                     Expanded(
@@ -337,7 +358,8 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
                             side: const BorderSide(color: Colors.grey),
                           ),
                         ),
-                        child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                        child: const Text('ยกเลิก',
+                            style: TextStyle(color: Colors.grey, fontSize: 16)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -348,13 +370,24 @@ class _EditCustomerProfilePageState extends State<EditCustomerProfilePage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xff2196F3),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 2,
                         ),
                         child: _isLoading
-                            ? const SizedBox(width: 20, height: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('บันทึกการเปลี่ยนแปลง',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text(
+                                'บันทึกการเปลี่ยนแปลง',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold),
+                              ),
                       ),
                     ),
                   ],

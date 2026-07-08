@@ -66,8 +66,11 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ดึงชื่อจาก userData
-    final firstName = userData['first_name'] ?? userData['shop_name'] ?? 'ผู้ใช้';
+    // ดึงชื่อจาก userData (ชื่อเต็มสำหรับลูกค้า, ชื่อร้านสำหรับอู่)
+    final firstName = userData['first_name'] ?? '';
+    final lastName = userData['last_name'] ?? '';
+    final fullName = userData['shop_name'] ??
+        (('$firstName $lastName').trim().isEmpty ? 'ผู้ใช้' : '$firstName $lastName'.trim());
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -85,6 +88,7 @@ class HomeContent extends StatelessWidget {
               child: Column(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
@@ -96,7 +100,7 @@ class HomeContent extends StatelessWidget {
                             ),
                             const SizedBox(height: 5),
                             Text(
-                              firstName, // ✅ ใช้ชื่อจริงจาก DB
+                              fullName, // ✅ ใช้ชื่อเต็มจาก DB
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 34,
@@ -107,7 +111,17 @@ class HomeContent extends StatelessWidget {
                         ),
                       ),
 
-                      // ไม่มีปุ่มแจ้งเตือน ✅
+                      // ✅ ปุ่มแจ้งเตือน
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                          onPressed: () {},
+                        ),
+                      ),
                     ],
                   ),
 
@@ -212,35 +226,6 @@ class HomeContent extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 30),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text("อู่แนะนำ", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-                      Text("ดูทั้งหมด", style: TextStyle(color: Colors.blue, fontSize: 20)),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const GarageCard(
-                    image: "https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=800",
-                    title: "อู่ซ่อมรถบ้านสวน",
-                    rating: "4.8",
-                    reviews: "124",
-                    distance: "2.5 กม.",
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const GarageCard(
-                    image: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=800",
-                    title: "ศูนย์ซ่อมรถยนต์ชัยภูมิ",
-                    rating: "4.6",
-                    reviews: "89",
-                    distance: "3.8 กม.",
-                  ),
                 ],
               ),
             ),
