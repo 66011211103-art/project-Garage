@@ -3,6 +3,7 @@ import 'dashboard.dart';
 import 'garage_dashboard.dart';
 import 'register.dart';
 import 'api_service.dart';
+import 'forgot_password_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -209,11 +210,21 @@ class _LoginPageState extends State<LoginPage> {
 
                       const SizedBox(height: 10),
 
-                      const Align(
+                      Align(
                         alignment: Alignment.centerRight,
-                        child: Text(
-                          'ลืมรหัสผ่าน?',
-                          style: TextStyle(color: Colors.blue),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ForgotPasswordPage(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'ลืมรหัสผ่าน?',
+                            style: TextStyle(color: Colors.blue),
+                          ),
                         ),
                       ),
 

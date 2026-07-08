@@ -25,24 +25,8 @@ class _GarageDashboardState extends State<GarageDashboard> {
     setState(() => _userData = newUserData);
   }
 
-  final List<Map<String, dynamic>> _requests = [
-    {
-      'name': 'สมชาย ใจดี',
-      'time': '10 นาทีที่แล้ว',
-      'car': 'รถเก๋ง',
-      'distance': '2.5 กม.',
-      'problem': 'ปัญหา: เครื่องยนต์ติดยาก มีเสียงผิดปกติ',
-      'color': const Color(0xff2196F3),
-    },
-    {
-      'name': 'สมหญิง รักดี',
-      'time': '25 นาทีที่แล้ว',
-      'car': 'SUV',
-      'distance': '4.2 กม.',
-      'problem': 'ปัญหา: ยางรั่ว ต้องการเปลี่ยนยางใหม่',
-      'color': const Color(0xffFF9800),
-    },
-  ];
+  // ✅ ยังไม่มีคำขอซ่อมจากลูกค้า เริ่มต้นเป็นค่าว่าง
+  final List<Map<String, dynamic>> _requests = [];
 
   @override
   Widget build(BuildContext context) {
@@ -137,10 +121,10 @@ class _GarageDashboardState extends State<GarageDashboard> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  _statCard(icon: Icons.calendar_today, value: '8', label: 'งานวันนี้', color: const Color(0xff2196F3)),
-                  _statCard(icon: Icons.build, value: '5', label: 'กำลังดำเนินการ', color: const Color(0xffFF9800)),
-                  _statCard(icon: Icons.check_circle, value: '3', label: 'เสร็จแล้ว', color: const Color(0xff4CAF50)),
-                  _statCard(icon: Icons.attach_money, value: '12.5K', label: 'รายได้วันนี้', color: const Color(0xff9C27B0)),
+                  _statCard(icon: Icons.calendar_today, value: '0', label: 'งานวันนี้', color: const Color(0xff2196F3)),
+                  _statCard(icon: Icons.build, value: '0', label: 'กำลังดำเนินการ', color: const Color(0xffFF9800)),
+                  _statCard(icon: Icons.check_circle, value: '0', label: 'เสร็จแล้ว', color: const Color(0xff4CAF50)),
+                  _statCard(icon: Icons.attach_money, value: '0', label: 'รายได้วันนี้', color: const Color(0xff9C27B0)),
                 ],
               ),
             ),
@@ -161,6 +145,8 @@ class _GarageDashboardState extends State<GarageDashboard> {
             ),
 
             ..._requests.map((r) => _requestCard(r)).toList(),
+
+            if (_requests.isEmpty) _emptyRequestsState(),
 
             // ===== เมนูด่วน =====
             const Padding(
@@ -188,6 +174,32 @@ class _GarageDashboardState extends State<GarageDashboard> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _emptyRequestsState() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+          SizedBox(height: 12),
+          Text(
+            'ยังไม่มีคำขอซ่อมเข้ามา',
+            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'คำขอจากลูกค้าจะแสดงที่นี่',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ],
       ),
     );
   }

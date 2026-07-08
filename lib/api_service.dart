@@ -269,4 +269,56 @@ static Future<ApiResult> getProfile({
       return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
     }
   }
+
+  // ===== FORGOT PASSWORD (ขอ OTP) =====
+  static Future<ApiResult> forgotPassword({required String email}) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/forgot-password'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== RESET PASSWORD (ยืนยัน OTP + ตั้งรหัสผ่านใหม่) =====
+  static Future<ApiResult> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/reset-password'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'otp': otp,
+              'newPassword': newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
 }
