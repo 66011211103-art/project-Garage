@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_goodgarage/edit_customer_profile_page.dart';
+import 'package:flutter_goodgarage/editprofile_page.dart';
 import 'api_service.dart';
-import 'package:flutter_goodgarage/edit_garage_profile_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -171,12 +170,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         final updated = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => isRepair
-                                ? EditGarageProfilePage(userData: _userData)
-                                : EditCustomerProfilePage(userData: _userData),
+                            builder: (context) => EditCustomerProfilePage(userData: _userData),
                           ),
                         );
-                        if (updated == true) await _refreshProfile();
+                        if (updated == true) {
+                          await _refreshProfile(); // ✅ ดึงข้อมูลใหม่พร้อมรูป
+                        }
                       },
                     ),
                     _menuItem(Icons.history, "ประวัติการซ่อม"),
