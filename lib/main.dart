@@ -34,6 +34,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePassword = true; // ✅ ควบคุมการซ่อน/แสดงรหัสผ่าน
 
   @override
   void dispose() {
@@ -190,9 +191,18 @@ class _LoginPageState extends State<LoginPage> {
 
                       TextFormField(
                         controller: _passwordController,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() => _obscurePassword = !_obscurePassword);
+                            },
+                          ),
                           filled: true,
                           fillColor: const Color(0xFFF5F6FA),
                           border: OutlineInputBorder(
