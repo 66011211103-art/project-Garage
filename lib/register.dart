@@ -27,6 +27,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   String selectedUserType = 'customer';
   bool _isLoading = false;
+  bool _obscurePassword = true; // ✅ ควบคุมการซ่อน/แสดงรหัสผ่าน
+  bool _obscureConfirmPassword = true; // ✅ ควบคุมการซ่อน/แสดงยืนยันรหัสผ่าน
 
   @override
   void dispose() {
@@ -268,9 +270,27 @@ class _RegisterPageState extends State<RegisterPage> {
                 const Text('รหัสผ่าน'),
                 const SizedBox(height: 8),
                 TextFormField(
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   controller: _passwordController,
-                  decoration: customInput(hint: '••••••••', icon: Icons.lock_outline),
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F6FA),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'กรุณากรอกรหัสผ่าน';
                     if (v.length < 6) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
@@ -282,9 +302,27 @@ class _RegisterPageState extends State<RegisterPage> {
                 const Text('ยืนยันรหัสผ่าน'),
                 const SizedBox(height: 8),
                 TextFormField(
-                  obscureText: true,
+                  obscureText: _obscureConfirmPassword,
                   controller: _confirmPasswordController,
-                  decoration: customInput(hint: '••••••••', icon: Icons.lock_outline),
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                      },
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F6FA),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'กรุณายืนยันรหัสผ่าน';
                     if (v != _passwordController.text) return 'รหัสผ่านไม่ตรงกัน';
