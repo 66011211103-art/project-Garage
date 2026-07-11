@@ -75,6 +75,10 @@ class ApiService {
   }
 
   // ===== UPDATE PROFILE =====
+  // หมายเหตุ: ownerName / hoursWeekday / hoursWeekend / services เป็นพารามิเตอร์
+  // เสริมสำหรับฝั่งอู่ซ่อม (userType == 'repair') เท่านั้น ไม่ใส่ก็ได้สำหรับฝั่งลูกค้า
+  // ฝั่ง backend (Express route + MySQL) ต้องรองรับคีย์เหล่านี้ด้วย ไม่งั้นจะถูกส่งไป
+  // แต่เซิร์ฟเวอร์จะไม่บันทึกค่าให้
   static Future<ApiResult> updateProfile({
     required int userId,
     required String name,
@@ -83,6 +87,10 @@ class ApiService {
     required String carModel,
     required String carPlate,
     required String userType,
+    String? ownerName,
+    String? hoursWeekday,
+    String? hoursWeekend,
+    List<String>? services,
   }) async {
     try {
       final response = await http
@@ -97,6 +105,10 @@ class ApiService {
               'carModel': carModel,
               'carPlate': carPlate,
               'userType': userType,
+              if (ownerName != null) 'ownerName': ownerName,
+              if (hoursWeekday != null) 'hoursWeekday': hoursWeekday,
+              if (hoursWeekend != null) 'hoursWeekend': hoursWeekend,
+              if (services != null) 'services': services,
             }),
           )
           .timeout(const Duration(seconds: 15));

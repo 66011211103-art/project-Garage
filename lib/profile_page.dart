@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_goodgarage/%20myCarPage.dart';
 import 'package:flutter_goodgarage/editprofile_customer_page.dart';
 import 'package:flutter_goodgarage/editprofile_shop_page.dart';
-import 'package:flutter_goodgarage/garage_info_edit_page.dart';
 import 'api_service.dart';
 import ' myCarPage.dart';
 
@@ -168,9 +168,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     _menuItem(
                       Icons.person_outline,
-                      "แก้ไขข้อมูลส่วนตัว",
+                      isRepair ? "แก้ไขข้อมูลอู่" : "แก้ไขข้อมูลส่วนตัว",
                       onTap: () async {
-                        final updated = await Navigator.push(
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => isRepair
@@ -178,27 +178,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : EditProfileCustomerPage(userData: _userData),
                           ),
                         );
-                        if (updated == true) {
+                        // ฝั่งลูกค้าคืนค่า true เฉยๆ ส่วนฝั่งอู่คืนค่าเป็น Map
+                        // (มีข้อมูลเวลาทำการ/บริการ/เจ้าของร้านติดมาด้วย)
+                        final wasSaved = result == true ||
+                            (result is Map && result['success'] == true);
+                        if (wasSaved) {
                           await _refreshProfile(); // ✅ ดึงข้อมูลใหม่พร้อมรูป
                         }
                       },
                     ),
-                    if (isRepair)
-                      _menuItem(
-                        Icons.storefront_outlined,
-                        "แก้ไขข้อมูลอู่",
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => GarageInfoEditPage(userData: _userData),
-                            ),
-                          );
-                          if (result is Map && result['success'] == true) {
-                            await _refreshProfile();
-                          }
-                        },
-                      ),
                     _menuItem(Icons.history, "ประวัติการซ่อม"),
                     if (!isRepair)
                       _menuItem(
