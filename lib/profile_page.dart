@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_goodgarage/editprofile_page.dart';
+import 'package:flutter_goodgarage/editprofile_customer_page.dart';
+import 'package:flutter_goodgarage/editprofile_shop_page.dart';
+import 'package:flutter_goodgarage/garage_info_edit_page.dart';
 import 'api_service.dart';
 import ' myCarPage.dart';
 
@@ -171,7 +173,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         final updated = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EditProfilePage(userData: _userData),
+                            builder: (context) => isRepair
+                                ? EditProfileShopPage(userData: _userData)
+                                : EditProfileCustomerPage(userData: _userData),
                           ),
                         );
                         if (updated == true) {
@@ -179,6 +183,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         }
                       },
                     ),
+                    if (isRepair)
+                      _menuItem(
+                        Icons.storefront_outlined,
+                        "แก้ไขข้อมูลอู่",
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => GarageInfoEditPage(userData: _userData),
+                            ),
+                          );
+                          if (result is Map && result['success'] == true) {
+                            await _refreshProfile();
+                          }
+                        },
+                      ),
                     _menuItem(Icons.history, "ประวัติการซ่อม"),
                     if (!isRepair)
                       _menuItem(
