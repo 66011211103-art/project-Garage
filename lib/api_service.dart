@@ -77,6 +77,7 @@ class ApiService {
   // ===== UPDATE PROFILE =====
   // หมายเหตุ: ownerName / hoursWeekday / hoursWeekend / services เป็นพารามิเตอร์
   // เสริมสำหรับฝั่งอู่ซ่อม (userType == 'repair') เท่านั้น ไม่ใส่ก็ได้สำหรับฝั่งลูกค้า
+  // latitude / longitude ใช้ได้ทั้งฝั่งลูกค้าและอู่ (มาจากการค้นหาที่อยู่แบบแชท)
   // ฝั่ง backend (Express route + MySQL) ต้องรองรับคีย์เหล่านี้ด้วย ไม่งั้นจะถูกส่งไป
   // แต่เซิร์ฟเวอร์จะไม่บันทึกค่าให้
   static Future<ApiResult> updateProfile({
@@ -91,6 +92,8 @@ class ApiService {
     String? hoursWeekday,
     String? hoursWeekend,
     List<String>? services,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final response = await http
@@ -109,6 +112,8 @@ class ApiService {
               if (hoursWeekday != null) 'hoursWeekday': hoursWeekday,
               if (hoursWeekend != null) 'hoursWeekend': hoursWeekend,
               if (services != null) 'services': services,
+              if (latitude != null) 'latitude': latitude,
+              if (longitude != null) 'longitude': longitude,
             }),
           )
           .timeout(const Duration(seconds: 15));

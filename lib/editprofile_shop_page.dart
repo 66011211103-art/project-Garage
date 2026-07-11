@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom sheet เลือก/ถ่ายรูป) และ profileInputDeco ร่วมกัน
+import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
+import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
 
 /// รายการบริการที่อู่สามารถเลือกให้บริการได้
 const List<String> kGarageServiceOptions = [
@@ -47,6 +49,10 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
   String _weekendHours = '09:00-17:00';
   late Set<String> _selectedServices;
 
+  // ===== พิกัดที่อยู่ (ได้จากการค้นหาที่อยู่แบบแชท) =====
+  double? _latitude;
+  double? _longitude;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +70,9 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
     _selectedServices = existingServices is List
         ? existingServices.map((e) => e.toString()).toSet()
         : <String>{};
+
+    _latitude = double.tryParse(u['latitude']?.toString() ?? '');
+    _longitude = double.tryParse(u['longitude']?.toString() ?? '');
   }
 
   @override
@@ -94,6 +103,40 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         _selectedImageName = picked.name;
       });
     }
+  }
+
+  // ✅ เปิด chatbox ให้พิมพ์ที่อยู่ ค้นหาพิกัดให้อัตโนมัติ (ฟรี ไม่ใช้ Google API)
+  Future<void> _handlePickAddress() async {
+    final picked = await pickAddressViaChat(
+      context,
+      initialQuery: _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim(),
+    );
+    if (picked != null) {
+      setState(() {
+        _addressController.text = picked.address;
+        _latitude = picked.latitude;
+        _longitude = picked.longitude;
+      });
+    }
+  }
+
+  void _openAddressOnMap() {
+    if (_latitude == null || _longitude == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddressMapPage(
+          title: _shopNameController.text.trim().isEmpty
+              ? 'อู่ซ่อมรถ'
+              : _shopNameController.text.trim(),
+          subtitle: _addressController.text.trim(),
+          latitude: _latitude!,
+          longitude: _longitude!,
+        ),
+      ),
+    );
   }
 
   Future<void> _editHours({required bool isWeekday}) async {
@@ -229,6 +272,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
       hoursWeekday: _weekdayHours,
       hoursWeekend: _weekendHours,
       services: _selectedServices.toList(),
+      latitude: _latitude,
+      longitude: _longitude,
     );
 
     if (!mounted) return;
@@ -248,6 +293,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         'hours_weekend': _weekendHours,
         'services': _selectedServices.toList(),
         'owner_name': _ownerNameController.text.trim(),
+        'latitude': _latitude,
+        'longitude': _longitude,
       });
     }
   }
@@ -324,6 +371,42 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         maxLines: 2,
                         decoration: profileInputDeco(
                             hint: 'ที่อยู่อู่ซ่อมรถ', icon: Icons.location_on_outlined),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _handlePickAddress,
+                              icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                              label: const Text('ค้นหาที่อยู่/พิกัด'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xff2196F3),
+                                side: const BorderSide(color: Color(0xff2196F3)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _latitude != null && _longitude != null
+                                  ? _openAddressOnMap
+                                  : null,
+                              icon: const Icon(Icons.map_outlined, size: 18),
+                              label: const Text('ดูบนแผนที่'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.grey.shade700,
+                                side: BorderSide(color: Colors.grey.shade400),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 16),

@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'profile_avatar_picker.dart';
+import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
+import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
 
 /// หน้าแก้ไขข้อมูลส่วนตัวสำหรับ "ลูกค้า"
 class EditProfileCustomerPage extends StatefulWidget {
@@ -27,6 +29,10 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
 
+  // ===== พิกัดที่อยู่ (ได้จากการค้นหาที่อยู่แบบแชท) =====
+  double? _latitude;
+  double? _longitude;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +42,9 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
     _phoneController = TextEditingController(text: u['phone'] ?? '');
     _emailController = TextEditingController(text: u['email'] ?? '');
     _addressController = TextEditingController(text: u['address'] ?? '');
+
+    _latitude = double.tryParse(u['latitude']?.toString() ?? '');
+    _longitude = double.tryParse(u['longitude']?.toString() ?? '');
   }
 
   @override
@@ -70,6 +79,41 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
         _selectedImageName = picked.name;
       });
     }
+  }
+
+  // ✅ เปิด chatbox ให้พิมพ์ที่อยู่ ค้นหาพิกัดให้อัตโนมัติ (ฟรี ไม่ใช้ Google API)
+  Future<void> _handlePickAddress() async {
+    final picked = await pickAddressViaChat(
+      context,
+      initialQuery: _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim(),
+    );
+    if (picked != null) {
+      setState(() {
+        _addressController.text = picked.address;
+        _latitude = picked.latitude;
+        _longitude = picked.longitude;
+      });
+    }
+  }
+
+  void _openAddressOnMap() {
+    if (_latitude == null || _longitude == null) return;
+    final name =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+            .trim();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddressMapPage(
+          title: name.isEmpty ? 'ที่อยู่ของฉัน' : name,
+          subtitle: _addressController.text.trim(),
+          latitude: _latitude!,
+          longitude: _longitude!,
+        ),
+      ),
+    );
   }
 
   Future<void> _handleSave() async {
@@ -109,6 +153,8 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
       carModel: '',
       carPlate: '',
       userType: 'customer',
+      latitude: _latitude,
+      longitude: _longitude,
     );
 
     if (!mounted) return;
@@ -222,6 +268,42 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                   decoration: profileInputDeco(
                       hint: 'ที่อยู่สำหรับติดต่อ',
                       icon: Icons.location_on_outlined),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _handlePickAddress,
+                        icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                        label: const Text('ค้นหาที่อยู่/พิกัด'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xff2196F3),
+                          side: const BorderSide(color: Color(0xff2196F3)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _latitude != null && _longitude != null
+                            ? _openAddressOnMap
+                            : null,
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: const Text('ดูบนแผนที่'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.grey.shade700,
+                          side: BorderSide(color: Colors.grey.shade400),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 16),
