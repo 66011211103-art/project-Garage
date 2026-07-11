@@ -78,8 +78,6 @@ class ApiService {
   // หมายเหตุ: ownerName / hoursWeekday / hoursWeekend / services เป็นพารามิเตอร์
   // เสริมสำหรับฝั่งอู่ซ่อม (userType == 'repair') เท่านั้น ไม่ใส่ก็ได้สำหรับฝั่งลูกค้า
   // latitude / longitude ใช้ได้ทั้งฝั่งลูกค้าและอู่ (มาจากการค้นหาที่อยู่แบบแชท)
-  // ฝั่ง backend (Express route + MySQL) ต้องรองรับคีย์เหล่านี้ด้วย ไม่งั้นจะถูกส่งไป
-  // แต่เซิร์ฟเวอร์จะไม่บันทึกค่าให้
   static Future<ApiResult> updateProfile({
     required int userId,
     required String name,
@@ -115,6 +113,56 @@ class ApiService {
               if (latitude != null) 'latitude': latitude,
               if (longitude != null) 'longitude': longitude,
             }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== REQUEST EMAIL CHANGE (ส่ง OTP ไปอีเมลใหม่) =====
+  static Future<ApiResult> requestEmailChange({
+    required int userId,
+    required String newEmail,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/request-email-change'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId, 'newEmail': newEmail}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== CONFIRM EMAIL CHANGE (ยืนยัน OTP แล้วเปลี่ยนอีเมลจริง) =====
+  static Future<ApiResult> confirmEmailChange({
+    required int userId,
+    required String otp,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/confirm-email-change'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId, 'otp': otp}),
           )
           .timeout(const Duration(seconds: 15));
 

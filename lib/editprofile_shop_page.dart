@@ -4,6 +4,7 @@ import 'api_service.dart';
 import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom sheet เลือก/ถ่ายรูป) และ profileInputDeco ร่วมกัน
 import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
 import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
+import 'change_email_sheet.dart'; // ✅ เปลี่ยนอีเมลผ่าน OTP
 
 /// รายการบริการที่อู่สามารถเลือกให้บริการได้
 const List<String> kGarageServiceOptions = [
@@ -41,6 +42,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
   late TextEditingController _addressController;
 
   bool _isLoading = false;
+  bool _emailChangedSuccessfully = false; // ✅ อีเมลถูกเปลี่ยนไปแล้วจริงใน DB แม้ยังไม่กด "บันทึกข้อมูล"
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
 
@@ -137,6 +139,21 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         ),
       ),
     );
+  }
+
+  // ✅ เปิดขั้นตอนเปลี่ยนอีเมล (กรอกอีเมลใหม่ -> ยืนยัน OTP) แล้วอัปเดตช่องอีเมลทันทีเมื่อสำเร็จ
+  // หมายเหตุ: อีเมลใหม่ถูกบันทึกลง DB ทันทีที่ยืนยัน OTP สำเร็จ (ไม่ต้องรอกด "บันทึกข้อมูล")
+  Future<void> _handleChangeEmail() async {
+    final newEmail = await showChangeEmailSheet(context, userId: widget.userData['id']);
+    if (newEmail != null && mounted) {
+      setState(() {
+        _emailController.text = newEmail;
+        _emailChangedSuccessfully = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เปลี่ยนอีเมลสำเร็จ'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   Future<void> _editHours({required bool isWeekday}) async {
@@ -308,7 +325,10 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         title: const Text('แก้ไขข้อมูลอู่', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(
+            context,
+            _emailChangedSuccessfully ? {'success': true} : null,
+          ),
         ),
         elevation: 0,
       ),
@@ -416,13 +436,15 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       TextFormField(
                         controller: _emailController,
                         readOnly: true,
+                        onTap: _handleChangeEmail,
                         decoration: profileInputDeco(
                           hint: 'example@email.com',
                           icon: Icons.email_outlined,
                         ).copyWith(
-                          fillColor: const Color(0xFFEEEEEE),
-                          suffixIcon:
-                              const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+                          suffixIcon: TextButton(
+                            onPressed: _handleChangeEmail,
+                            child: const Text('เปลี่ยน'),
+                          ),
                         ),
                       ),
 
