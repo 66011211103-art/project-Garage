@@ -302,6 +302,49 @@ static Future<ApiResult> getProfile({
       return ApiResult(success: false, message: 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่');
     }
   }
+
+  // ===== GET REPAIR REQUESTS (ฝั่งอู่ ดูคำขอที่ลูกค้าส่งเข้ามา) =====
+  static Future<ApiResult> getRepairRequests({required int garageId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/repair-requests').replace(
+        queryParameters: {'garageId': garageId.toString()},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== UPDATE REPAIR REQUEST STATUS (รับงาน / ปฏิเสธ / เสร็จงาน) =====
+  static Future<ApiResult> updateRepairRequestStatus({
+    required int requestId,
+    required String status, // 'accepted' | 'rejected' | 'done'
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/repair-requests/$requestId/status'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'status': status}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
   static Future<ApiResult> getCars({required int userId}) async {
     try {
       final response = await http
