@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
+import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อมรถ
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -13,8 +14,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int currentIndex = 0;
+  int _bodyIndex = 0; // ดัชนีของหน้าเนื้อหาจริง (Home / ประวัติ / แชท / โปรไฟล์) ไม่รวมแท็บค้นหา
   late Map<String, dynamic> _userData; // ✅ เก็บ userData เป็น state ของหน้านี้เอง
+
+  // แผนที่: ตำแหน่งปุ่มด้านล่าง (5 ปุ่ม) -> ดัชนีหน้าเนื้อหาจริง (4 หน้า)
+  // ปุ่ม "ค้นหา" (nav index 1) ไม่ได้ผูกกับหน้าเนื้อหาใน pages เพราะเปิดแบบ push (มีปุ่มย้อนกลับ)
+  static const Map<int, int> _navIndexToBodyIndex = {0: 0, 2: 1, 3: 2, 4: 3};
 
   @override
   void initState() {
@@ -26,6 +31,22 @@ class _HomePageState extends State<HomePage> {
   void _handleUserDataUpdated(Map<String, dynamic> newUserData) {
     setState(() => _userData = newUserData);
   }
+
+  void _handleNavTap(int navIndex) {
+    if (navIndex == 1) {
+      // ปุ่ม "ค้นหา" -> เปิดหน้า Search แบบ push (มีปุ่มย้อนกลับ) ไม่สลับแท็บ
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SearchPage(userData: _userData)),
+      );
+      return;
+    }
+    setState(() => _bodyIndex = _navIndexToBodyIndex[navIndex] ?? 0);
+  }
+
+  // แปลง _bodyIndex กลับเป็นตำแหน่งปุ่มด้านล่าง เพื่อไฮไลต์ปุ่มที่ถูกต้อง
+  int get _selectedNavIndex =>
+      _navIndexToBodyIndex.entries.firstWhere((e) => e.value == _bodyIndex).key;
 
   @override
   Widget build(BuildContext context) {
@@ -41,15 +62,16 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
-      body: pages[currentIndex],
+      body: pages[_bodyIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
+        currentIndex: _selectedNavIndex,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
-        onTap: (i) => setState(() => currentIndex = i),
+        onTap: _handleNavTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "หน้าหลัก"),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: "ค้นหา"),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: "ประวัติ"),
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: "แชท"),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: "โปรไฟล์"),
@@ -57,6 +79,15 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+}
+
+void _openSearch(BuildContext context, Map<String, dynamic> userData, String service) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => SearchPage(userData: userData, initialService: service),
+    ),
+  );
 }
 
 class HomeContent extends StatelessWidget {
@@ -128,6 +159,15 @@ class HomeContent extends StatelessWidget {
                   const SizedBox(height: 30),
 
                   TextField(
+                    readOnly: true,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SearchPage(userData: userData),
+                        ),
+                      );
+                    },
                     decoration: InputDecoration(
                       hintText: "ค้นหาอู่ซ่อมรถ...",
                       prefixIcon: const Icon(Icons.search),
@@ -159,11 +199,27 @@ class HomeContent extends StatelessWidget {
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      CategoryItem(icon: FontAwesomeIcons.car, title: "เครื่องยนต์"),
-                      CategoryItem(icon: FontAwesomeIcons.circle, title: "ยาง"),
-                      CategoryItem(icon: FontAwesomeIcons.carBattery, title: "แบตเตอรี่"),
-                      CategoryItem(icon: FontAwesomeIcons.sprayCanSparkles, title: "ซ่อมสี"),
+                    children: [
+                      CategoryItem(
+                        icon: FontAwesomeIcons.car,
+                        title: "เครื่องยนต์",
+                        onTap: () => _openSearch(context, userData, "เครื่องยนต์"),
+                      ),
+                      CategoryItem(
+                        icon: FontAwesomeIcons.circle,
+                        title: "ยาง",
+                        onTap: () => _openSearch(context, userData, "ยาง"),
+                      ),
+                      CategoryItem(
+                        icon: FontAwesomeIcons.carBattery,
+                        title: "แบตเตอรี่",
+                        onTap: () => _openSearch(context, userData, "แบตเตอรี่"),
+                      ),
+                      CategoryItem(
+                        icon: FontAwesomeIcons.sprayCanSparkles,
+                        title: "ซ่อมสี",
+                        onTap: () => _openSearch(context, userData, "ซ่อมสี"),
+                      ),
                     ],
                   ),
 
@@ -239,25 +295,30 @@ class HomeContent extends StatelessWidget {
 class CategoryItem extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
-  const CategoryItem({super.key, required this.icon, required this.title});
+  const CategoryItem({super.key, required this.icon, required this.title, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(20),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: Colors.blue),
           ),
-          child: Icon(icon, color: Colors.blue),
-        ),
-        const SizedBox(height: 8),
-        Text(title),
-      ],
+          const SizedBox(height: 8),
+          Text(title),
+        ],
+      ),
     );
   }
 }

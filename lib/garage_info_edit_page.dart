@@ -1,10 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
-import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom sheet เลือก/ถ่ายรูป) และ profileInputDeco ร่วมกัน
-import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
-import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
-import 'change_email_sheet.dart'; // ✅ เปลี่ยนอีเมลผ่าน OTP
+import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom sheet เลือก/ถ่ายรูป) ร่วมกัน
 
 /// รายการบริการที่อู่สามารถเลือกให้บริการได้
 const List<String> kGarageServiceOptions = [
@@ -18,174 +15,77 @@ const List<String> kGarageServiceOptions = [
   'ระบบไฟ',
 ];
 
-/// หน้าแก้ไขข้อมูล "อู่ซ่อมรถ" แบบรวมเดียว
-/// รวมทั้งข้อมูลส่วนตัว (ชื่อร้าน, เจ้าของร้าน, เบอร์, ที่อยู่, อีเมล, รูป)
-/// และข้อมูลธุรกิจของอู่ (เวลาทำการ, บริการที่ให้บริการ) ไว้ในหน้าเดียว
-/// เพื่อไม่ให้ผู้ใช้ต้องกรอกชื่อร้าน/ที่อยู่/เบอร์โทร/รูปซ้ำสองรอบ
-class EditProfileShopPage extends StatefulWidget {
+/// หน้าแก้ไข "ข้อมูลอู่" (รูปภาพ, ที่อยู่, เวลาทำการ, บริการ)
+/// แยกจากหน้า "แก้ไขข้อมูลส่วนตัว" — ใช้สำหรับข้อมูลธุรกิจ/หน้าร้านที่แสดงในโปรไฟล์อู่
+class GarageInfoEditPage extends StatefulWidget {
   final Map<String, dynamic> userData;
 
-  const EditProfileShopPage({super.key, required this.userData});
+  const GarageInfoEditPage({super.key, required this.userData});
 
   @override
-  State<EditProfileShopPage> createState() => _EditProfileShopPageState();
+  State<GarageInfoEditPage> createState() => _GarageInfoEditPageState();
 }
 
-class _EditProfileShopPageState extends State<EditProfileShopPage> {
+class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // ===== ข้อมูลส่วนตัว / ร้าน (ใช้ร่วมกัน ไม่ซ้ำ) =====
-  late TextEditingController _shopNameController;
-  late TextEditingController _ownerNameController;
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
+  late TextEditingController _garageNameController;
   late TextEditingController _addressController;
+  late TextEditingController _phoneController;
 
   bool _isLoading = false;
-  bool _emailChangedSuccessfully = false; // ✅ อีเมลถูกเปลี่ยนไปแล้วจริงใน DB แม้ยังไม่กด "บันทึกข้อมูล"
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
 
-  // ===== ข้อมูลธุรกิจของอู่ (ไม่มีฝั่งลูกค้า) =====
+  // เวลาทำการ เก็บเป็นข้อความ "HH:mm-HH:mm"
   String _weekdayHours = '08:00-18:00';
   String _weekendHours = '09:00-17:00';
-  late Set<String> _selectedServices;
-  final Map<String, TextEditingController> _priceControllers = {}; // ✅ ราคาโดยประมาณต่อบริการ (พิมพ์อิสระ)
 
-  // ===== พิกัดที่อยู่ (ได้จากการค้นหาที่อยู่แบบแชท) =====
-  double? _latitude;
-  double? _longitude;
+  // บริการที่เลือก
+  late Set<String> _selectedServices;
 
   @override
   void initState() {
     super.initState();
     final u = widget.userData;
-    _shopNameController = TextEditingController(text: u['shop_name'] ?? '');
-    _ownerNameController = TextEditingController(text: u['owner_name'] ?? '');
-    _phoneController = TextEditingController(text: u['phone'] ?? '');
-    _emailController = TextEditingController(text: u['email'] ?? '');
+    _garageNameController =
+        TextEditingController(text: u['shop_name'] ?? u['garage_name'] ?? '');
     _addressController = TextEditingController(text: u['address'] ?? '');
+    _phoneController = TextEditingController(text: u['phone'] ?? '');
 
     _weekdayHours = u['hours_weekday'] ?? _weekdayHours;
     _weekendHours = u['hours_weekend'] ?? _weekendHours;
 
     final existingServices = u['services'];
-    _selectedServices = <String>{};
-    if (existingServices is List) {
-      for (final item in existingServices) {
-        // ✅ รองรับข้อมูลเก่า (เป็น String ล้วน) และข้อมูลใหม่ (เป็น Map ที่มี name/price)
-        if (item is Map) {
-          final name = item['name']?.toString() ?? '';
-          if (name.isEmpty) continue;
-          _selectedServices.add(name);
-          _priceControllers[name] =
-              TextEditingController(text: item['price']?.toString() ?? '');
-        } else {
-          final name = item.toString();
-          _selectedServices.add(name);
-          _priceControllers[name] = TextEditingController();
-        }
-      }
-    }
-
-    _latitude = double.tryParse(u['latitude']?.toString() ?? '');
-    _longitude = double.tryParse(u['longitude']?.toString() ?? '');
+    _selectedServices = existingServices is List
+        ? existingServices.map((e) => e.toString()).toSet()
+        : <String>{};
   }
 
   @override
   void dispose() {
-    _shopNameController.dispose();
-    _ownerNameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
+    _garageNameController.dispose();
     _addressController.dispose();
-    for (final c in _priceControllers.values) {
-      c.dispose();
-    }
+    _phoneController.dispose();
     super.dispose();
   }
 
-  // ✅ ดึง/สร้าง controller ราคาให้บริการที่เลือกไว้
-  TextEditingController _priceControllerFor(String service) {
-    return _priceControllers.putIfAbsent(service, () => TextEditingController());
-  }
-
-  // ✅ รวมบริการ + ราคาที่พิมพ์ไว้ ให้เป็น List<Map> พร้อมส่งไป backend
-  List<Map<String, dynamic>> get _servicesWithPrices {
-    return _selectedServices.map((service) {
-      return {
-        'name': service,
-        'price': _priceControllers[service]?.text.trim() ?? '',
-      };
-    }).toList();
-  }
-
-  // ✅ รูปเดียว ใช้ทั้งเป็นรูปโปรไฟล์และรูปอู่ (เดิมมี 2 ฟิลด์ซ้ำกัน: avatar กับ garage_photo)
-  ImageProvider? get _shopImage {
+  ImageProvider? get _coverImage {
     if (_selectedImageBytes != null) return MemoryImage(_selectedImageBytes!);
-    final photoUrl = widget.userData['avatar'];
+    final photoUrl = widget.userData['garage_photo'];
     if (photoUrl != null && photoUrl.toString().isNotEmpty) {
       return NetworkImage(photoUrl);
     }
     return null;
   }
 
-  Future<void> _handlePickImage() async {
+  Future<void> _handlePickCoverImage() async {
     final picked = await pickProfileAvatar(context);
     if (picked != null) {
       setState(() {
         _selectedImageBytes = picked.bytes;
         _selectedImageName = picked.name;
       });
-    }
-  }
-
-  // ✅ เปิด chatbox ให้พิมพ์ที่อยู่ ค้นหาพิกัดให้อัตโนมัติ (ฟรี ไม่ใช้ Google API)
-  Future<void> _handlePickAddress() async {
-    final picked = await pickAddressViaChat(
-      context,
-      initialQuery: _addressController.text.trim().isEmpty
-          ? null
-          : _addressController.text.trim(),
-    );
-    if (picked != null) {
-      setState(() {
-        _addressController.text = picked.address;
-        _latitude = picked.latitude;
-        _longitude = picked.longitude;
-      });
-    }
-  }
-
-  void _openAddressOnMap() {
-    if (_latitude == null || _longitude == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddressMapPage(
-          title: _shopNameController.text.trim().isEmpty
-              ? 'อู่ซ่อมรถ'
-              : _shopNameController.text.trim(),
-          subtitle: _addressController.text.trim(),
-          latitude: _latitude!,
-          longitude: _longitude!,
-        ),
-      ),
-    );
-  }
-
-  // ✅ เปิดขั้นตอนเปลี่ยนอีเมล (กรอกอีเมลใหม่ -> ยืนยัน OTP) แล้วอัปเดตช่องอีเมลทันทีเมื่อสำเร็จ
-  // หมายเหตุ: อีเมลใหม่ถูกบันทึกลง DB ทันทีที่ยืนยัน OTP สำเร็จ (ไม่ต้องรอกด "บันทึกข้อมูล")
-  Future<void> _handleChangeEmail() async {
-    final newEmail = await showChangeEmailSheet(context, userId: widget.userData['id']);
-    if (newEmail != null && mounted) {
-      setState(() {
-        _emailController.text = newEmail;
-        _emailChangedSuccessfully = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เปลี่ยนอีเมลสำเร็จ'), backgroundColor: Colors.green),
-      );
     }
   }
 
@@ -248,7 +148,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    final formatted = '${_fmt(tempStart)}-${_fmt(tempEnd)}';
+                    final formatted =
+                        '${_fmt(tempStart)}-${_fmt(tempEnd)}';
                     Navigator.pop(context, formatted);
                   },
                   child: const Text('ตกลง'),
@@ -290,7 +191,9 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         userId: widget.userData['id'],
         userType: 'repair',
         fileBytes: _selectedImageBytes!,
-        fileName: _selectedImageName ?? 'shop.jpg',
+        fileName: _selectedImageName ?? 'garage.jpg',
+        // หมายเหตุ: ตอนนี้ใช้ endpoint เดียวกับ uploadAvatar
+        // ถ้า backend แยก endpoint รูปอู่ออกจากรูปโปรไฟล์ ให้เปลี่ยนมาเรียก endpoint นั้นแทน
       );
 
       if (!photoResult.success) {
@@ -306,24 +209,19 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
       }
     }
 
-    // ส่งข้อมูลไป backend ครบทุกฟิลด์แล้ว (name/phone/address ฟังก์ชันเดิม
-    // + ownerName/hoursWeekday/hoursWeekend/services ที่เพิ่มใหม่ใน ApiService)
-    // หมายเหตุ: ฝั่ง Express route + MySQL ต้องรองรับคีย์เหล่านี้ด้วย
-    // ไม่งั้น backend จะรับค่ามาแต่ไม่บันทึกลงฐานข้อมูลจริง
+    // หมายเหตุสำคัญ: ApiService.updateProfile ปัจจุบันรองรับแค่
+    // name / phone / address / carModel / carPlate / userType
+    // ส่วนเวลาทำการ (hours_weekday, hours_weekend) และบริการ (services)
+    // ยังไม่มีพารามิเตอร์รองรับ — ต้องเพิ่มเมธอดใหม่ เช่น ApiService.updateGarageInfo(...)
+    // ที่ backend เพื่อให้บันทึกค่าพวกนี้ได้จริง ตอนนี้ผมส่งเฉพาะฟิลด์ที่มีอยู่แล้วไปก่อน
     final result = await ApiService.updateProfile(
       userId: widget.userData['id'],
-      name: _shopNameController.text.trim(),
+      name: _garageNameController.text.trim(),
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
       carModel: '',
       carPlate: '',
       userType: 'repair',
-      ownerName: _ownerNameController.text.trim(),
-      hoursWeekday: _weekdayHours,
-      hoursWeekend: _weekendHours,
-      services: _servicesWithPrices,
-      latitude: _latitude,
-      longitude: _longitude,
     );
 
     if (!mounted) return;
@@ -341,10 +239,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         'success': true,
         'hours_weekday': _weekdayHours,
         'hours_weekend': _weekendHours,
-        'services': _servicesWithPrices,
-        'owner_name': _ownerNameController.text.trim(),
-        'latitude': _latitude,
-        'longitude': _longitude,
+        'services': _selectedServices.toList(),
       });
     }
   }
@@ -358,10 +253,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         title: const Text('แก้ไขข้อมูลอู่', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(
-            context,
-            _emailChangedSuccessfully ? {'success': true} : null,
-          ),
+          onPressed: () => Navigator.pop(context),
         ),
         elevation: 0,
       ),
@@ -376,7 +268,6 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ===== รูปภาพ (ใช้ทั้งเป็นรูปโปรไฟล์และรูปอู่ — เหลือรูปเดียว) =====
                       const Text('รูปภาพอู่',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 10),
@@ -387,32 +278,11 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
-                        controller: _shopNameController,
-                        decoration:
-                            profileInputDeco(hint: 'ชื่ออู่ซ่อมรถ', icon: Icons.store_outlined),
+                        controller: _garageNameController,
+                        decoration: profileInputDeco(
+                            hint: 'ชื่ออู่ซ่อมรถ', icon: Icons.store_outlined),
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? 'กรุณากรอกชื่ออู่' : null,
-                      ),
-
-                      const SizedBox(height: 16),
-                      const Text('ชื่อเจ้าของร้าน',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _ownerNameController,
-                        decoration: profileInputDeco(
-                            hint: 'ชื่อ-นามสกุลเจ้าของร้าน', icon: Icons.person_outline),
-                      ),
-
-                      const SizedBox(height: 16),
-                      const Text('เบอร์โทรศัพท์',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration:
-                            profileInputDeco(hint: '02-123-4567', icon: Icons.phone_outlined),
                       ),
 
                       const SizedBox(height: 16),
@@ -423,65 +293,21 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         controller: _addressController,
                         maxLines: 2,
                         decoration: profileInputDeco(
-                            hint: 'ที่อยู่อู่ซ่อมรถ', icon: Icons.location_on_outlined),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _handlePickAddress,
-                              icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                              label: const Text('ค้นหาที่อยู่/พิกัด'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xff2196F3),
-                                side: const BorderSide(color: Color(0xff2196F3)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _latitude != null && _longitude != null
-                                  ? _openAddressOnMap
-                                  : null,
-                              icon: const Icon(Icons.map_outlined, size: 18),
-                              label: const Text('ดูบนแผนที่'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.grey.shade700,
-                                side: BorderSide(color: Colors.grey.shade400),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
+                            hint: 'ที่อยู่อู่ซ่อมรถ',
+                            icon: Icons.location_on_outlined),
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('อีเมล',
+                      const Text('เบอร์โทรศัพท์',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
-                        controller: _emailController,
-                        readOnly: true,
-                        onTap: _handleChangeEmail,
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
                         decoration: profileInputDeco(
-                          hint: 'example@email.com',
-                          icon: Icons.email_outlined,
-                        ).copyWith(
-                          suffixIcon: TextButton(
-                            onPressed: _handleChangeEmail,
-                            child: const Text('เปลี่ยน'),
-                          ),
-                        ),
+                            hint: '02-123-4567', icon: Icons.phone_outlined),
                       ),
 
-                      // ===== ข้อมูลธุรกิจของอู่ (ไม่มีในฝั่งลูกค้า) =====
                       const SizedBox(height: 16),
                       const Text('เวลาทำการ',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
@@ -545,10 +371,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                                 setState(() {
                                   if (value) {
                                     _selectedServices.add(service);
-                                    _priceControllerFor(service); // เตรียม controller ไว้
                                   } else {
                                     _selectedServices.remove(service);
-                                    _priceControllers.remove(service)?.dispose();
                                   }
                                 });
                               },
@@ -556,44 +380,6 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           }).toList(),
                         ),
                       ),
-
-                      // ✅ ราคาโดยประมาณต่อบริการ (ตามข้อ 1.3.2.5 ของสโคปโครงงาน)
-                      // อู่พิมพ์เองอิสระ เช่น "500-800 บาท" หรือ "เริ่มต้น 500 บาท"
-                      if (_selectedServices.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Text('ราคาโดยประมาณ',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            children: _selectedServices.map((service) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: TextField(
-                                  controller: _priceControllerFor(service),
-                                  decoration: InputDecoration(
-                                    labelText: service,
-                                    hintText: 'เช่น 500-800 บาท หรือ เริ่มต้น 500 บาท',
-                                    prefixIcon: const Icon(Icons.sell_outlined, size: 20),
-                                    filled: true,
-                                    fillColor: const Color(0xFFF5F6FA),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ],
 
                       const SizedBox(height: 16),
                       Container(
@@ -660,7 +446,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
 
   Widget _buildCoverImage() {
     return GestureDetector(
-      onTap: _handlePickImage,
+      onTap: _handlePickCoverImage,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -670,8 +456,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (_shopImage != null)
-                Image(image: _shopImage!, fit: BoxFit.cover)
+              if (_coverImage != null)
+                Image(image: _coverImage!, fit: BoxFit.cover)
               else
                 Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade500),
               Positioned.fill(

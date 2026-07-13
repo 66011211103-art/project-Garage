@@ -89,7 +89,7 @@ class ApiService {
     String? ownerName,
     String? hoursWeekday,
     String? hoursWeekend,
-    List<String>? services,
+    List<dynamic>? services, // ✅ รองรับทั้ง List<String> เดิม และ List<Map> ใหม่ที่มีชื่อ+ราคา
     double? latitude,
     double? longitude,
   }) async {
@@ -170,6 +170,31 @@ class ApiService {
       return ApiResult(
         success: body['success'] == true,
         message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== SEARCH / LIST GARAGES (สำหรับหน้าค้นหาฝั่งลูกค้า) =====
+  // service: กรองตามหมวดบริการ เช่น "ยาง" (null หรือ "" = ไม่กรอง)
+  // keyword: ค้นหาจากชื่อร้าน
+  static Future<ApiResult> searchGarages({String? service, String? keyword}) async {
+    try {
+      final queryParams = <String, String>{};
+      if (service != null && service.isNotEmpty) queryParams['service'] = service;
+      if (keyword != null && keyword.isNotEmpty) queryParams['keyword'] = keyword;
+
+      final uri = Uri.parse('$baseUrl/garages').replace(
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
         data: body['data'],
       );
     } catch (e) {
