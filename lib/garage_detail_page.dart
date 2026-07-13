@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'request_repair_page.dart'; // ✅ หน้าส่งคำขอซ่อม
 
 /// หน้ารายละเอียดอู่ซ่อมรถ (ฝั่งลูกค้า)
 /// รับข้อมูลอู่มาจากหน้า Search โดยตรง (ไม่ยิง API ซ้ำ เพราะข้อมูลชุดเดียวกันอยู่แล้ว)
@@ -329,9 +330,14 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // TODO: ต่อกับระบบส่งคำขอซ่อมจริง (ยังไม่มีหน้า/endpoint ส่วนนี้)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('ระบบส่งคำขอซ่อมยังไม่เปิดใช้งาน')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RequestRepairPage(
+                              garage: widget.garage,
+                              userData: widget.userData,
+                            ),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.build, color: Colors.white, size: 18),

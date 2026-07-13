@@ -253,7 +253,55 @@ static Future<ApiResult> getProfile({
   }
 }
 
-  // ===== GET CARS =====
+  // ===== SUBMIT REPAIR REQUEST (ส่งคำขอซ่อมรถ พร้อมรูปภาพ) =====
+  static Future<ApiResult> submitRepairRequest({
+    required int customerId,
+    required int garageId,
+    required String vehicleType,
+    required String problemCategory,
+    required String description,
+    required String address,
+    double? latitude,
+    double? longitude,
+    List<Uint8List> photos = const [],
+    List<String> photoNames = const [],
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/repair-requests'),
+      );
+      request.fields['customerId'] = customerId.toString();
+      request.fields['garageId'] = garageId.toString();
+      request.fields['vehicleType'] = vehicleType;
+      request.fields['problemCategory'] = problemCategory;
+      request.fields['description'] = description;
+      request.fields['address'] = address;
+      if (latitude != null) request.fields['latitude'] = latitude.toString();
+      if (longitude != null) request.fields['longitude'] = longitude.toString();
+
+      for (var i = 0; i < photos.length; i++) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'photos',
+            photos[i],
+            filename: i < photoNames.length ? photoNames[i] : 'photo_$i.jpg',
+          ),
+        );
+      }
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString());
+
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
   static Future<ApiResult> getCars({required int userId}) async {
     try {
       final response = await http
