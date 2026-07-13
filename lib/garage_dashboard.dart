@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'profile_page.dart';
 import 'api_service.dart';
+import 'all_repair_requests_page.dart'; // ✅ หน้ารายการคำขอซ่อมทั้งหมด
+import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -43,8 +45,12 @@ class _GarageDashboardState extends State<GarageDashboard> {
     });
   }
 
-  Future<void> _respondToRequest(int requestId, String status) async {
-    final result = await ApiService.updateRepairRequestStatus(requestId: requestId, status: status);
+  Future<void> _respondToRequest(int requestId, String status, {String? reason}) async {
+    final result = await ApiService.updateRepairRequestStatus(
+      requestId: requestId,
+      status: status,
+      reason: reason,
+    );
     if (!mounted) return;
     if (result.success) {
       _fetchRequests(); // โหลดรายการใหม่หลังอัปเดตสถานะ
@@ -97,6 +103,22 @@ class _GarageDashboardState extends State<GarageDashboard> {
         math.cos(deg2rad(myLat)) * math.cos(deg2rad(rLat)) * math.sin(dLon / 2) * math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return '${(radius * c).toStringAsFixed(1)} กม.';
+  }
+
+  Widget _detailRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+      ],
+    );
+  }
+
+  Future<void> _handleReject(int requestId) async {
+    final reason = await showRejectReasonDialog(context);
+    if (reason == null) return; // ผู้ใช้กดยกเลิก
+    await _respondToRequest(requestId, 'rejected', reason: reason);
   }
 
   Color _avatarColor(int index) {
@@ -262,11 +284,14 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 children: [
                   const Text('คำขอซ่อมล่าสุด', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   TextButton(
-                    onPressed: () {
-                      // TODO: ทำหน้า "คำขอซ่อมทั้งหมด" แยกต่างหาก (รวมทุกสถานะ ไม่ใช่แค่ที่ยังใหม่)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('หน้าคำขอซ่อมทั้งหมดยังไม่ได้เชื่อมต่อ')),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AllRepairRequestsPage(userData: _userData),
+                        ),
                       );
+                      _fetchRequests(); // กลับมาแล้วรีเฟรชเผื่อมีการรับ/ปฏิเสธงานในหน้านั้น
                     },
                     child: const Text('ดูทั้งหมด', style: TextStyle(color: Colors.blue)),
                   ),
@@ -363,14 +388,12 @@ class _GarageDashboardState extends State<GarageDashboard> {
   }
 
   Widget _requestCard(Map<String, dynamic> r, int index) {
+    final id = r['id'];
     final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
-    final problem = (r['description']?.toString().isNotEmpty ?? false)
-        ? r['description'].toString()
-        : (r['problem_category']?.toString() ?? 'ไม่ระบุปัญหา');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -380,79 +403,68 @@ class _GarageDashboardState extends State<GarageDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              CircleAvatar(
-                backgroundColor: _avatarColor(index),
-                radius: 20,
-                child: const Icon(Icons.person, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name.isEmpty ? 'ไม่ระบุชื่อ' : name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(_timeAgo(r['created_at']?.toString()),
-                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.description_outlined, size: 18, color: Color(0xff2196F3)),
+                  const SizedBox(width: 6),
+                  Text('#REQ${id.toString().padLeft(6, '0')}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(20)),
-                child: const Text('ใหม่', style: TextStyle(color: Colors.white, fontSize: 12)),
+                decoration: BoxDecoration(
+                  color: const Color(0xff4CAF50).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('ใหม่',
+                    style: TextStyle(color: Color(0xff4CAF50), fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.directions_car, size: 16, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text(_vehicleLabel(r['vehicle_type']?.toString()),
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              const SizedBox(width: 16),
-              const Icon(Icons.location_on, size: 16, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text(_distanceLabel(r), style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xffF5F5F5), borderRadius: BorderRadius.circular(8)),
-            child: Text(problem, style: const TextStyle(fontSize: 13)),
-          ),
-          const SizedBox(height: 10),
+          _detailRow(Icons.person_outline, name.isEmpty ? 'ไม่ระบุชื่อ' : name),
+          const SizedBox(height: 6),
+          _detailRow(Icons.directions_car_outlined, _vehicleLabel(r['vehicle_type']?.toString())),
+          const SizedBox(height: 6),
+          _detailRow(Icons.build_outlined, r['problem_category']?.toString() ?? '-'),
+          const SizedBox(height: 6),
+          _detailRow(Icons.access_time, _timeAgo(r['created_at']?.toString())),
+          const SizedBox(height: 6),
+          _detailRow(Icons.location_on_outlined, _distanceLabel(r)),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   onPressed: () => _showRequestDetail(r, index),
+                  icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                  label: const Text('ดูรายละเอียด'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blue,
                     side: const BorderSide(color: Colors.blue),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text('รายละเอียด'),
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(border: Border.all(color: Colors.red), borderRadius: BorderRadius.circular(8)),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () => _respondToRequest(r['id'], 'rejected'),
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  padding: EdgeInsets.zero,
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _handleReject(id),
+                  icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                  label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _respondToRequest(r['id'], 'accepted'),
+                  onPressed: () => _respondToRequest(id, 'accepted'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -495,6 +507,19 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   : 'ไม่มีรายละเอียดเพิ่มเติม'),
               const SizedBox(height: 12),
               Text('ที่อยู่: ${r['address'] ?? 'ไม่ระบุ'}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              if ((r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffFFEBEE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('เหตุผลที่ปฏิเสธ: ${r['rejection_reason']}',
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ),
+              ],
               if (photos.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 SizedBox(

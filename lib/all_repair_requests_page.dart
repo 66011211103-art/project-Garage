@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -41,8 +42,12 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     });
   }
 
-  Future<void> _respondToRequest(int requestId, String status) async {
-    final result = await ApiService.updateRepairRequestStatus(requestId: requestId, status: status);
+  Future<void> _respondToRequest(int requestId, String status, {String? reason}) async {
+    final result = await ApiService.updateRepairRequestStatus(
+      requestId: requestId,
+      status: status,
+      reason: reason,
+    );
     if (!mounted) return;
     if (result.success) {
       _fetchRequests();
@@ -51,6 +56,12 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
         SnackBar(content: Text(result.message), backgroundColor: Colors.red),
       );
     }
+  }
+
+  Future<void> _handleReject(int requestId) async {
+    final reason = await showRejectReasonDialog(context);
+    if (reason == null) return;
+    await _respondToRequest(requestId, 'rejected', reason: reason);
   }
 
   // "รายการคำขอซ่อม" นับเฉพาะงานที่ยัง active อยู่ (รอดำเนินการ + รับแล้ว)
@@ -323,7 +334,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _respondToRequest(id, 'rejected'),
+                    onPressed: () => _handleReject(id),
                     icon: const Icon(Icons.close, size: 16, color: Colors.red),
                     label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
                     style: OutlinedButton.styleFrom(
@@ -420,6 +431,19 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   : 'ไม่มีรายละเอียดเพิ่มเติม'),
               const SizedBox(height: 12),
               Text('ที่อยู่: ${r['address'] ?? 'ไม่ระบุ'}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              if ((r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffFFEBEE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('เหตุผลที่ปฏิเสธ: ${r['rejection_reason']}',
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ),
+              ],
               if (photos.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 SizedBox(

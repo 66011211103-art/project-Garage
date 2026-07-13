@@ -325,13 +325,17 @@ static Future<ApiResult> getProfile({
   static Future<ApiResult> updateRepairRequestStatus({
     required int requestId,
     required String status, // 'accepted' | 'rejected' | 'done'
+    String? reason, // ใช้ตอน status == 'rejected' เท่านั้น
   }) async {
     try {
       final response = await http
           .put(
             Uri.parse('$baseUrl/repair-requests/$requestId/status'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'status': status}),
+            body: jsonEncode({
+              'status': status,
+              if (reason != null) 'reason': reason,
+            }),
           )
           .timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
