@@ -245,16 +245,20 @@ class _LoginPageState extends State<LoginPage> {
 
                 Column(
                   children: const [
-                    Icon(Icons.home_work_outlined, size: 80, color: Colors.blue),
+                    Image(
+                      image: AssetImage('images/logo-2.png'),
+                      width: 220,
+                      height: 212,
+                    ),
                     SizedBox(height: 10),
                     Text(
                       'อู่ที่ไว้วางใจ',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: TextStyle(fontSize: 25 , fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'ค้นหาอู่ซ่อมรถ\nใกล้คุณ',
+                      'ค้นหาอู่ซ่อมรถใกล้คุณ',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),
