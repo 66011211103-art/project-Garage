@@ -3,6 +3,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
 import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อมรถ
+import 'push_notification_service.dart'; // ✅ ระบบ push notification
+import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติคำขอซ่อม
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -25,6 +27,29 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _userData = widget.userData;
+    _setupPushNotifications();
+  }
+
+  // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้าที่ถูกต้อง
+  Future<void> _setupPushNotifications() async {
+    await PushNotificationService.setup(
+      userId: _userData['id'],
+      userType: 'customer',
+      onNotificationTap: (data) {
+        if (data['type'] == 'repair_status') {
+          final requestId = int.tryParse(data['requestId']?.toString() ?? '');
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyRepairRequestsPage(
+                userData: _userData,
+                highlightRequestId: requestId,
+              ),
+            ),
+          );
+        }
+      },
+    );
   }
 
   // ✅ เรียกจาก ProfilePage เมื่อข้อมูลถูกแก้ไข เพื่ออัปเดตทุกหน้าพร้อมกันทันที
@@ -52,7 +77,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       HomeContent(userData: _userData), // ✅ ใช้ _userData แทน widget.userData
-      const Center(child: Text("ประวัติ", style: TextStyle(fontSize: 24))),
+      MyRepairRequestsPage(userData: _userData), // ✅ แท็บ "ประวัติ" ตอนนี้โชว์ของจริงแล้ว
       const ChatScreen(),
       ProfilePage(
         userData: _userData,
@@ -142,7 +167,7 @@ class HomeContent extends StatelessWidget {
                         ),
                       ),
 
-                      // ✅ ปุ่มแจ้งเตือน
+                      // ✅ ปุ่มแจ้งเตือน -> พาไปหน้าประวัติคำขอซ่อม (จุดที่เห็นสถานะ/เหตุผลปฏิเสธ)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white24,
@@ -150,7 +175,14 @@ class HomeContent extends StatelessWidget {
                         ),
                         child: IconButton(
                           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MyRepairRequestsPage(userData: userData),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],

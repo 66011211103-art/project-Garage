@@ -4,6 +4,7 @@ import 'profile_page.dart';
 import 'api_service.dart';
 import 'all_repair_requests_page.dart'; // ✅ หน้ารายการคำขอซ่อมทั้งหมด
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
+import 'push_notification_service.dart'; // ✅ ระบบ push notification
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -23,6 +24,25 @@ class _GarageDashboardState extends State<GarageDashboard> {
     super.initState();
     _userData = widget.userData;
     _fetchRequests();
+    _setupPushNotifications();
+  }
+
+  // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้ารายการคำขอซ่อม
+  Future<void> _setupPushNotifications() async {
+    await PushNotificationService.setup(
+      userId: _userData['id'],
+      userType: 'repair',
+      onNotificationTap: (data) {
+        if (data['type'] == 'new_request') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AllRepairRequestsPage(userData: _userData),
+            ),
+          ).then((_) => _fetchRequests());
+        }
+      },
+    );
   }
 
   // ✅ เรียกจาก ProfilePage เมื่อข้อมูลถูกแก้ไข เพื่ออัปเดตทุกหน้าพร้อมกันทันที

@@ -6,8 +6,14 @@ import 'garage_dashboard.dart';
 import 'register.dart';
 import 'api_service.dart';
 import 'forgot_password_page.dart';
+import 'push_notification_service.dart'; // ✅ ระบบ push notification
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initFirebase();
+  // ✅ ต้องลงทะเบียน background handler ก่อน runApp เสมอ (ตามข้อกำหนดของ Firebase)
+  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   runApp(const MyApp());
 }
 
@@ -246,19 +252,19 @@ class _LoginPageState extends State<LoginPage> {
                 Column(
                   children: const [
                     Image(
-                      image: AssetImage('images/logo-2.png'),
+                      image: AssetImage('images/logo.png'),
                       width: 220,
-                      height: 212,
+                      height: 202,
                     ),
                     SizedBox(height: 10),
                     Text(
                       'อู่ที่ไว้วางใจ',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 25 , fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'ค้นหาอู่ซ่อมรถใกล้คุณ',
+                      'ค้นหาอู่ซ่อมรถ\nใกล้คุณ',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),

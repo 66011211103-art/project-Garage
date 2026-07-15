@@ -304,10 +304,13 @@ static Future<ApiResult> getProfile({
   }
 
   // ===== GET REPAIR REQUESTS (ฝั่งอู่ ดูคำขอที่ลูกค้าส่งเข้ามา) =====
-  static Future<ApiResult> getRepairRequests({required int garageId}) async {
+  static Future<ApiResult> getRepairRequests({int? garageId, int? customerId}) async {
     try {
       final uri = Uri.parse('$baseUrl/repair-requests').replace(
-        queryParameters: {'garageId': garageId.toString()},
+        queryParameters: {
+          if (garageId != null) 'garageId': garageId.toString(),
+          if (customerId != null) 'customerId': customerId.toString(),
+        },
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -335,6 +338,35 @@ static Future<ApiResult> getProfile({
             body: jsonEncode({
               'status': status,
               if (reason != null) 'reason': reason,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== SAVE FCM TOKEN (เก็บรหัสอุปกรณ์ไว้ส่ง push notification) =====
+  static Future<ApiResult> saveFcmToken({
+    required int userId,
+    required String userType,
+    required String fcmToken,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/user/fcm-token'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'userId': userId,
+              'userType': userType,
+              'fcmToken': fcmToken,
             }),
           )
           .timeout(const Duration(seconds: 15));
