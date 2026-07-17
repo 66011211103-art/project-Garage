@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
+import 'create_quotation_page.dart'; // ✅ หน้าสร้างใบเสนอราคา
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -64,16 +65,19 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     await _respondToRequest(requestId, 'rejected', reason: reason);
   }
 
-  // "รายการคำขอซ่อม" นับเฉพาะงานที่ยัง active อยู่ (รอดำเนินการ + รับแล้ว)
+  // "รายการคำขอซ่อม" นับเฉพาะงานที่ยัง active อยู่ (รอดำเนินการ + รับแล้ว/เสนอราคา/ยืนยันแล้ว)
   // ไม่รวมที่ปฏิเสธ/เสร็จงานไปแล้ว เพราะถือว่าไม่ใช่งานที่ต้อง follow-up ต่อ
-  List<Map<String, dynamic>> get _activeRequests =>
-      _requests.where((r) => r['status'] == 'pending' || r['status'] == 'accepted').toList();
+  List<Map<String, dynamic>> get _activeRequests => _requests
+      .where((r) => ['pending', 'accepted', 'quoted', 'confirmed'].contains(r['status']))
+      .toList();
 
   List<Map<String, dynamic>> get _pendingOnly =>
       _requests.where((r) => r['status'] == 'pending').toList();
 
-  List<Map<String, dynamic>> get _acceptedOnly =>
-      _requests.where((r) => r['status'] == 'accepted').toList();
+  // "รับแล้ว" ครอบคลุมทุกขั้นหลังรับงาน (รับแล้ว/ส่งใบเสนอราคาแล้ว/ลูกค้ายืนยันแล้ว)
+  List<Map<String, dynamic>> get _acceptedOnly => _requests
+      .where((r) => ['accepted', 'quoted', 'confirmed'].contains(r['status']))
+      .toList();
 
   List<Map<String, dynamic>> get _visibleRequests {
     switch (_selectedTab) {
@@ -259,11 +263,19 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     final status = r['status']?.toString() ?? 'pending';
     final isPending = status == 'pending';
     final isAccepted = status == 'accepted';
+    final isQuoted = status == 'quoted';
+    final isConfirmed = status == 'confirmed';
 
-    // ป้ายสถานะ: ใหม่ (เพิ่งเข้ามาไม่เกิน 3 ชม.) / รอดำเนินการ (pending ที่ค้างนานกว่านั้น) / รับแล้ว
+    // ป้ายสถานะ: ใหม่ / รอดำเนินการ / รับแล้ว / รอลูกค้ายืนยันใบเสนอราคา / ลูกค้ายืนยันแล้ว
     late String badgeText;
     late Color badgeColor;
-    if (isAccepted) {
+    if (isConfirmed) {
+      badgeText = 'ลูกค้ายืนยันแล้ว';
+      badgeColor = const Color(0xff4CAF50);
+    } else if (isQuoted) {
+      badgeText = 'รอลูกค้ายืนยันใบเสนอราคา';
+      badgeColor = const Color(0xff9C27B0);
+    } else if (isAccepted) {
       badgeText = 'รับแล้ว';
       badgeColor = const Color(0xff2196F3);
     } else if (_isRecentlyCreated(r['created_at']?.toString())) {
@@ -356,6 +368,60 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   ),
                 ),
               ],
+            )
+          else if (isAccepted)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRequestDetail(r),
+                    icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                    label: const Text('ดูรายละเอียด'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue,
+                      side: const BorderSide(color: Colors.blue),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateQuotationPage(
+                            repairRequestId: id,
+                            customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+                          ),
+                        ),
+                      );
+                      if (result == true) _fetchRequests();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff9C27B0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
+                    label: const Text('สร้างใบเสนอราคา', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            )
+          else if (isQuoted)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showRequestDetail(r),
+                icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                label: const Text('ดูรายละเอียด / รอลูกค้ายืนยันใบเสนอราคา'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue,
+                  side: const BorderSide(color: Colors.blue),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             )
           else
             Row(

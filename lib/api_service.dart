@@ -352,21 +352,112 @@ static Future<ApiResult> getProfile({
     }
   }
 
-  // ===== SAVE FCM TOKEN (เก็บรหัสอุปกรณ์ไว้ส่ง push notification) =====
-  static Future<ApiResult> saveFcmToken({
-    required int userId,
-    required String userType,
-    required String fcmToken,
+  // ===== นับจำนวนคำขอที่อู่ตอบกลับแล้ว แต่ลูกค้ายังไม่ได้เปิดดู (โชว์ที่กระดิ่ง) =====
+  static Future<ApiResult> getUnseenRequestCount({required int customerId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/repair-requests/unseen-count').replace(
+        queryParameters: {'customerId': customerId.toString()},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== มาร์คว่าลูกค้าเปิดดูคำขอทั้งหมดแล้ว (เรียกตอนกดเข้ากระดิ่ง/หน้าประวัติ) =====
+  static Future<ApiResult> markRequestsSeen({required int customerId}) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/repair-requests/mark-seen'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'customerId': customerId}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== CREATE QUOTATION (อู่สร้างใบเสนอราคา) =====
+  static Future<ApiResult> createQuotation({
+    required int repairRequestId,
+    required List<Map<String, dynamic>> items,
+    required double laborCost,
+    String? estimatedStartDate, // 'YYYY-MM-DD'
+    String? estimatedEndDate,
+    String? notes,
   }) async {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/user/fcm-token'),
+            Uri.parse('$baseUrl/quotations'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'userId': userId,
-              'userType': userType,
-              'fcmToken': fcmToken,
+              'repairRequestId': repairRequestId,
+              'items': items,
+              'laborCost': laborCost,
+              'estimatedStartDate': estimatedStartDate,
+              'estimatedEndDate': estimatedEndDate,
+              'notes': notes,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'สร้างใบเสนอราคาไม่สำเร็จ');
+    }
+  }
+
+  // ===== GET QUOTATION (ดูใบเสนอราคาของคำขอซ่อมหนึ่งรายการ) =====
+  static Future<ApiResult> getQuotation({required int repairRequestId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/quotations').replace(
+        queryParameters: {'repairRequestId': repairRequestId.toString()},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== RESPOND TO QUOTATION (ลูกค้ายืนยัน/ปฏิเสธใบเสนอราคา) =====
+  static Future<ApiResult> respondToQuotation({
+    required int quotationId,
+    required String status, // 'confirmed' | 'rejected'
+    String? reason,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/quotations/$quotationId/respond'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'status': status,
+              if (reason != null) 'reason': reason,
             }),
           )
           .timeout(const Duration(seconds: 15));

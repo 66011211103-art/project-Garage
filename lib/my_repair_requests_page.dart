@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'quotation_card.dart'; // ✅ การ์ดใบเสนอราคา (ยืนยัน/ปฏิเสธ)
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -68,6 +69,10 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
         return 'รอดำเนินการ';
       case 'accepted':
         return 'อู่รับงานแล้ว';
+      case 'quoted':
+        return 'มีใบเสนอราคาใหม่';
+      case 'confirmed':
+        return 'ยืนยันแล้ว กำลังซ่อม';
       case 'rejected':
         return 'อู่ปฏิเสธ';
       case 'done':
@@ -83,6 +88,10 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
         return const Color(0xffFF9800);
       case 'accepted':
         return const Color(0xff2196F3);
+      case 'quoted':
+        return const Color(0xff9C27B0);
+      case 'confirmed':
+        return const Color(0xff4CAF50);
       case 'rejected':
         return const Color(0xffE53935);
       case 'done':
@@ -98,6 +107,10 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
         return Icons.hourglass_empty;
       case 'accepted':
         return Icons.check_circle_outline;
+      case 'quoted':
+        return Icons.receipt_long;
+      case 'confirmed':
+        return Icons.build_circle_outlined;
       case 'rejected':
         return Icons.cancel_outlined;
       case 'done':
@@ -257,6 +270,10 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
                   ),
                 ),
               ],
+
+              // ✅ โชว์ใบเสนอราคาให้ยืนยัน/ปฏิเสธตรงในการ์ดเลย
+              if (status == 'quoted' || status == 'confirmed')
+                QuotationCard(repairRequestId: r['id'], onResponded: _fetchRequests),
             ],
           ),
         ),

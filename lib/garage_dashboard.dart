@@ -4,7 +4,7 @@ import 'profile_page.dart';
 import 'api_service.dart';
 import 'all_repair_requests_page.dart'; // ✅ หน้ารายการคำขอซ่อมทั้งหมด
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
-import 'push_notification_service.dart'; // ✅ ระบบ push notification
+import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -29,7 +29,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
   // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้ารายการคำขอซ่อม
   Future<void> _setupPushNotifications() async {
-    await PushNotificationService.setup(
+    await SocketNotificationService.setup(
       userId: _userData['id'],
       userType: 'repair',
       onNotificationTap: (data) {
@@ -223,15 +223,6 @@ class _GarageDashboardState extends State<GarageDashboard> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.home_work, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       shopName, // ✅ ชื่อร้านจริงจาก DB
@@ -242,42 +233,46 @@ class _GarageDashboardState extends State<GarageDashboard> {
                       ),
                     ),
                   ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(10),
+                  // ✅ กระดิ่งกดได้แล้ว พาไปหน้า "รายการคำขอซ่อม" เดียวกับปุ่ม "ดูทั้งหมด"
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AllRepairRequestsPage(userData: _userData),
                         ),
-                        child: const Icon(Icons.notifications_outlined, color: Colors.white),
-                      ),
-                      if (_pendingCount > 0)
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                            child: Text(
-                              '$_pendingCount',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      );
+                      _fetchRequests();
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.notifications_outlined, color: Colors.white),
+                        ),
+                        if (_pendingCount > 0)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                              child: Text(
+                                '$_pendingCount',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(10),
+                      ],
                     ),
-                    child: const Icon(Icons.person_outline, color: Colors.white),
                   ),
                 ],
               ),

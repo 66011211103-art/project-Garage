@@ -3,8 +3,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
 import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อมรถ
-import 'push_notification_service.dart'; // ✅ ระบบ push notification
+import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติคำขอซ่อม
+import 'api_service.dart'; // ✅ สำหรับนับ/มาร์คแจ้งเตือนที่ยังไม่อ่าน
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -28,16 +29,43 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _userData = widget.userData;
     _setupPushNotifications();
+    _fetchUnseenCount();
+  }
+
+  // ✅ ตัวเลขแจ้งเตือนที่กระดิ่ง (คำขอที่อู่ตอบกลับแล้ว แต่ลูกค้ายังไม่ได้เปิดดู)
+  int _unseenCount = 0;
+
+  Future<void> _fetchUnseenCount() async {
+    final result = await ApiService.getUnseenRequestCount(customerId: _userData['id']);
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      setState(() => _unseenCount = result.data!['count'] ?? 0);
+    }
+  }
+
+  // ✅ กดกระดิ่งแล้ว: เคลียร์ตัวเลขทันที (responsive) + มาร์คว่าอ่านแล้วที่ backend + เปิดหน้าประวัติ
+  Future<void> _openNotifications() async {
+    setState(() => _unseenCount = 0);
+    ApiService.markRequestsSeen(customerId: _userData['id']);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MyRepairRequestsPage(userData: _userData),
+      ),
+    );
+    _fetchUnseenCount(); // เผื่อมีคำขอใหม่ที่อู่ตอบกลับมาระหว่างที่เปิดหน้านั้นอยู่
   }
 
   // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้าที่ถูกต้อง
   Future<void> _setupPushNotifications() async {
-    await PushNotificationService.setup(
+    await SocketNotificationService.setup(
       userId: _userData['id'],
       userType: 'customer',
       onNotificationTap: (data) {
         if (data['type'] == 'repair_status') {
           final requestId = int.tryParse(data['requestId']?.toString() ?? '');
+          setState(() => _unseenCount = 0);
+          ApiService.markRequestsSeen(customerId: _userData['id']);
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -46,7 +74,7 @@ class _HomePageState extends State<HomePage> {
                 highlightRequestId: requestId,
               ),
             ),
-          );
+          ).then((_) => _fetchUnseenCount());
         }
       },
     );
@@ -66,6 +94,11 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
+    if (navIndex == 2 && _unseenCount > 0) {
+      // แท็บ "ประวัติ" -> เคลียร์ตัวเลขแจ้งเตือนเหมือนกดกระดิ่ง
+      setState(() => _unseenCount = 0);
+      ApiService.markRequestsSeen(customerId: _userData['id']);
+    }
     setState(() => _bodyIndex = _navIndexToBodyIndex[navIndex] ?? 0);
   }
 
@@ -76,7 +109,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      HomeContent(userData: _userData), // ✅ ใช้ _userData แทน widget.userData
+      HomeContent(
+        userData: _userData,
+        unseenCount: _unseenCount,
+        onNotificationTap: _openNotifications,
+      ), // ✅ ใช้ _userData แทน widget.userData
       MyRepairRequestsPage(userData: _userData), // ✅ แท็บ "ประวัติ" ตอนนี้โชว์ของจริงแล้ว
       const ChatScreen(),
       ProfilePage(
@@ -117,8 +154,15 @@ void _openSearch(BuildContext context, Map<String, dynamic> userData, String ser
 
 class HomeContent extends StatelessWidget {
   final Map<String, dynamic> userData;
+  final int unseenCount;
+  final VoidCallback? onNotificationTap;
 
-  const HomeContent({super.key, required this.userData});
+  const HomeContent({
+    super.key,
+    required this.userData,
+    this.unseenCount = 0,
+    this.onNotificationTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -167,23 +211,45 @@ class HomeContent extends StatelessWidget {
                         ),
                       ),
 
-                      // ✅ ปุ่มแจ้งเตือน -> พาไปหน้าประวัติคำขอซ่อม (จุดที่เห็นสถานะ/เหตุผลปฏิเสธ)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MyRepairRequestsPage(userData: userData),
+                      // ✅ ปุ่มแจ้งเตือน -> พาไปหน้าประวัติคำขอซ่อม พร้อมตัวเลขแจ้งเตือนที่ยังไม่อ่าน
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                              onPressed: onNotificationTap ??
+                                  () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MyRepairRequestsPage(userData: userData),
+                                      ),
+                                    );
+                                  },
+                            ),
+                          ),
+                          if (unseenCount > 0)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                child: Text(
+                                  unseenCount > 9 ? '9+' : '$unseenCount',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

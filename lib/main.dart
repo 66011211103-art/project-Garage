@@ -6,14 +6,12 @@ import 'garage_dashboard.dart';
 import 'register.dart';
 import 'api_service.dart';
 import 'forgot_password_page.dart';
-import 'push_notification_service.dart'; // ✅ ระบบ push notification
-import 'package:firebase_messaging/firebase_messaging.dart';
+// ✅ เปลี่ยนจาก Firebase มาใช้ Socket.IO แทน (ไม่ต้อง initFirebase()/background handler
+// ตั้งแต่ตอน main() อีกแล้ว เพราะ Socket.IO ต่อกับ backend ตอนล็อกอินสำเร็จโดยตรง
+// ไปดูการเชื่อมต่อได้ที่ dashboard.dart / garage_dashboard.dart ใน initState())
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initFirebase();
-  // ✅ ต้องลงทะเบียน background handler ก่อน runApp เสมอ (ตามข้อกำหนดของ Firebase)
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   runApp(const MyApp());
 }
 
@@ -252,9 +250,9 @@ class _LoginPageState extends State<LoginPage> {
                 Column(
                   children: const [
                     Image(
-                      image: AssetImage('images/logo.png'),
-                      width: 220,
-                      height: 202,
+                      image: AssetImage('images/logo-2.png'),
+                      width: 230,
+                      height: 222,
                     ),
                     SizedBox(height: 10),
                     Text(
