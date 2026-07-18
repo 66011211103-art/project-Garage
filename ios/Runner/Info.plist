@@ -70,5 +70,7 @@
 	<string>ต้องการเข้าถึงรูปภาพเพื่อเปลี่ยนรูปโปรไฟล์</string>
 	<key>NSCameraUsageDescription</key>
 	<string>ต้องการเข้าถึงกล้องเพื่อถ่ายรูปโปรไฟล์</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>แอปต้องใช้ตำแหน่งของคุณเพื่อค้นหาที่อยู่และอู่ซ่อมใกล้เคียง</string>
 </dict>
 </plist>

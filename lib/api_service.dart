@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:3000/api';
+  static const String baseUrl = 'http://172.20.10.2:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({

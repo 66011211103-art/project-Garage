@@ -250,7 +250,7 @@ class _LoginPageState extends State<LoginPage> {
                 Column(
                   children: const [
                     Image(
-                      image: AssetImage('images/logo-2.png'),
+                      image: AssetImage('images/logo.png'),
                       width: 230,
                       height: 222,
                     ),

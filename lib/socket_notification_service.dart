@@ -17,7 +17,7 @@ class SocketNotificationService {
   static bool _localNotifInitialized = false;
 
   // ✅ เปลี่ยนเป็น URL ของ backend จริงตอน deploy (ตอนนี้ใช้ localhost สำหรับ dev)
-  static const String _serverUrl = 'http://127.0.0.1:3000';
+  static const String _serverUrl = 'http://172.20.10.2:3000';
 
   /// เรียกครั้งเดียวตอนแอปเปิด (ก่อน setup ก็ได้) เพื่อเตรียมระบบ local notification
   static Future<void> _initLocalNotifications() async {
