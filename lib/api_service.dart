@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://10.160.64.56:3000/api';
+  static const String baseUrl = 'http://10.160.24.138:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -304,12 +304,13 @@ static Future<ApiResult> getProfile({
   }
 
   // ===== GET REPAIR REQUESTS (ฝั่งอู่ ดูคำขอที่ลูกค้าส่งเข้ามา) =====
-  static Future<ApiResult> getRepairRequests({int? garageId, int? customerId}) async {
+  static Future<ApiResult> getRepairRequests({int? garageId, int? customerId, int? technicianId}) async {
     try {
       final uri = Uri.parse('$baseUrl/repair-requests').replace(
         queryParameters: {
           if (garageId != null) 'garageId': garageId.toString(),
           if (customerId != null) 'customerId': customerId.toString(),
+          if (technicianId != null) 'technicianId': technicianId.toString(),
         },
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -353,6 +354,188 @@ static Future<ApiResult> getProfile({
   }
 
   // ===== นับจำนวนคำขอที่อู่ตอบกลับแล้ว แต่ลูกค้ายังไม่ได้เปิดดู (โชว์ที่กระดิ่ง) =====
+  // ===== เพิ่มบัญชีช่างใหม่ (ฝั่งอู่) =====
+  static Future<ApiResult> createTechnician({
+    required int garageId,
+    required String name,
+    required String phone,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/technicians'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'garageId': garageId,
+              'name': name,
+              'phone': phone,
+              'email': email,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== ดูรายชื่อช่างในสังกัดอู่ =====
+  static Future<ApiResult> getTechnicians({required int garageId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/technicians').replace(
+        queryParameters: {'garageId': garageId.toString()},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== เปิด/ปิดการใช้งานบัญชีช่าง =====
+  static Future<ApiResult> updateTechnicianStatus({
+    required int technicianId,
+    required String status, // 'active' | 'inactive'
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/technicians/$technicianId/status'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'status': status}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== มอบหมายงานให้ช่าง =====
+  static Future<ApiResult> assignTechnician({
+    required int requestId,
+    required int technicianId,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/repair-requests/$requestId/assign'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'technicianId': technicianId}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== ช่างอัปเดตสถานะงาน (เริ่มซ่อม / ซ่อมเสร็จ) =====
+  static Future<ApiResult> updateTechnicianJobStatus({
+    required int requestId,
+    required String status, // 'in_progress' | 'completed'
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/repair-requests/$requestId/technician-status'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'status': status}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== ช่างบันทึกความคืบหน้างานซ่อม (โน้ต + อะไหล่ + รูป) =====
+  static Future<ApiResult> createRepairLog({
+    required int repairRequestId,
+    required int technicianId,
+    required String note,
+    required String partsUsed,
+    List<Uint8List> photos = const [],
+    List<String> photoNames = const [],
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/repair-logs'),
+      );
+      request.fields['repairRequestId'] = repairRequestId.toString();
+      request.fields['technicianId'] = technicianId.toString();
+      request.fields['note'] = note;
+      request.fields['partsUsed'] = partsUsed;
+
+      for (var i = 0; i < photos.length; i++) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'photos',
+            photos[i],
+            filename: i < photoNames.length ? photoNames[i] : 'log_$i.jpg',
+          ),
+        );
+      }
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString());
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
+
+  // ===== ดูไทม์ไลน์ความคืบหน้าของงานซ่อม =====
+  static Future<ApiResult> getRepairLogs({required int repairRequestId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/repair-logs').replace(
+        queryParameters: {'repairRequestId': repairRequestId.toString()},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
   static Future<ApiResult> getUnseenRequestCount({required int customerId}) async {
     try {
       final uri = Uri.parse('$baseUrl/repair-requests/unseen-count').replace(

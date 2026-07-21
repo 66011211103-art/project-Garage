@@ -3,15 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard.dart';
 import 'garage_dashboard.dart';
+import 'technician_dashboard.dart'; // ✅ หน้าหลักฝั่งช่าง
 import 'register.dart';
 import 'api_service.dart';
 import 'forgot_password_page.dart';
-// ✅ เปลี่ยนจาก Firebase มาใช้ Socket.IO แทน (ไม่ต้อง initFirebase()/background handler
-// ตั้งแต่ตอน main() อีกแล้ว เพราะ Socket.IO ต่อกับ backend ตอนล็อกอินสำเร็จโดยตรง
-// ไปดูการเชื่อมต่อได้ที่ dashboard.dart / garage_dashboard.dart ใน initState())
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ กันไม่ให้แอปโชว์ "หน้าจอแดง" (Flutter error screen) เวลามี widget พัง
+  //     ไม่ว่าจะเกิดที่หน้าไหนก็ตาม (รวมถึงหน้าเพิ่มช่าง) — โชว์การ์ดข้อความ
+  //     สุภาพแทน ผู้ใช้จะไม่เห็นหน้าจอแดงเต็มจออีกต่อไป
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: const Color(0xffF5F5F5),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่อีกครั้ง',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp(const MyApp());
 }
 
@@ -176,6 +201,14 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(
             builder: (context) =>
                 GarageDashboard(userData: result.data!['user']),
+          ),
+        );
+      } else if (userType == 'technician') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                TechnicianDashboard(userData: result.data!['user']),
           ),
         );
       } else {
