@@ -64,7 +64,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (raw != null && raw.isNotEmpty) {
       final List<dynamic> decoded = jsonDecode(raw);
-      final accounts = decoded.map((e) => Map<String, String>.from(e as Map)).toList();
+      final accounts = decoded
+          .map((e) => Map<String, String>.from(e as Map))
+          .toList();
 
       setState(() {
         _savedAccounts = accounts;
@@ -172,7 +174,8 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => GarageDashboard(userData: result.data!['user']),
+            builder: (context) =>
+                GarageDashboard(userData: result.data!['user']),
           ),
         );
       } else {
@@ -192,6 +195,47 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     }
+  }
+
+  // ✅ เพิ่มใหม่: กล่องกรอกที่เห็นขอบชัดเจน + คอนทราสต์สูงขึ้น ใช้ร่วมกันทั้งช่อง
+  // อีเมล/รหัสผ่าน แก้ปัญหาเดิมที่พื้นหลังจางเกินไปจนแยกจากพื้นขาวรอบๆ ไม่ออก
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey.shade500),
+      prefixIcon: Icon(icon, color: Colors.blueGrey.shade400),
+      suffixIcon: suffixIcon,
+      filled: true,
+      // ✅ พื้นหลังเข้มขึ้นเล็กน้อยจากเดิม (0xFFF5F6FA) ให้แยกจากพื้นขาวรอบๆ ชัดขึ้น
+      fillColor: const Color(0xFFEDF0F5),
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      // ✅ เพิ่มเส้นขอบที่มองเห็นได้ตลอดเวลา (เดิมไม่มีเส้นขอบเลย)
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade400, width: 1.2),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade400, width: 1.2),
+      ),
+      // ✅ ขอบหนา+สีฟ้าเด่นชัดตอนกำลังกรอกอยู่ ให้รู้ทันทีว่าโฟกัสช่องไหนอยู่
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xff2196F3), width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 1.2),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
+      ),
+    );
   }
 
   // ✅ dropdown ตัวเดียว ใช้ร่วมกันทั้งช่องอีเมล/รหัสผ่าน เป็น widget ปกติในหน้าจอ
@@ -215,12 +259,18 @@ class _LoginPageState extends State<LoginPage> {
           final email = accounts[index]['email'] ?? '';
           return ListTile(
             dense: true,
-            leading: const Icon(Icons.account_circle, size: 22, color: Colors.blue),
+            leading: const Icon(
+              Icons.account_circle,
+              size: 22,
+              color: Colors.blue,
+            ),
             title: Text(email, style: const TextStyle(fontSize: 14)),
             subtitle: const Text('••••••••', style: TextStyle(fontSize: 12)),
             trailing: InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _removeSavedAccount(email), // ✅ widget ปกติ ไม่มี Overlay แย่งโฟกัส กดลบได้แน่นอน
+              onTap: () => _removeSavedAccount(
+                email,
+              ), // ✅ widget ปกติ ไม่มี Overlay แย่งโฟกัส กดลบได้แน่นอน
               child: const Padding(
                 padding: EdgeInsets.all(8),
                 child: Icon(Icons.close, size: 18, color: Colors.grey),
@@ -258,7 +308,11 @@ class _LoginPageState extends State<LoginPage> {
                     Text(
                       'อู่ที่ไว้วางใจ',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
                     ),
                     SizedBox(height: 8),
                     Text(
@@ -279,7 +333,7 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 5),
                       ),
@@ -293,7 +347,10 @@ class _LoginPageState extends State<LoginPage> {
                         const Center(
                           child: Text(
                             'เข้าสู่ระบบ',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
 
@@ -304,32 +361,36 @@ class _LoginPageState extends State<LoginPage> {
 
                         // ✅ กันไม่ให้แตะในช่องอีเมล/รหัสผ่านไปโดน GestureDetector ปิด dropdown ของตัวเอง
                         GestureDetector(
-                          onTap: () {}, // กันการไหลของ tap ไปโดน parent ปิด dropdown ตัวเอง
+                          onTap:
+                              () {}, // กันการไหลของ tap ไปโดน parent ปิด dropdown ตัวเอง
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 onTap: () {
                                   setState(() {
                                     _showPasswordSuggestions = false;
-                                    _showEmailSuggestions = _savedAccounts.isNotEmpty;
+                                    _showEmailSuggestions =
+                                        _savedAccounts.isNotEmpty;
                                   });
                                 },
                                 onChanged: (_) => setState(() {}),
-                                decoration: InputDecoration(
-                                  hintText: 'example@email.com',
-                                  prefixIcon: const Icon(Icons.email_outlined),
+                                decoration: _fieldDecoration(
+                                  hint: 'example@email.com',
+                                  icon: Icons.email_outlined,
                                   suffixIcon: _savedAccounts.isNotEmpty
-                                      ? const Icon(Icons.arrow_drop_down, color: Colors.grey)
+                                      ? Icon(
+                                          Icons.arrow_drop_down,
+                                          color: Colors.blueGrey.shade400,
+                                        )
                                       : null,
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F6FA),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
@@ -341,9 +402,14 @@ class _LoginPageState extends State<LoginPage> {
                               if (_showEmailSuggestions)
                                 _buildAccountsDropdown(
                                   _savedAccounts
-                                      .where((a) => (a['email'] ?? '')
-                                          .toLowerCase()
-                                          .contains(_emailController.text.toLowerCase()))
+                                      .where(
+                                        (a) => (a['email'] ?? '')
+                                            .toLowerCase()
+                                            .contains(
+                                              _emailController.text
+                                                  .toLowerCase(),
+                                            ),
+                                      )
                                       .toList(),
                                 ),
                             ],
@@ -364,29 +430,40 @@ class _LoginPageState extends State<LoginPage> {
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
                                 textInputAction: TextInputAction.done,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 onFieldSubmitted: (_) => _handleLogin(),
                                 onTap: () {
                                   setState(() {
                                     _showEmailSuggestions = false;
-                                    _showPasswordSuggestions = _savedAccounts.isNotEmpty;
+                                    _showPasswordSuggestions =
+                                        _savedAccounts.isNotEmpty;
                                   });
                                 },
-                                decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.lock_outline),
+                                decoration: _fieldDecoration(
+                                  hint: '••••••••',
+                                  icon: Icons.lock_outline,
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                      color: Colors.grey,
+                                      _obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: const Color.fromARGB(
+                                        255,
+                                        144,
+                                        168,
+                                        180,
+                                      ),
                                     ),
                                     onPressed: () {
-                                      setState(() => _obscurePassword = !_obscurePassword);
+                                      setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
+                                      );
                                     },
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F6FA),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
                                   ),
                                 ),
                                 validator: (value) {
@@ -396,7 +473,8 @@ class _LoginPageState extends State<LoginPage> {
                                   return null;
                                 },
                               ),
-                              if (_showPasswordSuggestions) _buildAccountsDropdown(_savedAccounts),
+                              if (_showPasswordSuggestions)
+                                _buildAccountsDropdown(_savedAccounts),
                             ],
                           ),
                         ),
@@ -416,12 +494,20 @@ class _LoginPageState extends State<LoginPage> {
                                     child: Checkbox(
                                       value: _rememberMe,
                                       activeColor: Colors.blue,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      onChanged: (value) => _toggleRememberMe(value ?? false),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      onChanged: (value) =>
+                                          _toggleRememberMe(value ?? false),
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  const Text('จดจำฉัน', style: TextStyle(color: Colors.black87, fontSize: 14)),
+                                  const Text(
+                                    'จดจำฉัน',
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -429,10 +515,16 @@ class _LoginPageState extends State<LoginPage> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ForgotPasswordPage(),
+                                  ),
                                 );
                               },
-                              child: const Text('ลืมรหัสผ่าน?', style: TextStyle(color: Colors.blue)),
+                              child: const Text(
+                                'ลืมรหัสผ่าน?',
+                                style: TextStyle(color: Colors.blue),
+                              ),
                             ),
                           ],
                         ),
@@ -446,15 +538,26 @@ class _LoginPageState extends State<LoginPage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             child: _isLoading
                                 ? const SizedBox(
                                     width: 22,
                                     height: 22,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.5,
+                                    ),
                                   )
-                                : const Text('เข้าสู่ระบบ', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                : const Text(
+                                    'เข้าสู่ระบบ',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
 
@@ -481,12 +584,17 @@ class _LoginPageState extends State<LoginPage> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                                  MaterialPageRoute(
+                                    builder: (context) => const RegisterPage(),
+                                  ),
                                 );
                               },
                               child: const Text(
                                 'สมัครสมาชิก',
-                                style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],

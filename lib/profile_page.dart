@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_goodgarage/%20myCarPage.dart';
-import 'package:flutter_goodgarage/editprofile_customer_page.dart';
-import 'package:flutter_goodgarage/editprofile_shop_page.dart';
+import 'editprofile_customer_page.dart';
+import 'editprofile_shop_page.dart';
+import ' myCarPage.dart'; // ✅ แก้แล้ว: เดิมชื่อไฟล์ผิด (มีช่องว่างนำหน้า) และ import ซ้ำ 2 บรรทัด
 import 'api_service.dart';
-import ' myCarPage.dart';
+import 'settings_page.dart'; // ✅ เพิ่มใหม่: หน้าตั้งค่า
+import 'help_page.dart'; // ✅ เพิ่มใหม่: ศูนย์ช่วยเหลือ
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final void Function(Map<String, dynamic> newUserData)? onUserDataChanged; // ✅ callback บอกหน้าแม่ว่าข้อมูลเปลี่ยน
+  final void Function(Map<String, dynamic> newUserData)?
+  onUserDataChanged; // ✅ callback บอกหน้าแม่ว่าข้อมูลเปลี่ยน
 
-  const ProfilePage({super.key, required this.userData, this.onUserDataChanged});
+  const ProfilePage({
+    super.key,
+    required this.userData,
+    this.onUserDataChanged,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -30,7 +36,9 @@ class _ProfilePageState extends State<ProfilePage> {
     }
     final first = _userData['first_name'] ?? '';
     final last = _userData['last_name'] ?? '';
-    return '$first $last'.trim().isEmpty ? 'ไม่ระบุชื่อ' : '$first $last'.trim();
+    return '$first $last'.trim().isEmpty
+        ? 'ไม่ระบุชื่อ'
+        : '$first $last'.trim();
   }
 
   // ✅ ดึงข้อมูลใหม่จาก server หลังแก้ไข
@@ -42,7 +50,22 @@ class _ProfilePageState extends State<ProfilePage> {
     if (result.success && result.data != null) {
       final updatedUser = result.data!['user'];
       setState(() => _userData = updatedUser);
-      widget.onUserDataChanged?.call(updatedUser); // ✅ แจ้งหน้าแม่ (HomePage/GarageDashboard) ให้อัปเดตด้วย
+      widget.onUserDataChanged?.call(
+        updatedUser,
+      ); // ✅ แจ้งหน้าแม่ (HomePage/GarageDashboard) ให้อัปเดตด้วย
+    }
+  }
+
+  // ✅ เพิ่มใหม่: เปิดหน้าตั้งค่า แล้ว refresh โปรไฟล์ถ้ามีการเปลี่ยนอีเมลจากในนั้น
+  Future<void> _openSettings() async {
+    final emailChanged = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SettingsPage(userData: _userData),
+      ),
+    );
+    if (emailChanged == true) {
+      await _refreshProfile();
     }
   }
 
@@ -57,7 +80,6 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-
               // Header
               Container(
                 padding: const EdgeInsets.all(20),
@@ -71,11 +93,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     const Text(
                       "โปรไฟล์",
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.settings, color: Colors.white),
-                      onPressed: () {},
+                      onPressed: _openSettings, // ✅ เชื่อมแล้ว
                     ),
                   ],
                 ),
@@ -93,17 +119,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: Column(
                   children: [
-
                     // ✅ แสดงรูปจาก DB ถ้ามี ไม่งั้นแสดงตัวอักษร
                     CircleAvatar(
                       radius: 45,
                       backgroundColor: const Color(0xff2196F3),
-                      backgroundImage: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                      backgroundImage:
+                          avatarUrl != null && avatarUrl.toString().isNotEmpty
                           ? NetworkImage(avatarUrl)
                           : null,
                       child: avatarUrl == null || avatarUrl.toString().isEmpty
                           ? Text(
-                              _displayName.isNotEmpty ? _displayName[0].toUpperCase() : '?',
+                              _displayName.isNotEmpty
+                                  ? _displayName[0].toUpperCase()
+                                  : '?',
                               style: const TextStyle(
                                 fontSize: 36,
                                 color: Colors.white,
@@ -117,7 +145,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     Text(
                       _displayName,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
 
                     Text(
@@ -131,25 +162,40 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 10),
                     _infoRow(Icons.email, _userData['email'] ?? 'ไม่ระบุอีเมล'),
 
-                    if (_userData['address'] != null && _userData['address'].toString().isNotEmpty) ...[
+                    if (_userData['address'] != null &&
+                        _userData['address'].toString().isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      _infoRow(Icons.location_on_outlined, _userData['address']),
+                      _infoRow(
+                        Icons.location_on_outlined,
+                        _userData['address'],
+                      ),
                     ],
 
                     if (!isRepair) ...[
-                      if (_userData['car_model'] != null && _userData['car_model'].toString().isNotEmpty) ...[
+                      if (_userData['car_model'] != null &&
+                          _userData['car_model'].toString().isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _infoRow(Icons.directions_car_outlined, _userData['car_model']),
+                        _infoRow(
+                          Icons.directions_car_outlined,
+                          _userData['car_model'],
+                        ),
                       ],
-                      if (_userData['car_plate'] != null && _userData['car_plate'].toString().isNotEmpty) ...[
+                      if (_userData['car_plate'] != null &&
+                          _userData['car_plate'].toString().isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _infoRow(Icons.card_membership_outlined, _userData['car_plate']),
+                        _infoRow(
+                          Icons.card_membership_outlined,
+                          _userData['car_plate'],
+                        ),
                       ],
                     ],
 
                     if (isRepair && _userData['owner_name'] != null) ...[
                       const SizedBox(height: 10),
-                      _infoRow(Icons.person_outline, 'เจ้าของ: ${_userData['owner_name']}'),
+                      _infoRow(
+                        Icons.person_outline,
+                        'เจ้าของ: ${_userData['owner_name']}',
+                      ),
                     ],
                   ],
                 ),
@@ -180,7 +226,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         );
                         // ฝั่งลูกค้าคืนค่า true เฉยๆ ส่วนฝั่งอู่คืนค่าเป็น Map
                         // (มีข้อมูลเวลาทำการ/บริการ/เจ้าของร้านติดมาด้วย)
-                        final wasSaved = result == true ||
+                        final wasSaved =
+                            result == true ||
                             (result is Map && result['success'] == true);
                         if (wasSaved) {
                           await _refreshProfile(); // ✅ ดึงข้อมูลใหม่พร้อมรูป
@@ -196,13 +243,29 @@ class _ProfilePageState extends State<ProfilePage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => MyCarPage(userId: _userData['id']),
+                              builder: (context) =>
+                                  MyCarPage(userId: _userData['id']),
                             ),
                           );
                         },
                       ),
-                    _menuItem(Icons.settings, "ตั้งค่า"),
-                    _menuItem(Icons.help_outline, "ช่วยเหลือ"),
+                    _menuItem(
+                      Icons.settings,
+                      "ตั้งค่า",
+                      onTap: _openSettings, // ✅ เชื่อมแล้ว
+                    ),
+                    _menuItem(
+                      Icons.help_outline,
+                      "ช่วยเหลือ",
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const HelpPage(),
+                          ),
+                        ); // ✅ เชื่อมแล้ว
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -216,10 +279,16 @@ class _ProfilePageState extends State<ProfilePage> {
                     foregroundColor: Colors.red,
                     side: const BorderSide(color: Colors.red),
                     minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
                   ),
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/',
+                      (route) => false,
+                    );
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text("ออกจากระบบ"),
@@ -227,7 +296,10 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
 
               const SizedBox(height: 20),
-              const Text("เวอร์ชัน 1.0.0", style: TextStyle(color: Colors.grey)),
+              const Text(
+                "เวอร์ชัน 1.0.0",
+                style: TextStyle(color: Colors.grey),
+              ),
               const SizedBox(height: 20),
             ],
           ),

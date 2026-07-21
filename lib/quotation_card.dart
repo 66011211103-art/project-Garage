@@ -1,3 +1,11 @@
+// ============================================================
+// 📄 ไฟล์: quotation_card.dart
+// 📌 หน้า/ฟีเจอร์: การ์ด "ใบเสนอราคา" — แสดงในหน้า "ประวัติคำขอซ่อม" (my_repair_requests_page.dart)
+//     ของฝั่งลูกค้า ใช้ดูรายละเอียดใบเสนอราคาจากอู่ พร้อมปุ่มยืนยัน/ปฏิเสธ
+// 📝 คำอธิบาย: ดึงข้อมูลใบเสนอราคาตาม repairRequestId, แสดงรายการอะไหล่ + ค่าแรง
+//     + ยอดรวม และให้ลูกค้ากดยืนยันหรือปฏิเสธ (พร้อมเลือก/กรอกเหตุผล) ได้
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 
@@ -169,130 +177,289 @@ class _QuotationCardState extends State<QuotationCard> {
     final items = (_quotation!['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
     final status = _quotation!['status']?.toString() ?? 'pending';
     final totalPrice = double.tryParse(_quotation!['total_price']?.toString() ?? '0') ?? 0;
+    final laborCost = double.tryParse(_quotation!['labor_cost']?.toString() ?? '0') ?? 0;
     final startDate = _quotation!['estimated_start_date']?.toString();
     final endDate = _quotation!['estimated_end_date']?.toString();
+    final notes = _quotation!['notes']?.toString() ?? '';
+
+    // แสดงภาษีมูลค่าเพิ่มเฉพาะกรณีที่ backend ส่งค่ามาให้เท่านั้น (ไม่คำนวณเดาเอง
+    // เพื่อไม่ให้ตัวเลขที่โชว์คลาดเคลื่อนจากยอดจริงที่อู่/ระบบคำนวณไว้)
+    final vatRaw = _quotation!['vat_amount'] ?? _quotation!['tax_amount'];
+    final vatAmount = vatRaw != null ? double.tryParse(vatRaw.toString()) : null;
+
+    // ยอดรวมค่าอะไหล่ (รวมจากราคาต่อรายการที่ backend ส่งมา) ไว้ใช้แสดงผลเท่านั้น
+    final partsCost = items.fold<double>(
+        0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0));
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xffE3F2FD),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xff2196F3).withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
       ),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ---------- หัวการ์ด ----------
           Row(
             children: [
-              const Icon(Icons.receipt_long, size: 18, color: Color(0xff2196F3)),
-              const SizedBox(width: 6),
-              const Text('ใบเสนอราคา', style: TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              if (status != 'pending')
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: status == 'confirmed' ? Colors.green.shade100 : Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status == 'confirmed' ? 'ยืนยันแล้ว' : 'ปฏิเสธแล้ว',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: status == 'confirmed' ? Colors.green.shade800 : Colors.red.shade800,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xffE3F2FD),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...items.map((it) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text('${it['name']} x${it['quantity']}', style: const TextStyle(fontSize: 13)),
-                    ),
-                    Text('${it['price']} บาท', style: const TextStyle(fontSize: 13)),
-                  ],
-                ),
-              )),
-          if ((double.tryParse(_quotation!['labor_cost']?.toString() ?? '0') ?? 0) > 0)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('ค่าแรง', style: TextStyle(fontSize: 13)),
-                  Text('${_quotation!['labor_cost']} บาท', style: const TextStyle(fontSize: 13)),
-                ],
+                child: const Icon(Icons.receipt_long, size: 16, color: Color(0xff2196F3)),
               ),
-            ),
-          const Divider(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('รวมทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('${totalPrice.toStringAsFixed(0)} บาท',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xff2196F3))),
+              const SizedBox(width: 8),
+              const Text('ใบเสนอราคา', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const Spacer(),
+              if (status != 'pending') _statusBadge(status),
             ],
           ),
-          if (startDate != null || endDate != null) ...[
+
+          const SizedBox(height: 12),
+
+          // ---------- รายการอะไหล่ ----------
+          if (items.isNotEmpty) ...[
+            const Text('รายการอะไหล่', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
             const SizedBox(height: 6),
+            ...items.map((it) => _lineItemCard(
+                  title: '${it['name']}',
+                  subtitle: 'จำนวน ${it['quantity']}${(it['unit'] ?? '').toString().isNotEmpty ? ' ${it['unit']}' : ''}',
+                  price: double.tryParse(it['price']?.toString() ?? '0') ?? 0,
+                )),
+            _subtotalRow('รวมค่าอะไหล่', partsCost),
+            const SizedBox(height: 10),
+          ],
+
+          // ---------- ค่าแรง ----------
+          if (laborCost > 0) ...[
+            const Text('ค่าแรง', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 6),
+            _lineItemCard(title: 'ค่าแรงรวม', subtitle: null, price: laborCost),
+            const SizedBox(height: 10),
+          ],
+
+          // ---------- ยอดรวมสุทธิ ----------
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xff2196F3), Color(0xff1976D2)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (vatAmount != null) ...[
+                  _summaryRow('ราคาก่อนภาษี', totalPrice - vatAmount),
+                  _summaryRow('ภาษีมูลค่าเพิ่ม 7%', vatAmount),
+                  const Divider(color: Colors.white38, height: 16),
+                ],
+                _summaryRow('รวมทั้งหมด', totalPrice, big: true),
+              ],
+            ),
+          ),
+
+          // ---------- ระยะเวลาซ่อม ----------
+          if (startDate != null || endDate != null) ...[
+            const SizedBox(height: 10),
             Row(
               children: [
                 const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                 const SizedBox(width: 6),
-                Text('ระยะเวลาซ่อม: $startDate ถึง $endDate',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Expanded(
+                  child: Text('ระยะเวลาซ่อม: $startDate ถึง $endDate',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
               ],
             ),
           ],
-          if ((_quotation!['notes']?.toString() ?? '').isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text('หมายเหตุ: ${_quotation!['notes']}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+
+          // ---------- หมายเหตุจากอู่ ----------
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xffFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xffF9A825)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('หมายเหตุ: $notes',
+                        style: const TextStyle(fontSize: 12, color: Color(0xff8D6E00))),
+                  ),
+                ],
+              ),
+            ),
           ],
+
+          // ---------- เหตุผลที่ลูกค้าปฏิเสธ (ถ้ามี) ----------
           if (status == 'rejected' && (_quotation!['customer_rejection_reason']?.toString() ?? '').isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text('เหตุผลที่ปฏิเสธ: ${_quotation!['customer_rejection_reason']}',
-                style: const TextStyle(fontSize: 12, color: Colors.red)),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xffFFEBEE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.cancel_outlined, size: 16, color: Color(0xffE53935)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('เหตุผลที่ปฏิเสธ: ${_quotation!['customer_rejection_reason']}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xffE53935))),
+                  ),
+                ],
+              ),
+            ),
           ],
+
+          // ---------- ปุ่มยืนยัน/ปฏิเสธ ----------
           if (status == 'pending') ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     onPressed: _isResponding ? null : _handleReject,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('ปฏิเสธ'),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('ปฏิเสธ'),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: _isResponding ? null : () => _respond('confirmed'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    child: _isResponding
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff43A047),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: _isResponding
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
-                        : const Text('ยืนยัน', style: TextStyle(color: Colors.white)),
+                        : const Icon(Icons.check, size: 16, color: Colors.white),
+                    label: Text(_isResponding ? '' : 'ยอมรับใบเสนอราคา',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ---------- ชิ้นส่วน UI ย่อยที่ใช้ซ้ำ ----------
+
+  Widget _statusBadge(String status) {
+    final confirmed = status == 'confirmed';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: confirmed ? Colors.green.shade100 : Colors.red.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        confirmed ? 'ยืนยันแล้ว' : 'ปฏิเสธแล้ว',
+        style: TextStyle(
+          fontSize: 11,
+          color: confirmed ? Colors.green.shade800 : Colors.red.shade800,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _lineItemCard({required String title, String? subtitle, required double price}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xffF7F8FA),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ],
+            ),
+          ),
+          Text('฿${price.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff2196F3))),
+        ],
+      ),
+    );
+  }
+
+  Widget _subtotalRow(String label, double value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
+          Text('฿${value.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, double value, {bool big = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: big ? 15 : 12,
+                  fontWeight: big ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            '฿${value.toStringAsFixed(big ? 0 : 2)}',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: big ? FontWeight.bold : FontWeight.normal,
+              fontSize: big ? 19 : 12,
+            ),
+          ),
         ],
       ),
     );

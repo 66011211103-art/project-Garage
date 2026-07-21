@@ -311,7 +311,42 @@ class _SearchGarageCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(15),
               child: avatar != null && avatar.isNotEmpty
-                  ? Image.network(avatar, height: 160, width: double.infinity, fit: BoxFit.cover)
+                  ? Image.network(
+                      avatar,
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      // ✅ เพิ่ม errorBuilder ไว้เผื่อโหลดรูปไม่สำเร็จ (URL ผิด/ไฟล์หาย/เน็ตหลุด)
+                      // จะได้เห็นชัดว่าโหลดพังจริง แทนที่จะเป็นช่องขาวว่างเปล่าเงียบๆ
+                      errorBuilder: (context, error, stackTrace) {
+                        // ignore: avoid_print
+                        print('⚠️ โหลดรูปไม่สำเร็จ: $avatar — $error');
+                        return Container(
+                          height: 160,
+                          width: double.infinity,
+                          color: Colors.grey.shade200,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey.shade400),
+                              const SizedBox(height: 6),
+                              Text('โหลดรูปไม่สำเร็จ',
+                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                            ],
+                          ),
+                        );
+                      },
+                      // ✅ โชว์ loading indicator ระหว่างโหลด แทนที่จะเป็นช่องขาวเงียบๆ เหมือนกัน
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          height: 160,
+                          width: double.infinity,
+                          color: Colors.grey.shade100,
+                          child: const Center(child: CircularProgressIndicator()),
+                        );
+                      },
+                    )
                   : Container(
                       height: 160,
                       width: double.infinity,
