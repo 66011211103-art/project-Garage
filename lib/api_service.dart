@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://10.160.24.138:3000/api';
+  static const String baseUrl = 'http://10.160.135.214:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -361,6 +361,7 @@ static Future<ApiResult> getProfile({
     required String phone,
     required String email,
     required String password,
+    String? specialties,
   }) async {
     try {
       final response = await http
@@ -373,6 +374,7 @@ static Future<ApiResult> getProfile({
               'phone': phone,
               'email': email,
               'password': password,
+              if (specialties != null) 'specialties': specialties,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -433,13 +435,19 @@ static Future<ApiResult> getProfile({
   static Future<ApiResult> assignTechnician({
     required int requestId,
     required int technicianId,
+    String? assignmentDate,
+    String? assignmentNote,
   }) async {
     try {
       final response = await http
           .put(
             Uri.parse('$baseUrl/repair-requests/$requestId/assign'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'technicianId': technicianId}),
+            body: jsonEncode({
+              'technicianId': technicianId,
+              if (assignmentDate != null) 'assignmentDate': assignmentDate,
+              if (assignmentNote != null) 'assignmentNote': assignmentNote,
+            }),
           )
           .timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;

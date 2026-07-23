@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
 import 'create_quotation_page.dart'; // ✅ หน้าสร้างใบเสนอราคา
+import 'assign_technician_page.dart'; // ✅ หน้ามอบหมายงานให้ช่าง
+import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -370,42 +372,93 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               ],
             )
           else if (isAccepted)
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showRequestDetail(r),
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                    label: const Text('ดูรายละเอียด'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue,
-                      side: const BorderSide(color: Colors.blue),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateQuotationPage(
-                            repairRequestId: id,
-                            customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
-                          ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showRequestDetail(r),
+                        icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                        label: const Text('ดูรายละเอียด'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blue,
+                          side: const BorderSide(color: Colors.blue),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                      );
-                      if (result == true) _fetchRequests();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff9C27B0),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
-                    icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-                    label: const Text('สร้างใบเสนอราคา', style: TextStyle(color: Colors.white)),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CreateQuotationPage(
+                                repairRequestId: id,
+                                customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+                              ),
+                            ),
+                          );
+                          if (result == true) _fetchRequests();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff9C27B0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
+                        label: const Text('ใบเสนอราคา', style: TextStyle(color: Colors.white, fontSize: 13)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: r['assigned_technician_id'] != null
+                      ? InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => RepairTrackingPage(job: r, isCustomerView: false),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(
+                              child: Text('มอบหมายงานให้ช่างแล้ว — แตะเพื่อดูสถานะ ✅',
+                                  style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AssignTechnicianPage(
+                                  job: r,
+                                  garageId: widget.userData['id'],
+                                ),
+                              ),
+                            );
+                            if (result == true) _fetchRequests();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xff2196F3),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.engineering_outlined, color: Colors.white, size: 16),
+                          label: const Text('มอบหมายงานให้ช่าง', style: TextStyle(color: Colors.white)),
+                        ),
                 ),
               ],
             )

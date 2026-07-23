@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api_service.dart';
 import 'socket_notification_service.dart';
 import 'technician_job_detail_page.dart';
+import 'main.dart'; // ✅ ใช้ LoginPage สำหรับปุ่มล็อกเอาท์
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -86,6 +87,30 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
     }
   }
 
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ออกจากระบบ'),
+        content: const Text('ต้องการออกจากระบบใช่ไหม?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    SocketNotificationService.disconnect();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
   String _vehicleLabel(String? value) {
     switch (value) {
       case 'sedan':
@@ -103,8 +128,12 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
     switch (status) {
       case 'assigned':
         return 'รอเริ่มงาน';
+      case 'checking':
+        return 'กำลังตรวจสอบ';
       case 'in_progress':
         return 'กำลังซ่อม';
+      case 'waiting_parts':
+        return 'รอรับอะไหล่';
       case 'completed':
         return 'ซ่อมเสร็จแล้ว';
       default:
@@ -116,8 +145,12 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
     switch (status) {
       case 'assigned':
         return const Color(0xffFF9800);
+      case 'checking':
+        return const Color(0xff9C27B0);
       case 'in_progress':
         return const Color(0xff2196F3);
+      case 'waiting_parts':
+        return const Color(0xff795548);
       case 'completed':
         return const Color(0xff4CAF50);
       default:
@@ -203,6 +236,19 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                       ),
                       child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 20),
                     ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _handleLogout,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.logout, color: Colors.white, size: 20),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -237,7 +283,9 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                       itemBuilder: (context) => const [
                         PopupMenuItem(value: null, child: Text('ทั้งหมด')),
                         PopupMenuItem(value: 'assigned', child: Text('รอเริ่มงาน')),
+                        PopupMenuItem(value: 'checking', child: Text('กำลังตรวจสอบ')),
                         PopupMenuItem(value: 'in_progress', child: Text('กำลังซ่อม')),
+                        PopupMenuItem(value: 'waiting_parts', child: Text('รอรับอะไหล่')),
                         PopupMenuItem(value: 'completed', child: Text('เสร็จแล้ว')),
                       ],
                     ),

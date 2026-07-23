@@ -5,6 +5,7 @@ import 'chat_screen.dart';
 import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อมรถ
 import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติคำขอซ่อม
+import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม (ปุ่ม "ติดตาม" ในการ์ดกำลังซ่อม)
 import 'api_service.dart'; // ✅ สำหรับนับ/มาร์คแจ้งเตือนที่ยังไม่อ่าน
 
 class HomePage extends StatefulWidget {
@@ -30,6 +31,25 @@ class _HomePageState extends State<HomePage> {
     _userData = widget.userData;
     _setupPushNotifications();
     _fetchUnseenCount();
+    _fetchActiveJob();
+  }
+
+  // ✅ งานที่กำลังซ่อมอยู่ตอนนี้ (มีช่างรับผิดชอบแล้ว ยังไม่เสร็จ) — ใช้โชว์ในการ์ด "กำลังซ่อม" หน้าแรก
+  Map<String, dynamic>? _activeJob;
+
+  Future<void> _fetchActiveJob() async {
+    final result = await ApiService.getRepairRequests(customerId: _userData['id']);
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      final requests = List<Map<String, dynamic>>.from(result.data!['requests'] ?? []);
+      // เอางานที่มีช่างรับผิดชอบแล้วและยังไม่เสร็จ (เรียงตาม created_at DESC มาจาก backend อยู่แล้ว
+      // เลยตัวแรกที่เจอคืองานล่าสุด)
+      final active = requests.where((r) {
+        final status = r['status']?.toString() ?? '';
+        return r['assigned_technician_id'] != null && status != 'completed' && status != 'done';
+      }).toList();
+      setState(() => _activeJob = active.isNotEmpty ? active.first : null);
+    }
   }
 
   // ✅ ตัวเลขแจ้งเตือนที่กระดิ่ง (คำขอที่อู่ตอบกลับแล้ว แต่ลูกค้ายังไม่ได้เปิดดู)
@@ -43,6 +63,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _openTracking() {
+    if (_activeJob == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RepairTrackingPage(job: _activeJob!, isCustomerView: true),
+      ),
+    );
+  }
+
   // ✅ กดกระดิ่งแล้ว: เคลียร์ตัวเลขทันที (responsive) + มาร์คว่าอ่านแล้วที่ backend + เปิดหน้าประวัติ
   Future<void> _openNotifications() async {
     setState(() => _unseenCount = 0);
@@ -54,6 +84,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     _fetchUnseenCount(); // เผื่อมีคำขอใหม่ที่อู่ตอบกลับมาระหว่างที่เปิดหน้านั้นอยู่
+    _fetchActiveJob();
   }
 
   // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้าที่ถูกต้อง
@@ -74,7 +105,7 @@ class _HomePageState extends State<HomePage> {
                 highlightRequestId: requestId,
               ),
             ),
-          ).then((_) => _fetchUnseenCount());
+          ).then((_) { _fetchUnseenCount(); _fetchActiveJob(); });
         }
       },
     );
@@ -113,6 +144,8 @@ class _HomePageState extends State<HomePage> {
         userData: _userData,
         unseenCount: _unseenCount,
         onNotificationTap: _openNotifications,
+        activeJob: _activeJob,
+        onTrackTap: _openTracking,
       ), // ✅ ใช้ _userData แทน widget.userData
       MyRepairRequestsPage(userData: _userData), // ✅ แท็บ "ประวัติ" ตอนนี้โชว์ของจริงแล้ว
       const ChatScreen(),
@@ -156,12 +189,16 @@ class HomeContent extends StatelessWidget {
   final Map<String, dynamic> userData;
   final int unseenCount;
   final VoidCallback? onNotificationTap;
+  final Map<String, dynamic>? activeJob; // ✅ งานที่กำลังซ่อมอยู่ตอนนี้ (ถ้ามี)
+  final VoidCallback? onTrackTap; // ✅ กดปุ่ม "ติดตาม" ในการ์ดกำลังซ่อม
 
   const HomeContent({
     super.key,
     required this.userData,
     this.unseenCount = 0,
     this.onNotificationTap,
+    this.activeJob,
+    this.onTrackTap,
   });
 
   @override
@@ -323,62 +360,65 @@ class HomeContent extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xff42A5F5), Color(0xff1E88E5)],
+                  // ✅ การ์ด "กำลังซ่อม" ตอนนี้ใช้ข้อมูลจริงจาก activeJob เท่านั้น
+                  // ถ้าลูกค้าไม่มีงานที่กำลังซ่อมอยู่ (ยังไม่มีช่างรับผิดชอบ/ซ่อมเสร็จหมดแล้ว) จะไม่โชว์การ์ดนี้เลย
+                  if (activeJob != null)
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xff42A5F5), Color(0xff1E88E5)],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
                       ),
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 70,
-                          height: 70,
-                          decoration: const BoxDecoration(
-                            color: Colors.white24,
-                            shape: BoxShape.circle,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 70,
+                            height: 70,
+                            decoration: const BoxDecoration(
+                              color: Colors.white24,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.build, color: Colors.white, size: 35),
                           ),
-                          child: const Icon(Icons.build, color: Colors.white, size: 35),
-                        ),
-                        const SizedBox(width: 15),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "กำลังซ่อม",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 26,
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "กำลังซ่อม",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 26,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                "อู่ซ่อมรถบ้านสวน\nเครื่องยนต์",
-                                style: TextStyle(color: Colors.white, fontSize: 18),
-                              ),
-                            ],
+                                Text(
+                                  "${activeJob!['shop_name'] ?? 'ไม่ระบุอู่'}\n${activeJob!['problem_category'] ?? ''}",
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white24,
-                            foregroundColor: Colors.white,
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white24,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: onTrackTap,
+                            child: const Row(
+                              children: [
+                                Text("ติดตาม"),
+                                SizedBox(width: 5),
+                                Icon(Icons.arrow_forward_ios, size: 15),
+                              ],
+                            ),
                           ),
-                          onPressed: () {},
-                          child: const Row(
-                            children: [
-                              Text("ติดตาม"),
-                              SizedBox(width: 5),
-                              Icon(Icons.arrow_forward_ios, size: 15),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
                 ],
               ),

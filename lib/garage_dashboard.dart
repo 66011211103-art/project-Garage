@@ -1,15 +1,3 @@
-// ============================================================
-// 📄 ไฟล์: garage_dashboard.dart
-// 📌 หน้า/ฟีเจอร์: หน้าหลักของ "อู่" (Garage Dashboard) — ดูคำขอซ่อมที่เข้ามา,
-//     สถิติภาพรวม, เมนูด่วน และรับ/ปฏิเสธคำขอซ่อมจากลูกค้า
-// 📝 คำอธิบาย: แก้ไข 3 จุดจากเดิม —
-//   1) ปุ่ม "รับงาน" พาไปหน้า assign_technician_page.dart เพื่อเลือกช่างก่อน
-//   2) แท็บล่าง "งาน" (index 1) เดิมเป็น placeholder เฉยๆ ตอนนี้เปิด
-//      all_repair_requests_page.dart จริง
-//   3) ปุ่มเมนูด่วน "จัดการช่าง" (เดิมชื่อ "จัดการงาน" และกดไม่ได้เลย เพราะ
-//      ไม่เคยผูก onTap ไว้ตั้งแต่ต้น) ตอนนี้เปิดหน้า manage_technicians_page.dart
-// ============================================================
-
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'profile_page.dart';
@@ -17,8 +5,7 @@ import 'api_service.dart';
 import 'all_repair_requests_page.dart'; // ✅ หน้ารายการคำขอซ่อมทั้งหมด
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
 import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
-import 'assign_technician_page.dart'; // ✅ หน้ามอบหมายงานช่าง (เปิดตอนกด "รับงาน")
-import 'manage_technicians_page.dart'; // ✅ หน้าจัดการช่าง (เปิดตอนกด "จัดการงาน")
+import 'manage_technicians_page.dart'; // ✅ หน้าจัดการช่าง
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -149,18 +136,6 @@ class _GarageDashboardState extends State<GarageDashboard> {
     );
   }
 
-  // ✅ กด "รับงาน" -> เปิดหน้าเลือกช่างผู้รับผิดชอบ (assign_technician_page.dart)
-  // หน้านั้นจะจัดการทั้งการ accept คำขอ และมอบหมายช่างให้ในขั้นตอนเดียว
-  Future<void> _handleAcceptAndAssign(Map<String, dynamic> r) async {
-    final success = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AssignTechnicianPage(request: r, userData: _userData),
-      ),
-    );
-    if (success == true) _fetchRequests();
-  }
-
   Future<void> _handleReject(int requestId) async {
     final reason = await showRejectReasonDialog(context);
     if (reason == null) return; // ผู้ใช้กดยกเลิก
@@ -198,7 +173,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
     final List<Widget> pages = [
       _buildDashboard(shopName),
-      AllRepairRequestsPage(userData: _userData), // ✅ แท็บ "งาน" — เดิมเป็น placeholder เฉยๆ
+      const Center(child: Text("งาน", style: TextStyle(fontSize: 24))),
       const Center(child: Text("ประวัติ", style: TextStyle(fontSize: 24))),
       const Center(child: Text("รีวิว", style: TextStyle(fontSize: 24))),
       ProfilePage(
@@ -366,16 +341,30 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 mainAxisSpacing: 12,
                 children: [
                   _quickMenu(
+                    icon: Icons.assignment,
+                    label: 'จัดการงาน',
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AllRepairRequestsPage(userData: _userData),
+                        ),
+                      );
+                      _fetchRequests();
+                    },
+                  ),
+                  _quickMenu(
                     icon: Icons.engineering_outlined,
                     label: 'จัดการช่าง',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ManageTechniciansPage(userData: _userData),
-                      ),
-                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ManageTechniciansPage(userData: _userData),
+                        ),
+                      );
+                    },
                   ),
-                  _quickMenu(icon: Icons.receipt_long, label: 'สร้างใบเสนอราคา'),
                   _quickMenu(icon: Icons.chat_bubble_outline, label: 'แชทลูกค้า'),
                   _quickMenu(icon: Icons.refresh, label: 'อัปเดตสถานะ'),
                 ],
@@ -514,7 +503,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _handleAcceptAndAssign(r),
+                  onPressed: () => _respondToRequest(id, 'accepted'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

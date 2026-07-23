@@ -1,17 +1,6 @@
-// ============================================================
-// 📄 ไฟล์: my_repair_requests_page.dart
-// 📌 หน้า/ฟีเจอร์: หน้า "ประวัติคำขอซ่อม" ฝั่งลูกค้า
-// 📝 คำอธิบาย: แสดงรายการคำขอซ่อมทั้งหมดของลูกค้า พร้อมสถานะ (รอดำเนินการ/
-//     อู่รับงานแล้ว/มีใบเสนอราคาใหม่/ยืนยันแล้ว/ปฏิเสธ/เสร็จสิ้น) กดเข้าไปดู
-//     รายละเอียดคำขอแต่ละรายการได้ และฝัง QuotationCard (quotation_card.dart)
-//     ไว้ในการ์ดเพื่อให้ลูกค้ายืนยัน/ปฏิเสธใบเสนอราคาได้ทันที
-//     ใช้เป็นปลายทางเมื่อลูกค้ากดแจ้งเตือน (push notification) เรื่องสถานะคำขอซ่อมด้วย
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'quotation_card.dart'; // ✅ การ์ดใบเสนอราคา (ยืนยัน/ปฏิเสธ)
-import 'repair_request_detail_page.dart'; // ✅ หน้ารายละเอียดคำขอซ่อมแบบเต็มหน้าจอ
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -285,6 +274,9 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
               // ✅ โชว์ใบเสนอราคาให้ยืนยัน/ปฏิเสธตรงในการ์ดเลย
               if (status == 'quoted' || status == 'confirmed')
                 QuotationCard(repairRequestId: r['id'], onResponded: _fetchRequests),
+
+              // (ปุ่ม "ติดตามสถานะการซ่อม" ย้ายไปอยู่ที่การ์ด "กำลังซ่อม" หน้าแรกแทนแล้ว
+              // ตามที่ขอให้ใช้ปุ่มนั้นเป็นทางหลัก ไม่ซ้ำกันสองที่)
             ],
           ),
         ),
@@ -292,14 +284,95 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
     );
   }
 
-  // ✅ เปิดหน้ารายละเอียดคำขอซ่อมแบบเต็มหน้าจอ (แทนที่ bottom sheet ตัวหนังสือล้วนแบบเดิม)
   void _showRequestDetail(Map<String, dynamic> r) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RepairRequestDetailPage(
-          request: r,
-          onQuotationResponded: _fetchRequests,
+    final status = r['status']?.toString() ?? 'pending';
+    final shopName = r['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
+    final photos = (r['photos'] is List) ? List<dynamic>.from(r['photos']) : [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(shopName,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _statusColor(status).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(_statusLabel(status),
+                        style: TextStyle(
+                            color: _statusColor(status), fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('ประเภทรถ: ${_vehicleLabel(r['vehicle_type']?.toString())}',
+                  style: const TextStyle(color: Colors.grey)),
+              Text('ประเภทปัญหา: ${r['problem_category'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
+              Text('เบอร์อู่: ${r['garage_phone'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 12),
+              Text(r['description']?.toString().isNotEmpty == true
+                  ? r['description'].toString()
+                  : 'ไม่มีรายละเอียดเพิ่มเติม'),
+              const SizedBox(height: 12),
+              Text('ที่อยู่ที่แจ้ง: ${r['address'] ?? 'ไม่ระบุ'}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
+
+              if (status == 'rejected' && (r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffFFEBEE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('เหตุผลที่อู่ปฏิเสธ',
+                          style: TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(r['rejection_reason'].toString(),
+                          style: const TextStyle(color: Color(0xffE53935))),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (photos.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 90,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: photos.map((url) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(url.toString(), width: 90, height: 90, fit: BoxFit.cover),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -2,21 +2,12 @@
 // 📄 ไฟล์: update_job_status_page.dart
 // 📌 หน้า/ฟีเจอร์: หน้า "อัปเดตสถานะงาน" (Mechanic Update Screen) ฝั่งช่าง
 //     เปิดจากปุ่ม "อัปเดตสถานะงาน" ในหน้า technician_job_detail_page.dart
-// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่, บันทึกรายละเอียดที่ทำไป, แนบรูป
-//     ก่อน/หลังซ่อม และกรอกรายการอะไหล่ที่ใช้ (ชื่อ/จำนวน/ราคา) แล้วส่งอัปเดต
-//     ครั้งเดียว (เรียก API 2 ตัว: updateTechnicianJobStatus + createRepairLog)
-// ⚠️ หมายเหตุสำคัญ:
-//   1) API `updateTechnicianJobStatus` ปัจจุบันรองรับแค่สถานะ 'in_progress'
-//      และ 'completed' เท่านั้น จึงมีตัวเลือกให้ 2 สถานะนี้ก่อน ถ้าต้องการ
-//      สถานะย่อยเพิ่ม เช่น "กำลังตรวจสอบ" / "รอรับอะไหล่" ตามมอกอัป ต้อง
-//      แก้ backend + ฐานข้อมูลเพิ่มสถานะเหล่านี้ก่อน
-//   2) API `createRepairLog` เก็บ "อะไหล่ที่ใช้" เป็นข้อความรวมช่องเดียว
-//      (partsUsed: String) ไม่ใช่รายการแยกช่องแบบมีโครงสร้าง ฉะนั้นรายการ
-//      อะไหล่ที่กรอกในหน้านี้จะถูกรวมเป็นข้อความก่อนส่ง ถ้าต้องการเก็บแบบ
-//      โครงสร้างจริง (ชื่อ/จำนวน/ราคาแยกฟิลด์) ต้องแก้ backend เพิ่ม
-//   3) รูป "ก่อนซ่อม" และ "หลังซ่อม" ส่งรวมกันเป็น list เดียวไปยัง backend
-//      (API ปัจจุบันไม่มีฟิลด์แยกก่อน/หลัง) — ถ้าต้องการแยกเก็บจริง ต้อง
-//      เพิ่มฟิลด์ backend เช่นกัน
+// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่ (4 แบบ: กำลังตรวจสอบ/กำลังซ่อม/รอรับอะไหล่/เสร็จสิ้น
+//     ตรงกับที่ backend รองรับแล้ว), บันทึกรายละเอียดที่ทำไป, แนบรูปก่อน/หลังซ่อม
+//     และกรอกรายการอะไหล่ที่ใช้ (ชื่อ/จำนวน/ราคา) แล้วส่งอัปเดตครั้งเดียว
+//     (เรียก API 2 ตัว: updateTechnicianJobStatus + createRepairLog)
+// ⚠️ หมายเหตุ: "อะไหล่ที่ใช้" และรูปก่อน/หลัง ยังรวมเป็นข้อความ/list เดียวก่อนส่ง
+//     ให้ backend (API ปัจจุบันยังไม่มีฟิลด์แยกโครงสร้างแบบเต็มรูปแบบ)
 // ============================================================
 
 import 'dart:typed_data';
@@ -61,9 +52,21 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
   @override
   void initState() {
     super.initState();
-    // ค่าเริ่มต้น: ถ้ายังไม่เริ่มงาน (assigned) ให้เลือก "กำลังซ่อม" ไว้ก่อน
+    // ค่าเริ่มต้น: เลือกสถานะถัดไปที่สมเหตุสมผลจากสถานะปัจจุบัน
     final current = widget.job['status']?.toString() ?? 'assigned';
-    _selectedStatus = current == 'in_progress' ? 'completed' : 'in_progress';
+    switch (current) {
+      case 'assigned':
+        _selectedStatus = 'checking';
+        break;
+      case 'checking':
+        _selectedStatus = 'in_progress';
+        break;
+      case 'waiting_parts':
+        _selectedStatus = 'in_progress';
+        break;
+      default:
+        _selectedStatus = 'in_progress';
+    }
   }
 
   @override
@@ -213,7 +216,9 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                 const SizedBox(height: 16),
                 const Text('อัปเดตสถานะ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
+                _statusOption('checking', 'กำลังตรวจสอบ', Icons.search, const Color(0xff9C27B0)),
                 _statusOption('in_progress', 'กำลังซ่อม', Icons.build_circle_outlined, const Color(0xffFF9800)),
+                _statusOption('waiting_parts', 'รอรับอะไหล่', Icons.inventory_2_outlined, const Color(0xff795548)),
                 _statusOption('completed', 'เสร็จสิ้น', Icons.check_circle_outline, const Color(0xff4CAF50)),
 
                 const SizedBox(height: 16),
