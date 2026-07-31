@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'request_repair_page.dart'; // ✅ หน้าส่งคำขอซ่อม
+import 'api_service.dart';
+import 'chat_screen.dart'; // ✅ แชทกับอู่
 
 /// หน้ารายละเอียดอู่ซ่อมรถ (ฝั่งลูกค้า)
 /// รับข้อมูลอู่มาจากหน้า Search โดยตรง (ไม่ยิง API ซ้ำ เพราะข้อมูลชุดเดียวกันอยู่แล้ว)
@@ -21,6 +23,49 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
   String? get _avatar => widget.garage['avatar']?.toString();
   String get _address => widget.garage['address']?.toString() ?? 'ไม่ระบุที่อยู่';
   String get _phone => widget.garage['phone']?.toString() ?? '';
+  // ✅ garage_id ที่ใช้ทั่วทั้งระบบ คือ users.id ของอู่ (เท่ากับ garages.user_id)
+  int? get _garageId => widget.garage['id'] as int? ?? widget.garage['user_id'] as int?;
+
+  bool _isOpeningChat = false;
+
+  // ✅ แชทกับอู่นี้ (หาบทสนทนาเดิม หรือสร้างใหม่ถ้ายังไม่เคยคุยกัน)
+  Future<void> _openChat() async {
+    final garageId = _garageId;
+    if (garageId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่พบข้อมูลอู่ ไม่สามารถเปิดแชทได้'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isOpeningChat = true);
+    final result = await ApiService.getOrCreateConversation(
+      customerId: widget.userData['id'],
+      garageId: garageId,
+    );
+    if (!mounted) return;
+    setState(() => _isOpeningChat = false);
+
+    if (!result.success || result.data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: result.data!['conversationId'],
+          myId: widget.userData['id'],
+          myType: 'customer',
+          otherPartyName: _shopName,
+          otherPartyAvatar: _avatar,
+        ),
+      ),
+    );
+  }
 
   List<Map<String, dynamic>> get _services {
     final raw = widget.garage['services'];
@@ -287,15 +332,13 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            // TODO: ต่อกับการโทรจริงผ่าน url_launcher เช่น
-                            // launchUrl(Uri.parse('tel:$_phone'));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('โทร $_phone (ต้องเพิ่ม url_launcher)')),
-                            );
-                          },
-                          icon: const Icon(Icons.call_outlined, size: 18),
-                          label: const Text('ติดต่ออู่'),
+                          onPressed: _isOpeningChat ? null : _openChat,
+                          icon: _isOpeningChat
+                              ? const SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.chat_bubble_outline, size: 18),
+                          label: const Text('แชท'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xff2196F3),
                             side: const BorderSide(color: Color(0xff2196F3)),

@@ -380,8 +380,12 @@ class _TechnicianJobDetailPageState extends State<TechnicianJobDetailPage> {
     switch (status) {
       case 'assigned':
         return 'รอเริ่มงาน';
+      case 'checking':
+        return 'ช่างกำลังเดินทาง';
       case 'in_progress':
         return 'กำลังซ่อม';
+      case 'waiting_parts':
+        return 'รอรับอะไหล่';
       case 'completed':
         return 'ซ่อมเสร็จแล้ว';
       default:

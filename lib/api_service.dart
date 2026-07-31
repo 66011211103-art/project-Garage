@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://10.160.135.214:3000/api';
+  static const String baseUrl = 'http://192.168.1.53:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -818,6 +818,306 @@ static Future<ApiResult> getProfile({
       );
     } catch (e) {
       return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== ลูกค้าให้คะแนน/รีวิวอู่ซ่อม (ทำได้เมื่องานซ่อม status = 'completed' แล้วเท่านั้น) =====
+  static Future<ApiResult> submitReview({
+    required int repairRequestId,
+    required int customerId,
+    required int rating,
+    int? qualityRating,
+    int? priceRating,
+    int? serviceRating,
+    String? comment,
+    List<Uint8List> photos = const [],
+    List<String> photoNames = const [],
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/reviews'));
+      request.fields['repairRequestId'] = repairRequestId.toString();
+      request.fields['customerId'] = customerId.toString();
+      request.fields['rating'] = rating.toString();
+      if (qualityRating != null) request.fields['qualityRating'] = qualityRating.toString();
+      if (priceRating != null) request.fields['priceRating'] = priceRating.toString();
+      if (serviceRating != null) request.fields['serviceRating'] = serviceRating.toString();
+      if (comment != null) request.fields['comment'] = comment;
+
+      for (var i = 0; i < photos.length; i++) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'photos',
+            photos[i],
+            filename: i < photoNames.length ? photoNames[i] : 'review_$i.jpg',
+          ),
+        );
+      }
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
+
+  // ===== ดูรีวิว — ส่ง repairRequestId (เช็กว่างานนี้รีวิวหรือยัง) หรือ garageId (รีวิวทั้งหมดของอู่ + คะแนนเฉลี่ย) =====
+  static Future<ApiResult> getReviews({int? garageId, int? repairRequestId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/reviews').replace(
+        queryParameters: {
+          if (garageId != null) 'garageId': garageId.toString(),
+          if (repairRequestId != null) 'repairRequestId': repairRequestId.toString(),
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== อู่ตอบกลับรีวิวของลูกค้า =====
+  static Future<ApiResult> replyToReview({
+    required int reviewId,
+    required int garageId,
+    required String reply,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/reviews/$reviewId/reply'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'garageId': garageId, 'reply': reply}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== ลูกค้าแจ้งชำระเงิน (แนบสลิป) =====
+  static Future<ApiResult> submitPayment({
+    required int repairRequestId,
+    required int customerId,
+    required int garageId,
+    required double amount,
+    required String method, // bank_transfer | qr | credit_card
+    required Uint8List slipBytes,
+    required String slipName,
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/payments'));
+      request.fields['repairRequestId'] = repairRequestId.toString();
+      request.fields['customerId'] = customerId.toString();
+      request.fields['garageId'] = garageId.toString();
+      request.fields['amount'] = amount.toString();
+      request.fields['method'] = method;
+      request.files.add(http.MultipartFile.fromBytes('slip', slipBytes, filename: slipName));
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'แจ้งชำระเงินไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
+
+  // ===== ดูข้อมูลการชำระเงิน — ระบุ repairRequestId, customerId, หรือ garageId =====
+  static Future<ApiResult> getPayments({int? repairRequestId, int? customerId, int? garageId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/payments').replace(
+        queryParameters: {
+          if (repairRequestId != null) 'repairRequestId': repairRequestId.toString(),
+          if (customerId != null) 'customerId': customerId.toString(),
+          if (garageId != null) 'garageId': garageId.toString(),
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== อู่ยืนยัน/ปฏิเสธการชำระเงิน =====
+  static Future<ApiResult> confirmPayment({required int paymentId, required int garageId}) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/payments/$paymentId/confirm'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'garageId': garageId}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  static Future<ApiResult> rejectPayment({
+    required int paymentId,
+    required int garageId,
+    required String reason,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/payments/$paymentId/reject'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'garageId': garageId, 'reason': reason}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== อู่ตั้งค่าบัญชีธนาคารสำหรับรับชำระเงิน =====
+  static Future<ApiResult> updateBankDetails({
+    required int garageId,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/garages/$garageId/bank-details'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'bankName': bankName,
+              'bankAccountNumber': bankAccountNumber,
+              'bankAccountName': bankAccountName,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== แชท — หาบทสนทนาเดิม หรือสร้างใหม่ =====
+  static Future<ApiResult> getOrCreateConversation({required int customerId, required int garageId}) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/conversations'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'customerId': customerId, 'garageId': garageId}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== แชท — ลิสต์บทสนทนาทั้งหมด (ระบุ customerId หรือ garageId) =====
+  static Future<ApiResult> getConversations({int? customerId, int? garageId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/conversations').replace(
+        queryParameters: {
+          if (customerId != null) 'customerId': customerId.toString(),
+          if (garageId != null) 'garageId': garageId.toString(),
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== แชท — ดึงประวัติข้อความ (viewerType มาร์คข้อความของอีกฝ่ายว่าอ่านแล้ว) =====
+  static Future<ApiResult> getMessages({required int conversationId, required String viewerType}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/messages').replace(
+        queryParameters: {'conversationId': conversationId.toString(), 'viewerType': viewerType},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  // ===== แชท — ส่งข้อความ (แนบรูปได้) =====
+  static Future<ApiResult> sendMessage({
+    required int conversationId,
+    required int senderId,
+    required String senderType, // 'customer' | 'repair'
+    String? message,
+    Uint8List? imageBytes,
+    String? imageName,
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/messages'));
+      request.fields['conversationId'] = conversationId.toString();
+      request.fields['senderId'] = senderId.toString();
+      request.fields['senderType'] = senderType;
+      if (message != null) request.fields['message'] = message;
+      if (imageBytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes('image', imageBytes, filename: imageName ?? 'chat_image.jpg'),
+        );
+      }
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่');
     }
   }
 }

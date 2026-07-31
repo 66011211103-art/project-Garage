@@ -2,8 +2,8 @@
 // 📄 ไฟล์: update_job_status_page.dart
 // 📌 หน้า/ฟีเจอร์: หน้า "อัปเดตสถานะงาน" (Mechanic Update Screen) ฝั่งช่าง
 //     เปิดจากปุ่ม "อัปเดตสถานะงาน" ในหน้า technician_job_detail_page.dart
-// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่ (4 แบบ: กำลังตรวจสอบ/กำลังซ่อม/รอรับอะไหล่/เสร็จสิ้น
-//     ตรงกับที่ backend รองรับแล้ว), บันทึกรายละเอียดที่ทำไป, แนบรูปก่อน/หลังซ่อม
+// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่ (4 แบบ: ช่างกำลังเดินทาง/กำลังซ่อม/รอรับอะไหล่/ซ่อมเสร็จแล้ว
+//     ตรงกับที่ backend รองรับแล้ว — ใช้คำเดียวกับหน้าติดตามสถานะฝั่งลูกค้าเพื่อไม่ให้สับสน), บันทึกรายละเอียดที่ทำไป, แนบรูปก่อน/หลังซ่อม
 //     และกรอกรายการอะไหล่ที่ใช้ (ชื่อ/จำนวน/ราคา) แล้วส่งอัปเดตครั้งเดียว
 //     (เรียก API 2 ตัว: updateTechnicianJobStatus + createRepairLog)
 // ⚠️ หมายเหตุ: "อะไหล่ที่ใช้" และรูปก่อน/หลัง ยังรวมเป็นข้อความ/list เดียวก่อนส่ง
@@ -216,10 +216,10 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                 const SizedBox(height: 16),
                 const Text('อัปเดตสถานะ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                _statusOption('checking', 'กำลังตรวจสอบ', Icons.search, const Color(0xff9C27B0)),
+                _statusOption('checking', 'ช่างกำลังเดินทาง', Icons.directions_car_outlined, const Color(0xff9C27B0)),
                 _statusOption('in_progress', 'กำลังซ่อม', Icons.build_circle_outlined, const Color(0xffFF9800)),
                 _statusOption('waiting_parts', 'รอรับอะไหล่', Icons.inventory_2_outlined, const Color(0xff795548)),
-                _statusOption('completed', 'เสร็จสิ้น', Icons.check_circle_outline, const Color(0xff4CAF50)),
+                _statusOption('completed', 'ซ่อมเสร็จแล้ว', Icons.check_circle_outline, const Color(0xff4CAF50)),
 
                 const SizedBox(height: 16),
                 const Text('บันทึกรายละเอียด', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),

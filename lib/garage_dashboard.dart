@@ -6,6 +6,12 @@ import 'all_repair_requests_page.dart'; // ✅ หน้ารายการค
 import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผลปฏิเสธ
 import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 import 'manage_technicians_page.dart'; // ✅ หน้าจัดการช่าง
+import 'garage_reviews_page.dart'; // ✅ หน้ารีวิวจากลูกค้า
+import 'garage_completed_jobs_page.dart'; // ✅ ประวัติงานซ่อมที่เสร็จแล้ว (ดูอย่างเดียว)
+import 'payment_history_page.dart'; // ✅ จัดการ/ยืนยันการชำระเงิน (แยกจากหน้าประวัติ)
+import 'bank_settings_page.dart'; // ✅ ตั้งค่าบัญชีธนาคารรับชำระเงิน
+import 'garage_chat_list_page.dart'; // ✅ แชทกับลูกค้า
+import 'garage_tracking_list_page.dart'; // ✅ อัปเดตสถานะ/ติดตามงานที่กำลังซ่อม
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -173,9 +179,9 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
     final List<Widget> pages = [
       _buildDashboard(shopName),
-      const Center(child: Text("งาน", style: TextStyle(fontSize: 24))),
-      const Center(child: Text("ประวัติ", style: TextStyle(fontSize: 24))),
-      const Center(child: Text("รีวิว", style: TextStyle(fontSize: 24))),
+      AllRepairRequestsPage(userData: _userData, embedded: true), // ✅ แท็บ "งาน" ตอนนี้โชว์ของจริงแล้ว
+      GarageCompletedJobsPage(userData: _userData, embedded: true),
+      GarageReviewsPage(garageId: _userData['id'], embedded: true),
       ProfilePage(
         userData: _userData,
         onUserDataChanged: _handleUserDataUpdated, // ✅ ส่ง callback ไปให้
@@ -341,19 +347,6 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 mainAxisSpacing: 12,
                 children: [
                   _quickMenu(
-                    icon: Icons.assignment,
-                    label: 'จัดการงาน',
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AllRepairRequestsPage(userData: _userData),
-                        ),
-                      );
-                      _fetchRequests();
-                    },
-                  ),
-                  _quickMenu(
                     icon: Icons.engineering_outlined,
                     label: 'จัดการช่าง',
                     onTap: () {
@@ -365,8 +358,62 @@ class _GarageDashboardState extends State<GarageDashboard> {
                       );
                     },
                   ),
-                  _quickMenu(icon: Icons.chat_bubble_outline, label: 'แชทลูกค้า'),
-                  _quickMenu(icon: Icons.refresh, label: 'อัปเดตสถานะ'),
+                  _quickMenu(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'แชทลูกค้า',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GarageChatListPage(userData: _userData),
+                        ),
+                      );
+                    },
+                  ),
+                  _quickMenu(
+                    icon: Icons.refresh,
+                    label: 'อัปเดตสถานะ',
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GarageTrackingListPage(userData: _userData),
+                        ),
+                      );
+                      _fetchRequests();
+                    },
+                  ),
+                  _quickMenu(
+                    icon: Icons.payments_outlined,
+                    label: 'การชำระเงิน',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PaymentHistoryPage(
+                            garageId: _userData['id'],
+                            isGarageView: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _quickMenu(
+                    icon: Icons.account_balance_outlined,
+                    label: 'บัญชีรับเงิน',
+                    onTap: () async {
+                      final saved = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BankSettingsPage(userData: _userData),
+                        ),
+                      );
+                      if (saved == true) {
+                        // ✅ อัปเดต userData ในตัวเองด้วยเผื่อค่าที่แก้ไปมีการใช้อีก (เช่น เปิดหน้านี้ซ้ำ)
+                        setState(() {});
+                      }
+                    },
+                  ),
                 ],
               ),
             ),

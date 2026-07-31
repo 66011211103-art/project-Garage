@@ -129,7 +129,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
       case 'assigned':
         return 'รอเริ่มงาน';
       case 'checking':
-        return 'กำลังตรวจสอบ';
+        return 'ช่างกำลังเดินทาง';
       case 'in_progress':
         return 'กำลังซ่อม';
       case 'waiting_parts':
@@ -283,7 +283,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                       itemBuilder: (context) => const [
                         PopupMenuItem(value: null, child: Text('ทั้งหมด')),
                         PopupMenuItem(value: 'assigned', child: Text('รอเริ่มงาน')),
-                        PopupMenuItem(value: 'checking', child: Text('กำลังตรวจสอบ')),
+                        PopupMenuItem(value: 'checking', child: Text('ช่างกำลังเดินทาง')),
                         PopupMenuItem(value: 'in_progress', child: Text('กำลังซ่อม')),
                         PopupMenuItem(value: 'waiting_parts', child: Text('รอรับอะไหล่')),
                         PopupMenuItem(value: 'completed', child: Text('เสร็จแล้ว')),

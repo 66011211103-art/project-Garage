@@ -4,6 +4,8 @@ import 'reject_reason_dialog.dart'; // ✅ popup เลือกเหตุผ�
 import 'create_quotation_page.dart'; // ✅ หน้าสร้างใบเสนอราคา
 import 'assign_technician_page.dart'; // ✅ หน้ามอบหมายงานให้ช่าง
 import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม
+import 'payment_confirm_dialog.dart'; // ✅ popup ตรวจสอบ/ยืนยัน/ปฏิเสธการชำระเงิน
+import 'chat_screen.dart'; // ✅ แชทกับลูกค้า
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -13,8 +15,10 @@ const List<String> _thaiMonthsAbbr = [
 /// หน้ารายการคำขอซ่อมทั้งหมด (ฝั่งอู่) พร้อมแท็บกรองสถานะ
 class AllRepairRequestsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
+  /// ถ้าใช้เป็นแท็บ "งาน" ในหน้าแรก (ไม่ได้ถูก push มา) ส่ง true เพื่อซ่อน AppBar/ปุ่มย้อนกลับ
+  final bool embedded;
 
-  const AllRepairRequestsPage({super.key, required this.userData});
+  const AllRepairRequestsPage({super.key, required this.userData, this.embedded = false});
 
   @override
   State<AllRepairRequestsPage> createState() => _AllRepairRequestsPageState();
@@ -45,6 +49,35 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     });
   }
 
+  // ✅ เปิดแชทกับลูกค้าของคำขอซ่อมนี้ (หาบทสนทนาเดิม หรือสร้างใหม่ถ้ายังไม่เคยคุยกัน)
+  Future<void> _openChat(Map<String, dynamic> r) async {
+    final result = await ApiService.getOrCreateConversation(
+      customerId: r['customer_id'],
+      garageId: widget.userData['id'],
+    );
+    if (!mounted) return;
+    if (!result.success || result.data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: result.data!['conversationId'],
+          myId: widget.userData['id'],
+          myType: 'repair',
+          otherPartyName: name.isEmpty ? 'ลูกค้า' : name,
+          otherPartyAvatar: r['customer_avatar']?.toString(),
+        ),
+      ),
+    );
+  }
+
   Future<void> _respondToRequest(int requestId, String status, {String? reason}) async {
     final result = await ApiService.updateRepairRequestStatus(
       requestId: requestId,
@@ -67,19 +100,27 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     await _respondToRequest(requestId, 'rejected', reason: reason);
   }
 
-  // "รายการคำขอซ่อม" นับเฉพาะงานที่ยัง active อยู่ (รอดำเนินการ + รับแล้ว/เสนอราคา/ยืนยันแล้ว)
-  // ไม่รวมที่ปฏิเสธ/เสร็จงานไปแล้ว เพราะถือว่าไม่ใช่งานที่ต้อง follow-up ต่อ
-  List<Map<String, dynamic>> get _activeRequests => _requests
-      .where((r) => ['pending', 'accepted', 'quoted', 'confirmed'].contains(r['status']))
-      .toList();
+  // สถานะระหว่างซ่อมจริง (หลังมอบหมายช่างแล้ว) — ช่างเป็นคนอัปเดตจากฝั่งของช่างเอง
+  static const List<String> _inRepairStatuses = ['assigned', 'checking', 'in_progress', 'waiting_parts'];
+
+  // "รายการคำขอซ่อม" นับเฉพาะงานที่ยัง active อยู่ (รอดำเนินการ + รับแล้ว/เสนอราคา/ยืนยันแล้ว/กำลังซ่อม
+  // + ซ่อมเสร็จแล้วแต่ลูกค้ายังไม่จ่ายเงิน หรือจ่ายแล้วรอ/ถูกปฏิเสธการยืนยัน)
+  // ไม่รวมที่ปฏิเสธ/จ่ายเงินยืนยันเสร็จสมบูรณ์แล้ว เพราะถือว่าไม่ใช่งานที่ต้อง follow-up ต่อ
+  bool _isActiveRequest(Map<String, dynamic> r) {
+    final status = r['status'];
+    if (['pending', 'accepted', 'quoted', 'confirmed', ..._inRepairStatuses].contains(status)) return true;
+    if (status == 'completed' && r['payment_status'] != 'confirmed') return true;
+    return false;
+  }
+
+  List<Map<String, dynamic>> get _activeRequests => _requests.where(_isActiveRequest).toList();
 
   List<Map<String, dynamic>> get _pendingOnly =>
       _requests.where((r) => r['status'] == 'pending').toList();
 
-  // "รับแล้ว" ครอบคลุมทุกขั้นหลังรับงาน (รับแล้ว/ส่งใบเสนอราคาแล้ว/ลูกค้ายืนยันแล้ว)
-  List<Map<String, dynamic>> get _acceptedOnly => _requests
-      .where((r) => ['accepted', 'quoted', 'confirmed'].contains(r['status']))
-      .toList();
+  // "รับแล้ว" ครอบคลุมทุกขั้นหลังรับงาน (รับแล้ว/ส่งใบเสนอราคาแล้ว/ลูกค้ายืนยันแล้ว/กำลังซ่อม/รอเก็บเงิน)
+  List<Map<String, dynamic>> get _acceptedOnly =>
+      _requests.where((r) => r['status'] != 'pending' && _isActiveRequest(r)).toList();
 
   List<Map<String, dynamic>> get _visibleRequests {
     switch (_selectedTab) {
@@ -143,21 +184,23 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xff2196F3),
-        title: const Text('รายการคำขอซ่อม', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-        elevation: 0,
-      ),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              backgroundColor: const Color(0xff2196F3),
+              title: const Text('รายการคำขอซ่อม', style: TextStyle(color: Colors.white)),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                  onPressed: () {},
+                ),
+              ],
+              elevation: 0,
+            ),
       body: RefreshIndicator(
         onRefresh: _fetchRequests,
         child: _isLoading
@@ -267,11 +310,40 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     final isAccepted = status == 'accepted';
     final isQuoted = status == 'quoted';
     final isConfirmed = status == 'confirmed';
+    final isInRepair = _inRepairStatuses.contains(status);
+    final isCompleted = status == 'completed';
+    final paymentStatus = r['payment_status']?.toString();
 
-    // ป้ายสถานะ: ใหม่ / รอดำเนินการ / รับแล้ว / รอลูกค้ายืนยันใบเสนอราคา / ลูกค้ายืนยันแล้ว
+    // ป้ายสถานะ: ใหม่ / รอดำเนินการ / รับแล้ว / รอลูกค้ายืนยันใบเสนอราคา / ลูกค้ายืนยันแล้ว / กำลังซ่อม / รอเก็บเงิน
     late String badgeText;
     late Color badgeColor;
-    if (isConfirmed) {
+    if (isCompleted) {
+      if (paymentStatus == 'pending_confirmation') {
+        badgeText = 'รอตรวจสอบการชำระเงิน';
+        badgeColor = const Color(0xffFF9800);
+      } else if (paymentStatus == 'rejected') {
+        badgeText = 'ปฏิเสธสลิป รอลูกค้าส่งใหม่';
+        badgeColor = const Color(0xffE53935);
+      } else {
+        badgeText = 'ซ่อมเสร็จ รอลูกค้าชำระเงิน';
+        badgeColor = const Color(0xff4CAF50);
+      }
+    } else if (isInRepair) {
+      const labels = {
+        'assigned': 'มอบหมายช่างแล้ว',
+        'checking': 'ช่างกำลังเดินทาง',
+        'in_progress': 'กำลังซ่อม',
+        'waiting_parts': 'รอรับอะไหล่',
+      };
+      const colors = {
+        'assigned': Color(0xff2196F3),
+        'checking': Color(0xff9C27B0),
+        'in_progress': Color(0xffFF9800),
+        'waiting_parts': Color(0xff795548),
+      };
+      badgeText = labels[status] ?? status;
+      badgeColor = colors[status] ?? Colors.grey;
+    } else if (isConfirmed) {
       badgeText = 'ลูกค้ายืนยันแล้ว';
       badgeColor = const Color(0xff4CAF50);
     } else if (isQuoted) {
@@ -310,14 +382,28 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: badgeColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(badgeText,
-                    style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.w600)),
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () => _openChat(r),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(20)),
+                      child: const Icon(Icons.chat_bubble_outline, size: 16, color: Color(0xff2196F3)),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(badgeText,
+                        style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ],
               ),
             ],
           ),
@@ -372,46 +458,75 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               ],
             )
           else if (isAccepted)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRequestDetail(r),
+                    icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                    label: const Text('ดูรายละเอียด'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue,
+                      side: const BorderSide(color: Colors.blue),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateQuotationPage(
+                            repairRequestId: id,
+                            customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+                          ),
+                        ),
+                      );
+                      if (result == true) _fetchRequests();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff9C27B0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
+                    label: const Text('ใบเสนอราคา', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                ),
+              ],
+            )
+          else if (isQuoted)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showRequestDetail(r),
+                icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                label: const Text('ดูรายละเอียด / รอลูกค้ายืนยันใบเสนอราคา'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue,
+                  side: const BorderSide(color: Colors.blue),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            )
+          // ✅ ลูกค้ายืนยันใบเสนอราคาแล้ว — จุดที่อู่มอบหมายงานให้ช่างได้
+          else if (isConfirmed)
             Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showRequestDetail(r),
-                        icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                        label: const Text('ดูรายละเอียด'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.blue,
-                          side: const BorderSide(color: Colors.blue),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRequestDetail(r),
+                    icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                    label: const Text('ดูรายละเอียด'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue,
+                      side: const BorderSide(color: Colors.blue),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CreateQuotationPage(
-                                repairRequestId: id,
-                                customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
-                              ),
-                            ),
-                          );
-                          if (result == true) _fetchRequests();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xff9C27B0),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-                        label: const Text('ใบเสนอราคา', style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -462,48 +577,76 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                 ),
               ],
             )
-          else if (isQuoted)
+          // ✅ ซ่อมเสร็จแล้ว รอเก็บเงิน — ถ้ามีลูกค้าแจ้งชำระเงินเข้ามาแล้ว ให้อู่ตรวจสลิป/ยืนยัน/ปฏิเสธได้
+          else if (isCompleted)
+            SizedBox(
+              width: double.infinity,
+              child: paymentStatus == 'pending_confirmation'
+                  ? ElevatedButton.icon(
+                      onPressed: () async {
+                        final changed = await showPaymentConfirmDialog(
+                          context,
+                          paymentId: r['payment_id'],
+                          garageId: widget.userData['id'],
+                          amount: double.tryParse(r['payment_amount']?.toString() ?? '0') ?? 0,
+                          slipUrl: r['payment_slip']?.toString(),
+                        );
+                        if (changed == true) _fetchRequests();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xffFF9800),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
+                      label: const Text('ตรวจสอบการชำระเงิน', style: TextStyle(color: Colors.white)),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: () => _showRequestDetail(r),
+                      icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                      label: Text(paymentStatus == 'rejected'
+                          ? 'ดูรายละเอียด (รอลูกค้าแนบสลิปใหม่)'
+                          : 'ดูรายละเอียด (รอลูกค้าชำระเงิน)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                        side: const BorderSide(color: Colors.blue),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+            )
+          // ✅ มอบหมายช่างแล้ว กำลังซ่อมอยู่ — อู่ดูความคืบหน้าได้ (ช่างเป็นคนอัปเดตสถานะจากฝั่งช่าง)
+          else if (isInRepair)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RepairTrackingPage(job: r, isCustomerView: false),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff2196F3),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.timeline, color: Colors.white, size: 16),
+                label: const Text('ดูสถานะการซ่อม', style: TextStyle(color: Colors.white)),
+              ),
+            )
+          else
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () => _showRequestDetail(r),
                 icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                label: const Text('ดูรายละเอียด / รอลูกค้ายืนยันใบเสนอราคา'),
+                label: const Text('ดูรายละเอียด'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.blue,
                   side: const BorderSide(color: Colors.blue),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showRequestDetail(r),
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                    label: const Text('ดูรายละเอียด'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue,
-                      side: const BorderSide(color: Colors.blue),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _respondToRequest(id, 'done'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff2196F3),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.task_alt, color: Colors.white, size: 16),
-                    label: const Text('งานเสร็จแล้ว', style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-              ],
             ),
         ],
       ),

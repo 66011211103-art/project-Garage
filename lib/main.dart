@@ -10,6 +10,34 @@ import 'forgot_password_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ กันไม่ให้แอปโชว์ "หน้าจอแดง" (Flutter error screen) เวลามี widget พัง
+  //     ไม่ว่าจะเกิดที่หน้าไหนก็ตาม — โชว์การ์ดข้อความสุภาพแทน
+  //     ผู้ใช้จะไม่เห็นหน้าจอแดงเต็มจออีกต่อไป (ต้อง full restart ไม่ใช่
+  //     hot reload ถึงจะ apply โค้ดตรงนี้)
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: const Color(0xffF5F5F5),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่อีกครั้ง',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp(const MyApp());
 }
 

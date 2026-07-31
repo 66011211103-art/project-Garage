@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
+import 'chat_list_page.dart'; // ✅ ลิสต์บทสนทนาจริง (แทนที่ ChatScreen() เดี่ยวๆ เดิม)
 import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อมรถ
 import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติคำขอซ่อม
@@ -147,8 +148,11 @@ class _HomePageState extends State<HomePage> {
         activeJob: _activeJob,
         onTrackTap: _openTracking,
       ), // ✅ ใช้ _userData แทน widget.userData
-      MyRepairRequestsPage(userData: _userData), // ✅ แท็บ "ประวัติ" ตอนนี้โชว์ของจริงแล้ว
-      const ChatScreen(),
+      MyRepairRequestsPage(
+        userData: _userData,
+        onBack: () => setState(() => _bodyIndex = 0), // ✅ ปุ่มย้อนกลับพากลับไปแท็บ "หน้าหลัก"
+      ), // ✅ แท็บ "ประวัติ" ตอนนี้โชว์ของจริงแล้ว
+      ChatListPage(userData: _userData), // ✅ แท็บ "แชท" ตอนนี้เป็นลิสต์บทสนทนาจริงแล้ว
       ProfilePage(
         userData: _userData,
         onUserDataChanged: _handleUserDataUpdated, // ✅ ส่ง callback ไปให้

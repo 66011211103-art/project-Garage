@@ -14,10 +14,11 @@ class RepairTrackingPage extends StatefulWidget {
   State<RepairTrackingPage> createState() => _RepairTrackingPageState();
 }
 
-// ✅ ลำดับขั้นตอนจริงตามสถานะที่ระบบมี (ไม่ได้ใส่ "ช่างกำลังเดินทาง" เพราะไม่มีข้อมูลสถานะนี้จริงในระบบ)
+// ✅ ลำดับขั้นตอนจริงตามสถานะที่ระบบมี — เปลี่ยนคำอธิบายขั้น "checking" ให้ตรงกับ
+// ดีไซน์ที่ขอ (แสดงเป็น "ช่างกำลังเดินทาง" แทน "กำลังตรวจสอบ" เฉพาะหน้านี้)
 const List<Map<String, String>> _steps = [
   {'status': 'assigned', 'label': 'รับงานแล้ว'},
-  {'status': 'checking', 'label': 'กำลังตรวจสอบ'},
+  {'status': 'checking', 'label': 'ช่างกำลังเดินทาง'},
   {'status': 'in_progress', 'label': 'กำลังซ่อม'},
   {'status': 'completed', 'label': 'ซ่อมเสร็จ'},
 ];
@@ -25,11 +26,13 @@ const List<Map<String, String>> _steps = [
 class _RepairTrackingPageState extends State<RepairTrackingPage> {
   bool _isLoadingLogs = true;
   List<Map<String, dynamic>> _logs = [];
+  Map<String, dynamic>? _quotation;
 
   @override
   void initState() {
     super.initState();
     _fetchLogs();
+    _fetchQuotation();
   }
 
   Future<void> _fetchLogs() async {
@@ -42,6 +45,14 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
           ? List<Map<String, dynamic>>.from(result.data!['logs'] ?? [])
           : [];
     });
+  }
+
+  Future<void> _fetchQuotation() async {
+    final result = await ApiService.getQuotation(repairRequestId: widget.job['id']);
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      setState(() => _quotation = result.data!['quotation'] as Map<String, dynamic>?);
+    }
   }
 
   String _vehicleLabel(String? value) {
@@ -66,7 +77,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
       case 'assigned':
         return 'รับงานแล้ว';
       case 'checking':
-        return 'กำลังตรวจสอบ';
+        return 'ช่างกำลังเดินทาง';
       case 'in_progress':
         return 'กำลังซ่อม';
       case 'waiting_parts':
@@ -83,7 +94,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
   String _statusDescription(String status) {
     switch (status) {
       case 'checking':
-        return 'ช่างกำลังตรวจเช็คอาการรถของคุณ';
+        return 'ช่างกำลังเดินทางมายังจุดนัดหมายของคุณ';
       case 'in_progress':
         return 'ช่างกำลังดำเนินการซ่อมรถของคุณ';
       case 'waiting_parts':
@@ -101,6 +112,50 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
   }
 
+  String _formatDateTime(String? isoString) {
+    final dt = DateTime.tryParse(isoString ?? '');
+    if (dt == null) return '-';
+    final buddhistYear2Digit = (dt.year + 543) % 100;
+    return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+  }
+
+  // ✅ เวลาของแต่ละขั้นตอน — ใช้ข้อมูลจริงเท่าที่มี:
+  // ขั้น "รับงานแล้ว" ใช้วันที่มอบหมายงาน (assignment_date ไม่มีเวลากำกับ จึงโชว์แค่วันที่)
+  // ขั้นถัดไปประมาณจากเวลาบันทึกความคืบหน้า (repair_logs) เรียงตามลำดับที่ช่างส่งจริง
+  // (ระบบยังไม่ได้บันทึกเวลาที่เปลี่ยนสถานะแยกเป็นรายขั้นตอน จึงเป็นการประมาณจากลำดับ log)
+  String? _stepTimestamp(int stepIndex) {
+    if (stepIndex == 0) {
+      final assignmentDate = widget.job['assignment_date']?.toString();
+      if (assignmentDate != null && assignmentDate.isNotEmpty) {
+        final dt = DateTime.tryParse(assignmentDate);
+        if (dt != null) {
+          final buddhistYear2Digit = (dt.year + 543) % 100;
+          return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')}';
+        }
+      }
+      return null;
+    }
+    final logIndex = stepIndex - 1;
+    if (logIndex < _logs.length) {
+      return _formatTime(_logs[logIndex]['created_at']?.toString());
+    }
+    return null;
+  }
+
+  // ✅ ระยะเวลาโดยประมาณ — คำนวณจากช่วงวันที่ในใบเสนอราคาที่อู่ระบุไว้ (ถ้ามี)
+  String? get _estimatedDurationText {
+    if (_quotation == null) return null;
+    final startRaw = _quotation!['estimated_start_date']?.toString();
+    final endRaw = _quotation!['estimated_end_date']?.toString();
+    final start = DateTime.tryParse(startRaw ?? '');
+    final end = DateTime.tryParse(endRaw ?? '');
+    if (start == null || end == null) return null;
+    final days = end.difference(start).inDays;
+    if (days <= 0) return 'ภายในวันเดียว';
+    return 'ประมาณ $days วัน';
+  }
+
   Future<void> _callTechnician(String? phone) async {
     if (phone == null || phone.isEmpty) return;
     final uri = Uri(scheme: 'tel', path: phone);
@@ -108,7 +163,11 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
   }
 
   int get _currentStepIndex {
-    final status = widget.job['status']?.toString() ?? 'assigned';
+    var status = widget.job['status']?.toString() ?? 'assigned';
+    // ✅ "รอรับอะไหล่" ถือเป็นการหยุดชั่วคราวระหว่างขั้น "กำลังซ่อม" (ไม่ได้มีบล็อกแยกใน
+    // stepper 4 ขั้นของฝั่งลูกค้า) จึงจับคู่ให้ไปอยู่ตำแหน่งเดียวกับ in_progress แทน
+    // ไม่งั้น indexWhere จะหาไม่เจอ (คืน -1) แล้ว fallback ไปที่ขั้นแรกผิดๆ
+    if (status == 'waiting_parts') status = 'in_progress';
     final index = _steps.indexWhere((s) => s['status'] == status);
     return index == -1 ? 0 : index;
   }
@@ -132,7 +191,9 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchLogs,
+        onRefresh: () async {
+          await Future.wait([_fetchLogs(), _fetchQuotation()]);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -231,7 +292,13 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                                   ),
                                 ),
                                 if (!done && !active)
-                                  const Text('รอดำเนินการ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                  const Text('รอดำเนินการ', style: TextStyle(color: Colors.grey, fontSize: 12))
+                                else if (active && status == 'waiting_parts')
+                                  const Text('หยุดชั่วคราว: รอรับอะไหล่',
+                                      style: TextStyle(color: Color(0xff795548), fontSize: 12, fontWeight: FontWeight.w600))
+                                else if (_stepTimestamp(index) != null)
+                                  Text(_stepTimestamp(index)!,
+                                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -259,6 +326,10 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                   _detailRow(Icons.build_outlined, 'ประเภทปัญหา', widget.job['problem_category']?.toString() ?? '-'),
                   _detailRow(Icons.directions_car_outlined, 'ประเภทรถ',
                       _vehicleLabel(widget.job['vehicle_type']?.toString())),
+                  _detailRow(Icons.access_time, 'เวลาที่ส่งคำขอ',
+                      _formatDateTime(widget.job['created_at']?.toString())),
+                  if (_estimatedDurationText != null)
+                    _detailRow(Icons.hourglass_bottom, 'เวลาโดยประมาณ', _estimatedDurationText!),
                 ],
               ),
             ),
@@ -303,7 +374,24 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                     ),
                   )),
 
-            if (status != 'completed') ...[
+            if (status == 'completed') ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xffE8F5E9), borderRadius: BorderRadius.circular(12)),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 18, color: Color(0xff4CAF50)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text('ซ่อมเสร็จเรียบร้อยแล้ว ดูสรุปงาน/ให้คะแนนได้ที่หน้าประวัติคำขอซ่อม',
+                          style: TextStyle(color: Color(0xff4CAF50), fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,

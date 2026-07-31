@@ -5,6 +5,7 @@ import ' myCarPage.dart'; // ✅ แก้แล้ว: เดิมชื่อ
 import 'api_service.dart';
 import 'settings_page.dart'; // ✅ เพิ่มใหม่: หน้าตั้งค่า
 import 'help_page.dart'; // ✅ เพิ่มใหม่: ศูนย์ช่วยเหลือ
+import 'payment_history_page.dart'; // ✅ ประวัติการชำระเงิน
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -235,6 +236,22 @@ class _ProfilePageState extends State<ProfilePage> {
                       },
                     ),
                     _menuItem(Icons.history, "ประวัติการซ่อม"),
+                    _menuItem(
+                      Icons.receipt_long_outlined,
+                      "ประวัติการชำระเงิน",
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PaymentHistoryPage(
+                              customerId: isRepair ? null : _userData['id'],
+                              garageId: isRepair ? _userData['id'] : null,
+                              isGarageView: isRepair,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     if (!isRepair)
                       _menuItem(
                         Icons.directions_car,

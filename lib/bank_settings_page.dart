@@ -1,0 +1,178 @@
+// ============================================================
+// 📄 ไฟล์: bank_settings_page.dart
+// 📌 หน้า/ฟีเจอร์: ให้อู่ตั้งค่าบัญชีธนาคารสำหรับรับชำระเงินจากลูกค้า
+//     (ใช้แสดงในหน้า customer_payment_page.dart ของฝั่งลูกค้า)
+// ============================================================
+
+import 'package:flutter/material.dart';
+import 'api_service.dart';
+
+class BankSettingsPage extends StatefulWidget {
+  final Map<String, dynamic> userData;
+
+  const BankSettingsPage({super.key, required this.userData});
+
+  @override
+  State<BankSettingsPage> createState() => _BankSettingsPageState();
+}
+
+class _BankSettingsPageState extends State<BankSettingsPage> {
+  late final TextEditingController _bankNameController;
+  late final TextEditingController _accountNumberController;
+  late final TextEditingController _accountNameController;
+  bool _isSaving = false;
+
+  static const List<String> _thaiBanks = [
+    'ธนาคารกสิกรไทย',
+    'ธนาคารไทยพาณิชย์',
+    'ธนาคารกรุงเทพ',
+    'ธนาคารกรุงไทย',
+    'ธนาคารกรุงศรีอยุธยา',
+    'ธนาคารทหารไทยธนชาต',
+    'ธนาคารออมสิน',
+    'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร',
+    'ธนาคารซีไอเอ็มบีไทย',
+    'ธนาคารยูโอบี',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _bankNameController = TextEditingController(text: widget.userData['bank_name']?.toString() ?? '');
+    _accountNumberController =
+        TextEditingController(text: widget.userData['bank_account_number']?.toString() ?? '');
+    _accountNameController =
+        TextEditingController(text: widget.userData['bank_account_name']?.toString() ?? widget.userData['shop_name']?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _bankNameController.dispose();
+    _accountNumberController.dispose();
+    _accountNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_bankNameController.text.trim().isEmpty || _accountNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกธนาคารและเลขที่บัญชี'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final result = await ApiService.updateBankDetails(
+      garageId: widget.userData['id'],
+      bankName: _bankNameController.text.trim(),
+      bankAccountNumber: _accountNumberController.text.trim(),
+      bankAccountName: _accountNameController.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message), backgroundColor: result.success ? Colors.green : Colors.red),
+    );
+
+    if (result.success) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xffF5F5F5),
+      appBar: AppBar(
+        backgroundColor: const Color(0xff2196F3),
+        title: const Text('บัญชีรับชำระเงิน', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        elevation: 0,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(12)),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('ข้อมูลนี้จะแสดงให้ลูกค้าเห็นตอนโอนเงินชำระค่าซ่อม กรุณากรอกให้ถูกต้อง',
+                      style: TextStyle(color: Color(0xff2196F3), fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('ธนาคาร', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+            child: DropdownButtonFormField<String>(
+              value: _thaiBanks.contains(_bankNameController.text) ? _bankNameController.text : null,
+              hint: const Text('เลือกธนาคาร'),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              items: _thaiBanks.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+              onChanged: (value) => setState(() => _bankNameController.text = value ?? ''),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          const Text('เลขที่บัญชี', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _accountNumberController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'xxx-x-xxxxx-x',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          const Text('ชื่อบัญชี', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _accountNameController,
+            decoration: InputDecoration(
+              hintText: 'ชื่อ-นามสกุล หรือ ชื่อร้าน',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff2196F3),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('บันทึกข้อมูลบัญชี', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
