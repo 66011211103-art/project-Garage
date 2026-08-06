@@ -279,40 +279,45 @@ class _LoginPageState extends State<LoginPage> {
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
       ),
       constraints: const BoxConstraints(maxHeight: 220),
-      child: ListView.builder(
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        itemCount: accounts.length,
-        itemBuilder: (context, index) {
-          final email = accounts[index]['email'] ?? '';
-          return ListTile(
-            dense: true,
-            leading: const Icon(
-              Icons.account_circle,
-              size: 22,
-              color: Colors.blue,
-            ),
-            title: Text(email, style: const TextStyle(fontSize: 14)),
-            subtitle: const Text('••••••••', style: TextStyle(fontSize: 12)),
-            trailing: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _removeSavedAccount(
-                email,
-              ), // ✅ widget ปกติ ไม่มี Overlay แย่งโฟกัส กดลบได้แน่นอน
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(Icons.close, size: 18, color: Colors.grey),
-              ),
-            ),
-            onTap: () => _selectAccount(email),
-          );
-        },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.white,
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: accounts.length,
+            itemBuilder: (context, index) {
+              final email = accounts[index]['email'] ?? '';
+              return ListTile(
+                dense: true,
+                leading: const Icon(
+                  Icons.account_circle,
+                  size: 22,
+                  color: Colors.blue,
+                ),
+                title: Text(email, style: const TextStyle(fontSize: 14)),
+                subtitle: const Text('••••••••', style: TextStyle(fontSize: 12)),
+                trailing: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _removeSavedAccount(
+                    email,
+                  ), // ✅ widget ปกติ ไม่มี Overlay แย่งโฟกัส กดลบได้แน่นอน
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.close, size: 18, color: Colors.grey),
+                  ),
+                ),
+                onTap: () => _selectAccount(email),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -335,8 +340,8 @@ class _LoginPageState extends State<LoginPage> {
                   children: const [
                     Image(
                       image: AssetImage('images/logo.png'),
-                      width: 230,
-                      height: 222,
+                      width: 220,
+                      height: 212,
                     ),
                     SizedBox(height: 10),
                     Text(
@@ -350,7 +355,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'ค้นหาอู่ซ่อมรถ\nใกล้คุณ',
+                      'ค้นหาอู่ซ่อมรถใกล้คุณ',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),

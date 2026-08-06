@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.53:3000/api';
+  static const String baseUrl = 'http://10.160.75.155:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -587,6 +587,7 @@ static Future<ApiResult> getProfile({
     required int repairRequestId,
     required List<Map<String, dynamic>> items,
     required double laborCost,
+    double? totalPrice, // ✅ ยอดรวมสุทธิที่รวม VAT 7% แล้ว (คำนวณจาก Flutter ฝั่งอู่)
     String? estimatedStartDate, // 'YYYY-MM-DD'
     String? estimatedEndDate,
     String? notes,
@@ -600,6 +601,7 @@ static Future<ApiResult> getProfile({
               'repairRequestId': repairRequestId,
               'items': items,
               'laborCost': laborCost,
+              if (totalPrice != null) 'totalPrice': totalPrice,
               'estimatedStartDate': estimatedStartDate,
               'estimatedEndDate': estimatedEndDate,
               'notes': notes,
@@ -614,6 +616,43 @@ static Future<ApiResult> getProfile({
       );
     } catch (e) {
       return ApiResult(success: false, message: 'สร้างใบเสนอราคาไม่สำเร็จ');
+    }
+  }
+
+  // ===== UPDATE QUOTATION (อู่แก้ไขใบเสนอราคาที่ส่งไปแล้ว) =====
+  // ⚠️ ต้องมี endpoint ฝั่ง backend รองรับด้วย: PUT /api/quotations/:id
+  static Future<ApiResult> updateQuotation({
+    required int quotationId,
+    required List<Map<String, dynamic>> items,
+    required double laborCost,
+    double? totalPrice, // ✅ ยอดรวมสุทธิที่รวม VAT 7% แล้ว
+    String? estimatedStartDate, // 'YYYY-MM-DD'
+    String? estimatedEndDate,
+    String? notes,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/quotations/$quotationId'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'items': items,
+              'laborCost': laborCost,
+              if (totalPrice != null) 'totalPrice': totalPrice,
+              'estimatedStartDate': estimatedStartDate,
+              'estimatedEndDate': estimatedEndDate,
+              'notes': notes,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'แก้ไขใบเสนอราคาไม่สำเร็จ');
     }
   }
 
@@ -1008,6 +1047,7 @@ static Future<ApiResult> getProfile({
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? promptpayId, // ✅ เบอร์โทร/เลขบัตรประชาชน สำหรับสร้าง QR พร้อมเพย์
   }) async {
     try {
       final response = await http
@@ -1018,6 +1058,7 @@ static Future<ApiResult> getProfile({
               'bankName': bankName,
               'bankAccountNumber': bankAccountNumber,
               'bankAccountName': bankAccountName,
+              'promptpayId': promptpayId,
             }),
           )
           .timeout(const Duration(seconds: 15));

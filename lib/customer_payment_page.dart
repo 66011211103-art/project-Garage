@@ -2,9 +2,9 @@
 // 📄 ไฟล์: customer_payment_page.dart
 // 📌 หน้า/ฟีเจอร์: หน้า "ชำระเงิน" ฝั่งลูกค้า (ตาม Figma ที่ส่งมา)
 // 📝 คำอธิบาย: เปิดได้เมื่องานซ่อมสถานะ "completed" แล้วเท่านั้น — ดึงยอดจริงจาก
-//     ใบเสนอราคาที่ยืนยันแล้ว (quotations.total_price) ให้เลือกวิธีชำระเงิน
-//     (โอนผ่านธนาคาร ใช้งานได้จริง / QR /บัตรเครดิต เป็น "เร็วๆ นี้") แนบสลิป
-//     แล้วส่งให้อู่ตรวจสอบ มี 3 สถานะการแสดงผล:
+//     ใบเสนอราคาที่ยืนยันแล้ว (คำนวณเองรวม VAT 7%) ให้เลือกวิธีชำระเงิน
+//     (โอนผ่านธนาคาร / QR พร้อมเพย์ ใช้งานได้จริงทั้งคู่ / บัตรเครดิต เป็น "เร็วๆ นี้")
+//     แนบสลิปแล้วส่งให้อู่ตรวจสอบ มี 3 สถานะการแสดงผล:
 //       - ยังไม่จ่าย → ฟอร์มให้กรอก
 //       - จ่ายแล้วรออู่ยืนยัน (pending_confirmation) → หน้าจอรอผล
 //       - อู่ปฏิเสธสลิป (rejected) → โชว์เหตุผล + ให้แนบใหม่ได้
@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'promptpay_qr.dart'; // ✅ ตัวสร้าง QR พร้อมเพย์จริง (EMV QR Code)
 
 class CustomerPaymentPage extends StatefulWidget {
   final int repairRequestId;
@@ -25,6 +26,7 @@ class CustomerPaymentPage extends StatefulWidget {
   final String? bankName;
   final String? bankAccountNumber;
   final String? bankAccountName;
+  final String? promptpayId; // ✅ เบอร์/เลขบัตรพร้อมเพย์ของอู่ — ใช้สร้าง QR ให้สแกนจ่าย
 
   const CustomerPaymentPage({
     super.key,
@@ -35,6 +37,7 @@ class CustomerPaymentPage extends StatefulWidget {
     this.bankName,
     this.bankAccountNumber,
     this.bankAccountName,
+    this.promptpayId,
   });
 
   @override
@@ -86,7 +89,17 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
     });
   }
 
-  double get _totalAmount => double.tryParse(_quotation?['total_price']?.toString() ?? '0') ?? 0;
+  // ✅ คำนวณยอดที่ต้องจ่ายจริงเอง (รวม VAT 7%) แทนการอ่าน total_price ตรงๆ จาก
+  // backend เพราะ backend เก็บ total_price = ค่าอะไหล่+ค่าแรง โดยไม่ได้บวก VAT
+  // เข้าไปเลย ต้องคำนวณให้ตรงกับยอดที่ quotation_card.dart แสดงให้ลูกค้าดูก่อนหน้านี้
+  double get _totalAmount {
+    final items = (_quotation?['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
+    final partsCost = items.fold<double>(
+        0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0));
+    final laborCost = double.tryParse(_quotation?['labor_cost']?.toString() ?? '0') ?? 0;
+    final subTotal = partsCost + laborCost;
+    return subTotal + (subTotal * 0.07);
+  }
 
   Future<void> _pickSlip() async {
     final picker = ImagePicker();
@@ -101,7 +114,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Future<void> _submit() async {
-    if (_selectedMethod != 'bank_transfer') return; // กันไว้ (ปุ่มถูกปิดอยู่แล้วสำหรับวิธีอื่น)
+    if (_selectedMethod != 'bank_transfer' && _selectedMethod != 'qr') return; // กันไว้ (บัตรเครดิตยังปิดอยู่)
     if (_slipBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณาแนบสลิปการโอนเงิน'), backgroundColor: Colors.red),
@@ -218,6 +231,15 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
           const Text('อัปโหลดสลิปการโอนเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _slipUploadBox(),
+        ] else if (_selectedMethod == 'qr') ...[
+          const SizedBox(height: 20),
+          const Text('สแกน QR เพื่อชำระเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 10),
+          _qrPaymentCard(),
+          const SizedBox(height: 20),
+          const Text('อัปโหลดสลิปการโอนเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 10),
+          _slipUploadBox(),
         ] else ...[
           const SizedBox(height: 20),
           Container(
@@ -229,7 +251,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                 Icon(Icons.hourglass_top, color: Colors.grey, size: 20),
                 SizedBox(width: 10),
                 Expanded(
-                  child: Text('ฟีเจอร์นี้จะเปิดให้บริการเร็วๆ นี้ ขณะนี้รองรับเฉพาะ "โอนเงินผ่านธนาคาร"',
+                  child: Text('ฟีเจอร์นี้จะเปิดให้บริการเร็วๆ นี้ ขณะนี้รองรับ "โอนเงินผ่านธนาคาร" และ "QR Payment"',
                       style: TextStyle(color: Colors.grey, fontSize: 13)),
                 ),
               ],
@@ -258,7 +280,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: (_selectedMethod == 'bank_transfer' && !_isSubmitting) ? _submit : null,
+            onPressed: ((_selectedMethod == 'bank_transfer' || _selectedMethod == 'qr') && !_isSubmitting) ? _submit : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xff4CAF50),
               disabledBackgroundColor: Colors.grey.shade300,
@@ -326,6 +348,8 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                       '${it['name']} x${it['quantity'] ?? 1}',
                       double.tryParse(it['price']?.toString() ?? '0') ?? 0)),
                   if (laborCost > 0) _costRow('ค่าแรง', laborCost),
+                  _costRow('ภาษีมูลค่าเพิ่ม 7%',
+                      (items.fold<double>(0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0)) + laborCost) * 0.07),
                   const Divider(height: 16),
                   _costRow('รวมทั้งหมด', _totalAmount, bold: true),
                 ],
@@ -396,6 +420,34 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
     );
   }
 
+  // ✅ สีประจำธนาคารแต่ละเจ้า (อิงจากสีแบรนด์จริง) ให้การ์ดดูมืออาชีพขึ้น
+  Color _bankColor(String? bankName) {
+    switch (bankName) {
+      case 'ธนาคารกสิกรไทย':
+        return const Color(0xff138F2D);
+      case 'ธนาคารไทยพาณิชย์':
+        return const Color(0xff4E2A84);
+      case 'ธนาคารกรุงเทพ':
+        return const Color(0xff1E4598);
+      case 'ธนาคารกรุงไทย':
+        return const Color(0xff1BA5E1);
+      case 'ธนาคารกรุงศรีอยุธยา':
+        return const Color(0xffFEC200);
+      case 'ธนาคารทหารไทยธนชาต':
+        return const Color(0xff1279BE);
+      case 'ธนาคารออมสิน':
+        return const Color(0xffEB198D);
+      case 'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร':
+        return const Color(0xff4B9B1D);
+      case 'ธนาคารซีไอเอ็มบีไทย':
+        return const Color(0xff7E2F36);
+      case 'ธนาคารยูโอบี':
+        return const Color(0xff0B3979);
+      default:
+        return const Color(0xff2196F3);
+    }
+  }
+
   Widget _bankDetailsCard() {
     final hasBankDetails = (widget.bankAccountNumber ?? '').isNotEmpty;
 
@@ -409,46 +461,99 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
       );
     }
 
+    final color = _bankColor(widget.bankName);
+
+    // ✅ การ์ดสไตล์ "บัตรธนาคาร" — พื้นไล่สีตามแบรนด์ธนาคาร โชว์เลขบัญชีตัวใหญ่
+    // อ่านง่าย พร้อมปุ่มคัดลอกเด่นชัด (ต่างจากเดิมที่เป็นแค่รายการข้อความล้วน)
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color, color.withOpacity(0.75)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _bankRow('ธนาคาร', widget.bankName ?? '-'),
-          const Divider(height: 20),
-          _bankRow('เลขที่บัญชี', widget.bankAccountNumber ?? '-', copyable: true),
-          const Divider(height: 20),
-          _bankRow('ชื่อบัญชี', widget.bankAccountName ?? widget.shopName),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.account_balance, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(widget.bankName ?? '-',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text('เลขที่บัญชี', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.bankAccountNumber ?? '-',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                ),
+              ),
+              InkWell(
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: widget.bankAccountNumber ?? ''));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('คัดลอกเลขบัญชีแล้ว'), duration: Duration(seconds: 1)),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
+                  child: const Icon(Icons.copy, size: 16, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text('ชื่อบัญชี', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
+          const SizedBox(height: 2),
+          Text(widget.bankAccountName ?? widget.shopName,
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
-  Widget _bankRow(String label, String value, {bool copyable = false}) {
-    return Row(
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-        const Spacer(),
-        Text(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 14, color: copyable ? const Color(0xff2196F3) : Colors.black)),
-        if (copyable) ...[
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: () async {
-              await Clipboard.setData(ClipboardData(text: value));
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('คัดลอกเลขบัญชีแล้ว'), duration: Duration(seconds: 1)),
-              );
-            },
-            child: const Icon(Icons.copy, size: 16, color: Color(0xff2196F3)),
-          ),
-        ],
-      ],
+  // ✅ การ์ด QR พร้อมเพย์จริง — ใช้ตัวสร้าง QR จาก promptpay_qr.dart (มาตรฐาน EMV QR)
+  // เข้ารหัสยอดที่ต้องจ่ายพอดีลงใน QR เลย ลูกค้าสแกนแล้วยอดขึ้นให้อัตโนมัติ
+  Widget _qrPaymentCard() {
+    final promptpayId = widget.promptpayId;
+    if ((promptpayId ?? '').isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(14)),
+        child: const Text('อู่ยังไม่ได้ตั้งค่า PromptPay สำหรับรับชำระเงิน กรุณาเลือก "โอนเงินผ่านธนาคาร" แทน',
+            style: TextStyle(color: Color(0xffE65100), fontSize: 13)),
+      );
+    }
+
+    return PromptPayQrCode(
+      promptPayId: promptpayId!,
+      amount: _totalAmount,
+      accountName: widget.bankAccountName ?? widget.shopName,
     );
   }
+
 
   Widget _slipUploadBox() {
     return InkWell(

@@ -203,7 +203,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
     );
 
     if (widget.embedded) {
-      return Scaffold(backgroundColor: const Color(0xffF5F5F5), body: body);
+      return Scaffold(backgroundColor: const Color(0xffF5F5F5), body: SafeArea(child: body));
     }
 
     return Scaffold(

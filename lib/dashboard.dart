@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
 import 'chat_list_page.dart'; // ✅ ลิสต์บทสนทนาจริง (แทนที่ ChatScreen() เดี่ยวๆ เดิม)
@@ -110,6 +109,19 @@ class _HomePageState extends State<HomePage> {
         }
       },
     );
+
+    // ✅ ฟังอีเวนต์เดิม ('notification') ตรงๆ เพิ่มอีกชุด แยกจาก onNotificationTap
+    // ด้านบน (ซึ่งทำงานเฉพาะตอนลูกค้า "กด" ที่ตัวแจ้งเตือน) — อันนี้ทำงานทันทีที่
+    // ช่างกดส่งอัปเดต ไม่ต้องรอลูกค้าเปิดแจ้งเตือน การ์ด "กำลังซ่อม" หน้าแรกจะ
+    // เปลี่ยนข้อความ (เช่น "ช่างกำลังเดินทาง") ให้ทันทีแบบ real-time
+    SocketNotificationService.socket?.on('notification', (data) {
+      if (!mounted || data is! Map) return;
+      final map = Map<String, dynamic>.from(data);
+      final notifData = (map['data'] is Map) ? Map<String, dynamic>.from(map['data']) : <String, dynamic>{};
+      if (notifData['type'] == 'repair_status') {
+        _fetchActiveJob();
+      }
+    });
   }
 
   // ✅ เรียกจาก ProfilePage เมื่อข้อมูลถูกแก้ไข เพื่ออัปเดตทุกหน้าพร้อมกันทันที
@@ -187,6 +199,23 @@ void _openSearch(BuildContext context, Map<String, dynamic> userData, String ser
       builder: (context) => SearchPage(userData: userData, initialService: service),
     ),
   );
+}
+
+// ✅ ข้อความหัวการ์ด "กำลังซ่อม" หน้าแรก — เปลี่ยนตามสถานะจริงที่ช่างอัปเดตล่าสุด
+// (เดิม const Text("กำลังซ่อม") ฝังตายตัว ไม่เคยอ่านสถานะจริงเลย)
+String _activeJobStatusLabel(String? status) {
+  switch (status) {
+    case 'assigned':
+      return 'รับงานแล้ว';
+    case 'checking':
+      return 'ช่างกำลังเดินทาง';
+    case 'in_progress':
+      return 'กำลังซ่อม';
+    case 'waiting_parts':
+      return 'รอรับอะไหล่';
+    default:
+      return 'กำลังซ่อม';
+  }
 }
 
 class HomeContent extends StatelessWidget {
@@ -340,22 +369,22 @@ class HomeContent extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       CategoryItem(
-                        icon: FontAwesomeIcons.car,
+                        icon: Icons.directions_car_filled_outlined,
                         title: "เครื่องยนต์",
                         onTap: () => _openSearch(context, userData, "เครื่องยนต์"),
                       ),
                       CategoryItem(
-                        icon: FontAwesomeIcons.circle,
+                        icon: Icons.circle,
                         title: "ยาง",
                         onTap: () => _openSearch(context, userData, "ยาง"),
                       ),
                       CategoryItem(
-                        icon: FontAwesomeIcons.carBattery,
+                        icon: Icons.battery_charging_full,
                         title: "แบตเตอรี่",
                         onTap: () => _openSearch(context, userData, "แบตเตอรี่"),
                       ),
                       CategoryItem(
-                        icon: FontAwesomeIcons.sprayCanSparkles,
+                        icon: Icons.format_paint,
                         title: "ซ่อมสี",
                         onTap: () => _openSearch(context, userData, "ซ่อมสี"),
                       ),
@@ -391,9 +420,9 @@ class HomeContent extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  "กำลังซ่อม",
-                                  style: TextStyle(
+                                Text(
+                                  _activeJobStatusLabel(activeJob!['status']?.toString()),
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 26,

@@ -2,12 +2,11 @@
 // 📄 ไฟล์: update_job_status_page.dart
 // 📌 หน้า/ฟีเจอร์: หน้า "อัปเดตสถานะงาน" (Mechanic Update Screen) ฝั่งช่าง
 //     เปิดจากปุ่ม "อัปเดตสถานะงาน" ในหน้า technician_job_detail_page.dart
-// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่ (4 แบบ: ช่างกำลังเดินทาง/กำลังซ่อม/รอรับอะไหล่/ซ่อมเสร็จแล้ว
-//     ตรงกับที่ backend รองรับแล้ว — ใช้คำเดียวกับหน้าติดตามสถานะฝั่งลูกค้าเพื่อไม่ให้สับสน), บันทึกรายละเอียดที่ทำไป, แนบรูปก่อน/หลังซ่อม
-//     และกรอกรายการอะไหล่ที่ใช้ (ชื่อ/จำนวน/ราคา) แล้วส่งอัปเดตครั้งเดียว
-//     (เรียก API 2 ตัว: updateTechnicianJobStatus + createRepairLog)
-// ⚠️ หมายเหตุ: "อะไหล่ที่ใช้" และรูปก่อน/หลัง ยังรวมเป็นข้อความ/list เดียวก่อนส่ง
-//     ให้ backend (API ปัจจุบันยังไม่มีฟิลด์แยกโครงสร้างแบบเต็มรูปแบบ)
+// 📝 คำอธิบาย: ให้ช่างเลือกสถานะใหม่ (3 แบบ: ช่างกำลังเดินทาง/กำลังซ่อม/ซ่อมเสร็จแล้ว
+//     ตรงกับที่ backend รองรับแล้ว — ใช้คำเดียวกับหน้าติดตามสถานะฝั่งลูกค้าเพื่อไม่ให้สับสน)
+//     บันทึกรายละเอียดที่ทำไป, แนบรูปก่อน/หลังซ่อม และกรอกรายการอะไหล่ที่ใช้
+//     (เฉพาะตอนเลือกสถานะ "กำลังซ่อม" เท่านั้น — อีก 2 สถานะไม่เกี่ยวกับอะไหล่)
+//     แล้วส่งอัปเดตครั้งเดียว (เรียก API 2 ตัว: updateTechnicianJobStatus + createRepairLog)
 // ============================================================
 
 import 'dart:typed_data';
@@ -40,6 +39,7 @@ class UpdateJobStatusPage extends StatefulWidget {
 class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
   late String _selectedStatus;
   final _noteController = TextEditingController();
+  // ✅ โผล่เฉพาะตอนเลือกสถานะ "กำลังซ่อม" (in_progress) เท่านั้น — อีก 2 สถานะไม่โชว์
   final List<_PartRow> _parts = [_PartRow()];
 
   Uint8List? _beforePhoto;
@@ -117,13 +117,6 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
   }
 
   Future<void> _handleSubmit() async {
-    if (_noteController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายละเอียดที่ทำไป'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     // 1) อัปเดตสถานะงาน
@@ -148,7 +141,7 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
       repairRequestId: widget.job['id'],
       technicianId: widget.userData['technician_id'] ?? widget.userData['id'],
       note: _noteController.text.trim(),
-      partsUsed: _buildPartsUsedText(),
+      partsUsed: _selectedStatus == 'in_progress' ? _buildPartsUsedText() : '',
       photos: photos,
       photoNames: photoNames,
     );
@@ -215,14 +208,22 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
 
                 const SizedBox(height: 16),
                 const Text('อัปเดตสถานะ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                _statusOption('checking', 'ช่างกำลังเดินทาง', Icons.directions_car_outlined, const Color(0xff9C27B0)),
-                _statusOption('in_progress', 'กำลังซ่อม', Icons.build_circle_outlined, const Color(0xffFF9800)),
-                _statusOption('waiting_parts', 'รอรับอะไหล่', Icons.inventory_2_outlined, const Color(0xff795548)),
-                _statusOption('completed', 'ซ่อมเสร็จแล้ว', Icons.check_circle_outline, const Color(0xff4CAF50)),
+                const SizedBox(height: 10),
+                _statusOption('checking', 'ช่างกำลังเดินทาง', 'กำลังมุ่งหน้าไปยังจุดนัดหมาย',
+                    Icons.directions_car_outlined, const Color(0xff9C27B0)),
+                _statusOption('in_progress', 'กำลังซ่อม', 'เริ่มดำเนินการซ่อมแล้ว',
+                    Icons.build_circle_outlined, const Color(0xffFF9800)),
+                _statusOption('completed', 'ซ่อมเสร็จแล้ว', 'งานซ่อมเสร็จสมบูรณ์',
+                    Icons.check_circle_outline, const Color(0xff4CAF50)),
 
                 const SizedBox(height: 16),
-                const Text('บันทึกรายละเอียด', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    const Text('บันทึกรายละเอียด', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 6),
+                    Text('(ไม่บังคับ)', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _noteController,
@@ -249,69 +250,73 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                   ],
                 ),
 
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('อะไหล่ที่ใช้', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                    TextButton.icon(
-                      onPressed: _addPartRow,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('เพิ่มอะไหล่'),
-                    ),
-                  ],
-                ),
-                ...List.generate(_parts.length, (index) {
-                  final p = _parts[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: p.nameCtrl,
-                                decoration: const InputDecoration(
-                                    labelText: 'ชื่ออะไหล่', isDense: true, border: OutlineInputBorder()),
+                // ✅ โผล่เฉพาะตอนเลือกสถานะ "กำลังซ่อม" (in_progress) เท่านั้น —
+                // เลือก "ช่างกำลังเดินทาง" หรือ "ซ่อมเสร็จแล้ว" จะไม่เห็นส่วนนี้
+                if (_selectedStatus == 'in_progress') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('อะไหล่ที่ใช้', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      TextButton.icon(
+                        onPressed: _addPartRow,
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('เพิ่มอะไหล่'),
+                      ),
+                    ],
+                  ),
+                  ...List.generate(_parts.length, (index) {
+                    final p = _parts[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: p.nameCtrl,
+                                  decoration: const InputDecoration(
+                                      labelText: 'ชื่ออะไหล่', isDense: true, border: OutlineInputBorder()),
+                                ),
                               ),
-                            ),
-                            if (_parts.length > 1)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                onPressed: () => _removePartRow(index),
+                              if (_parts.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () => _removePartRow(index),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: p.qtyCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'จำนวน', isDense: true, border: OutlineInputBorder()),
+                                ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: p.qtyCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                    labelText: 'จำนวน', isDense: true, border: OutlineInputBorder()),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: p.priceCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'ราคา (บาท)', isDense: true, border: OutlineInputBorder()),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: TextField(
-                                controller: p.priceCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                    labelText: 'ราคา (บาท)', isDense: true, border: OutlineInputBorder()),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ],
             ),
           ),
@@ -345,29 +350,57 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
     );
   }
 
-  Widget _statusOption(String value, String label, IconData icon, Color color) {
+  Widget _statusOption(String value, String label, String subtitle, IconData icon, Color color) {
     final selected = _selectedStatus == value;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: () => setState(() => _selectedStatus = value),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.1) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? color : Colors.transparent, width: 1.5),
+            color: selected ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? color : Colors.grey.shade200, width: selected ? 2 : 1),
+            boxShadow: selected
+                ? [BoxShadow(color: color.withOpacity(0.18), blurRadius: 12, offset: const Offset(0, 4))]
+                : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
           ),
           child: Row(
             children: [
-              Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  size: 18, color: selected ? color : Colors.grey),
-              const SizedBox(width: 10),
-              Icon(icon, size: 16, color: color),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? color : color.withOpacity(0.12),
+                ),
+                child: Icon(icon, size: 20, color: selected ? Colors.white : color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: selected ? color : Colors.black87)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_off,
+                color: selected ? color : Colors.grey.shade300,
+                size: 22,
+              ),
             ],
           ),
         ),

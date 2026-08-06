@@ -139,7 +139,7 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xff4CAF50), Color(0xff388E3C)]),
+                    gradient: const LinearGradient(colors: [Color(0xff2196F3), Color(0xff2196F3)]),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(

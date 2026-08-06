@@ -169,9 +169,29 @@ class _GarageDashboardState extends State<GarageDashboard> {
     }).length;
   }
 
-  int get _inProgressCount => _requests.where((r) => r['status'] == 'accepted').length;
+  // ✅ "กำลังดำเนินการ" = งานที่มอบหมายช่างแล้วแต่ยังไม่เสร็จ (เดิมเช็คแค่ status
+  // == 'accepted' ซึ่งเป็นแค่ขั้น "อู่รับงาน" ไม่ใช่ขั้นกำลังซ่อมจริงๆ เลยขึ้น 0
+  // ตลอด ทั้งที่มีงานกำลังซ่อมอยู่จริง)
+  static const List<String> _inRepairStatuses = ['assigned', 'checking', 'in_progress', 'waiting_parts'];
+  int get _inProgressCount => _requests.where((r) => _inRepairStatuses.contains(r['status'])).length;
 
-  int get _doneCount => _requests.where((r) => r['status'] == 'done').length;
+  // ✅ "เสร็จแล้ว" ต้องเช็ค status == 'completed' (สถานะจริงที่ช่างกดตอนซ่อมเสร็จ)
+  // ไม่ใช่ 'done' ซึ่งเป็นสถานะเก่าที่ไม่มีการใช้งานจริงในระบบแล้ว
+  int get _doneCount => _requests.where((r) => r['status'] == 'completed').length;
+
+  // ✅ "รายได้วันนี้" คำนวณจริงจากรายการที่อู่ยืนยันรับเงินแล้ว (payment_status ==
+  // confirmed) และแจ้งชำระเงินเข้ามาวันนี้ (เดิม hardcode เป็น '0' ตลอด ไม่เคยคำนวณจริง)
+  double get _todayRevenue {
+    final now = DateTime.now();
+    return _requests.where((r) {
+      if (r['payment_status']?.toString() != 'confirmed') return false;
+      final submitted = DateTime.tryParse(r['payment_submitted_at']?.toString() ?? '');
+      return submitted != null &&
+          submitted.year == now.year &&
+          submitted.month == now.month &&
+          submitted.day == now.day;
+    }).fold<double>(0, (sum, r) => sum + (double.tryParse(r['payment_amount']?.toString() ?? '0') ?? 0));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -205,10 +225,18 @@ class _GarageDashboardState extends State<GarageDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'โปรไฟล์'),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xff2196F3),
-        child: const Icon(Icons.add, color: Colors.white),
+      // ✅ เดิมซ่อน FAB แบบมี/ไม่มี widget (null สลับกับ FloatingActionButton) ตอนอยู่แท็บ
+      // "ประวัติ" ซึ่งทำให้โครงสร้าง Scaffold เปลี่ยนพร้อมกับตอน body สลับแท็บในเฟรม
+      // เดียวกัน — เป็นไปได้สูงว่าเป็นสาเหตุของ Flutter assertion error
+      // "!semantics.parentDataDirty" ที่เกิดซ้ำๆ เปลี่ยนมาใช้ Visibility ซ่อนแทน
+      // (FAB widget ยังอยู่ในทรีเสมอ แค่มองไม่เห็น/กดไม่ได้ ไม่กระทบ semantics tree)
+      floatingActionButton: Visibility(
+        visible: currentIndex == 0,
+        child: FloatingActionButton(
+          onPressed: () {},
+          backgroundColor: const Color(0xff2196F3),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }
@@ -293,7 +321,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   _statCard(icon: Icons.calendar_today, value: '$_todayCount', label: 'งานวันนี้', color: const Color(0xff2196F3)),
                   _statCard(icon: Icons.build, value: '$_inProgressCount', label: 'กำลังดำเนินการ', color: const Color(0xffFF9800)),
                   _statCard(icon: Icons.check_circle, value: '$_doneCount', label: 'เสร็จแล้ว', color: const Color(0xff4CAF50)),
-                  _statCard(icon: Icons.attach_money, value: '0', label: 'รายได้วันนี้', color: const Color(0xff9C27B0)),
+                  _statCard(icon: Icons.attach_money, value: '฿${_todayRevenue.toStringAsFixed(0)}', label: 'รายได้วันนี้', color: const Color(0xff9C27B0)),
                 ],
               ),
             ),

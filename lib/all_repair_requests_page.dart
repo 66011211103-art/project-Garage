@@ -6,6 +6,7 @@ import 'assign_technician_page.dart'; // ✅ หน้ามอบหมาย�
 import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม
 import 'payment_confirm_dialog.dart'; // ✅ popup ตรวจสอบ/ยืนยัน/ปฏิเสธการชำระเงิน
 import 'chat_screen.dart'; // ✅ แชทกับลูกค้า
+import 'garage_request_detail_page.dart'; // ✅ หน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม)
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -201,7 +202,9 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               ],
               elevation: 0,
             ),
-      body: RefreshIndicator(
+      body: SafeArea(
+        top: widget.embedded,
+        child: RefreshIndicator(
         onRefresh: _fetchRequests,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -254,6 +257,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   ),
                 ],
               ),
+      ),
       ),
     );
   }
@@ -382,28 +386,38 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
               ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () => _openChat(r),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(20)),
-                      child: const Icon(Icons.chat_bubble_outline, size: 16, color: Color(0xff2196F3)),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: badgeColor.withOpacity(0.12),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    InkWell(
+                      onTap: () => _openChat(r),
                       borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(20)),
+                        child: const Icon(Icons.chat_bubble_outline, size: 16, color: Color(0xff2196F3)),
+                      ),
                     ),
-                    child: Text(badgeText,
-                        style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                ],
+                    // ✅ Flexible กันบั๊ก overflow ตอน badgeText ยาว เช่น "รอลูกค้ายืนยันใบเสนอราคา"
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          badgeText,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -421,7 +435,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showRequestDetail(r),
+                    onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                     label: const Text('ดูรายละเอียด'),
                     style: OutlinedButton.styleFrom(
@@ -462,7 +476,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showRequestDetail(r),
+                    onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                     label: const Text('ดูรายละเอียด'),
                     style: OutlinedButton.styleFrom(
@@ -501,7 +515,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => _showRequestDetail(r),
+                onPressed: () => _openDetail(r),
                 icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                 label: const Text('ดูรายละเอียด / รอลูกค้ายืนยันใบเสนอราคา'),
                 style: OutlinedButton.styleFrom(
@@ -518,7 +532,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => _showRequestDetail(r),
+                    onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                     label: const Text('ดูรายละเอียด'),
                     style: OutlinedButton.styleFrom(
@@ -601,7 +615,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                       label: const Text('ตรวจสอบการชำระเงิน', style: TextStyle(color: Colors.white)),
                     )
                   : OutlinedButton.icon(
-                      onPressed: () => _showRequestDetail(r),
+                      onPressed: () => _openDetail(r),
                       icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                       label: Text(paymentStatus == 'rejected'
                           ? 'ดูรายละเอียด (รอลูกค้าแนบสลิปใหม่)'
@@ -638,7 +652,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => _showRequestDetail(r),
+                onPressed: () => _openDetail(r),
                 icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                 label: const Text('ดูรายละเอียด'),
                 style: OutlinedButton.styleFrom(
@@ -663,71 +677,16 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     );
   }
 
-  void _showRequestDetail(Map<String, dynamic> r) {
-    final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
-    final photos = (r['photos'] is List) ? List<dynamic>.from(r['photos']) : [];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('#REQ${r['id'].toString().padLeft(6, '0')}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              const SizedBox(height: 4),
-              Text(name.isEmpty ? 'ไม่ระบุชื่อ' : name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('ประเภทรถ: ${_vehicleLabel(r['vehicle_type']?.toString())}',
-                  style: const TextStyle(color: Colors.grey)),
-              Text('ประเภทปัญหา: ${r['problem_category'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
-              const SizedBox(height: 12),
-              Text(r['description']?.toString().isNotEmpty == true
-                  ? r['description'].toString()
-                  : 'ไม่มีรายละเอียดเพิ่มเติม'),
-              const SizedBox(height: 12),
-              Text('ที่อยู่: ${r['address'] ?? 'ไม่ระบุ'}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              if ((r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xffFFEBEE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text('เหตุผลที่ปฏิเสธ: ${r['rejection_reason']}',
-                      style: const TextStyle(color: Colors.red, fontSize: 13)),
-                ),
-              ],
-              if (photos.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 90,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: photos.map((url) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(url.toString(), width: 90, height: 90, fit: BoxFit.cover),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+  // ✅ เปิดหน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม) — มีข้อมูลครบ + ดู/แก้ไข
+  // ใบเสนอราคาได้ในตัว ถ้ามีการเปลี่ยนแปลงกลับมา (รับงาน/ปฏิเสธ/สร้างหรือแก้ไข
+  // ใบเสนอราคา/มอบหมายช่าง/ยืนยันการชำระเงิน) ให้รีเฟรชลิสต์ทันที
+  Future<void> _openDetail(Map<String, dynamic> r) async {
+    final changed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GarageRequestDetailPage(request: r, userData: widget.userData),
       ),
     );
+    if (changed == true) _fetchRequests();
   }
 }

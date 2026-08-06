@@ -6,6 +6,7 @@ import 'api_service.dart';
 import 'settings_page.dart'; // ✅ เพิ่มใหม่: หน้าตั้งค่า
 import 'help_page.dart'; // ✅ เพิ่มใหม่: ศูนย์ช่วยเหลือ
 import 'payment_history_page.dart'; // ✅ ประวัติการชำระเงิน
+import 'customer_repair_history_page.dart'; // ✅ ประวัติการซ่อมรถ (ลูกค้า)
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -207,12 +208,12 @@ class _ProfilePageState extends State<ProfilePage> {
               // Menu Items
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
+                child: Material(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  children: [
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
                     _menuItem(
                       Icons.person_outline,
                       isRepair ? "แก้ไขข้อมูลอู่" : "แก้ไขข้อมูลส่วนตัว",
@@ -235,7 +236,19 @@ class _ProfilePageState extends State<ProfilePage> {
                         }
                       },
                     ),
-                    _menuItem(Icons.history, "ประวัติการซ่อม"),
+                    if (!isRepair)
+                      _menuItem(
+                        Icons.history,
+                        "ประวัติการซ่อม",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CustomerRepairHistoryPage(userData: _userData),
+                            ),
+                          );
+                        },
+                      ),
                     _menuItem(
                       Icons.receipt_long_outlined,
                       "ประวัติการชำระเงิน",
@@ -284,6 +297,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       },
                     ),
                   ],
+                ),
                 ),
               ),
 

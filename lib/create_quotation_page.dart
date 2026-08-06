@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 
 /// หน้าสร้างใบเสนอราคา ให้อู่กรอกหลังจากกด "รับงาน" คำขอซ่อมแล้ว
+/// ✅ ใช้หน้าเดียวกันนี้ทำโหมด "แก้ไข" ได้ด้วย — ส่ง existingQuotation มา
+/// (ข้อมูลใบเสนอราคาเดิมจาก ApiService.getQuotation) เพื่อพรีฟิลข้อมูลและ
+/// เปลี่ยนไปเรียก ApiService.updateQuotation ตอนกดบันทึกแทนการสร้างใหม่
 class CreateQuotationPage extends StatefulWidget {
   final int repairRequestId;
   final String customerName;
+  final Map<String, dynamic>? existingQuotation;
 
   const CreateQuotationPage({
     super.key,
     required this.repairRequestId,
     required this.customerName,
+    this.existingQuotation,
   });
 
   @override
@@ -73,6 +78,44 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isSubmitting = false;
+
+  bool get _isEditMode => widget.existingQuotation != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final q = widget.existingQuotation;
+    if (q == null) return;
+
+    // ✅ พรีฟิลรายการอะไหล่จากใบเสนอราคาเดิม
+    final existingItems = (q['items'] is List) ? List<dynamic>.from(q['items']) : [];
+    if (existingItems.isNotEmpty) {
+      _items.clear();
+      for (final it in existingItems) {
+        final item = _QuoteItem(unit: it['unit']?.toString() ?? 'ชิ้น');
+        item.nameCtrl.text = it['name']?.toString() ?? '';
+        item.qtyCtrl.text = (it['quantity']?.toString() ?? '1');
+        item.priceCtrl.text = (it['price']?.toString() ?? '0');
+        _items.add(item);
+      }
+    }
+
+    // ⚠️ ข้อมูลเดิมเก็บ "ค่าแรงรวม" เป็นยอดเดียว (ไม่ได้แยกเป็นรายการย่อยแบบตอนกรอก
+    // ครั้งแรก) เลยพรีฟิลกลับมาเป็นรายการค่าแรงเดียวชื่อ "ค่าแรงรวม" — ถ้าอู่อยาก
+    // แยกเป็นหลายรายการใหม่ก็แก้ชื่อ/เพิ่มรายการเองได้ตามปกติ
+    final laborCost = double.tryParse(q['labor_cost']?.toString() ?? '0') ?? 0;
+    if (laborCost > 0) {
+      _laborItems.clear();
+      final labor = _LaborItem();
+      labor.nameCtrl.text = 'ค่าแรงรวม';
+      labor.priceCtrl.text = laborCost.toStringAsFixed(0);
+      _laborItems.add(labor);
+    }
+
+    _startDate = DateTime.tryParse(q['estimated_start_date']?.toString() ?? '');
+    _endDate = DateTime.tryParse(q['estimated_end_date']?.toString() ?? '');
+    _notesController.text = q['notes']?.toString() ?? '';
+  }
 
   @override
   void dispose() {
@@ -170,14 +213,25 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       if (notesText.isNotEmpty) notesText,
     ].join('\n');
 
-    final result = await ApiService.createQuotation(
-      repairRequestId: widget.repairRequestId,
-      items: validItems,
-      laborCost: _laborCost,
-      estimatedStartDate: _isoDate(_startDate),
-      estimatedEndDate: _isoDate(_endDate),
-      notes: combinedNotes,
-    );
+    final result = _isEditMode
+        ? await ApiService.updateQuotation(
+            quotationId: widget.existingQuotation!['id'],
+            items: validItems,
+            laborCost: _laborCost,
+            totalPrice: _totalPrice,
+            estimatedStartDate: _isoDate(_startDate),
+            estimatedEndDate: _isoDate(_endDate),
+            notes: combinedNotes,
+          )
+        : await ApiService.createQuotation(
+            repairRequestId: widget.repairRequestId,
+            items: validItems,
+            laborCost: _laborCost,
+            totalPrice: _totalPrice,
+            estimatedStartDate: _isoDate(_startDate),
+            estimatedEndDate: _isoDate(_endDate),
+            notes: combinedNotes,
+          );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -198,8 +252,8 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       backgroundColor: const Color(0xffF5F6FA),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('สร้างใบเสนอราคา',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(_isEditMode ? 'แก้ไขใบเสนอราคา' : 'สร้างใบเสนอราคา',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -498,9 +552,11 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                         height: 18,
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                       )
-                    : const Icon(Icons.send, color: Colors.white),
+                    : Icon(_isEditMode ? Icons.save : Icons.send, color: Colors.white),
                 label: Text(
-                  _isSubmitting ? 'กำลังส่ง...' : 'ส่งใบเสนอราคา',
+                  _isSubmitting
+                      ? (_isEditMode ? 'กำลังบันทึก...' : 'กำลังส่ง...')
+                      : (_isEditMode ? 'บันทึกการแก้ไข' : 'ส่งใบเสนอราคา'),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),

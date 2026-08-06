@@ -176,20 +176,26 @@ class _QuotationCardState extends State<QuotationCard> {
 
     final items = (_quotation!['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
     final status = _quotation!['status']?.toString() ?? 'pending';
-    final totalPrice = double.tryParse(_quotation!['total_price']?.toString() ?? '0') ?? 0;
     final laborCost = double.tryParse(_quotation!['labor_cost']?.toString() ?? '0') ?? 0;
     final startDate = _quotation!['estimated_start_date']?.toString();
     final endDate = _quotation!['estimated_end_date']?.toString();
     final notes = _quotation!['notes']?.toString() ?? '';
 
-    // แสดงภาษีมูลค่าเพิ่มเฉพาะกรณีที่ backend ส่งค่ามาให้เท่านั้น (ไม่คำนวณเดาเอง
-    // เพื่อไม่ให้ตัวเลขที่โชว์คลาดเคลื่อนจากยอดจริงที่อู่/ระบบคำนวณไว้)
-    final vatRaw = _quotation!['vat_amount'] ?? _quotation!['tax_amount'];
-    final vatAmount = vatRaw != null ? double.tryParse(vatRaw.toString()) : null;
-
-    // ยอดรวมค่าอะไหล่ (รวมจากราคาต่อรายการที่ backend ส่งมา) ไว้ใช้แสดงผลเท่านั้น
+    // ยอดรวมค่าอะไหล่ (รวมจากราคาต่อรายการที่ backend ส่งมา)
     final partsCost = items.fold<double>(
         0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0));
+
+    // ✅ คำนวณภาษีมูลค่าเพิ่ม 7% "บวกเพิ่มจริง" บนยอดค่าอะไหล่+ค่าแรง แล้วคำนวณ
+    // ยอดรวมสุทธิเองจากตรงนี้เสมอ (ไม่ใช้ total_price ที่ backend เก็บไว้โดยตรง)
+    // เพราะของเดิม backend เก็บ total_price = ค่าอะไหล่+ค่าแรง โดยไม่ได้บวก VAT
+    // เพิ่มเลย โค้ดเก่าเลยแค่ "ผ่า" ยอดเดิมออกเป็นก่อนภาษี/ภาษีโดยที่ยอดสุทธิไม่ขยับ
+    // (เช่น 1100 ผ่าเป็น 1028.04 + 71.96 = 1100 เท่าเดิม) ทำให้ลูกค้าเข้าใจผิดว่ามี
+    // VAT ทั้งที่จ่ายเท่าเดิม — ตอนนี้คิดจาก partsCost+laborCost ตรงๆ ให้ตรงกับที่
+    // customer_payment_page.dart ใช้เรียกเก็บเงินจริง
+    const vatRate = 0.07;
+    final subTotal = partsCost + laborCost;
+    final vatAmount = subTotal * vatRate;
+    final totalPrice = subTotal + vatAmount;
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -258,7 +264,7 @@ class _QuotationCardState extends State<QuotationCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (vatAmount != null) ...[
+                if (vatAmount > 0) ...[
                   _summaryRow('ราคาก่อนภาษี', totalPrice - vatAmount),
                   _summaryRow('ภาษีมูลค่าเพิ่ม 7%', vatAmount),
                   const Divider(color: Colors.white38, height: 16),

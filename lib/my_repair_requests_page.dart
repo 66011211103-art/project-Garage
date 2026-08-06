@@ -5,6 +5,7 @@ import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถ�
 import 'review_card.dart'; // ✅ การ์ดให้คะแนนอู่ — ฝังในลิสต์ตอนซ่อมเสร็จแล้ว ไม่ต้องเปิดหน้าใหม่
 import 'payment_card.dart'; // ✅ การ์ดชำระเงิน — ต้องจ่ายก่อนถึงจะรีวิวได้
 import 'chat_screen.dart'; // ✅ แชทกับอู่
+import 'customer_request_detail_page.dart'; // ✅ หน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม)
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -56,7 +57,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
     if (widget.highlightRequestId != null) {
       final match = _requests.where((r) => r['id'] == widget.highlightRequestId).toList();
       if (match.isNotEmpty && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _showRequestDetail(match.first));
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openDetail(match.first));
       }
     }
   }
@@ -257,7 +258,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: InkWell(
-        onTap: () => _showRequestDetail(r),
+        onTap: () => _openDetail(r),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -397,6 +398,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
                         bankName: r['bank_name']?.toString(),
                         bankAccountNumber: r['bank_account_number']?.toString(),
                         bankAccountName: r['bank_account_name']?.toString(),
+                        promptpayId: r['promptpay_id']?.toString(),
                         paymentStatus: r['payment_status']?.toString(),
                         rejectionReason: r['payment_rejection_reason']?.toString(),
                         onChanged: _fetchRequests,
@@ -408,97 +410,15 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
     );
   }
 
-  void _showRequestDetail(Map<String, dynamic> r) {
-    final status = r['status']?.toString() ?? 'pending';
-    final shopName = r['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
-    final photos = (r['photos'] is List) ? List<dynamic>.from(r['photos']) : [];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(shopName,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _statusColor(status).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(_statusLabel(status),
-                        style: TextStyle(
-                            color: _statusColor(status), fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('ประเภทรถ: ${_vehicleLabel(r['vehicle_type']?.toString())}',
-                  style: const TextStyle(color: Colors.grey)),
-              Text('ประเภทปัญหา: ${r['problem_category'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
-              Text('เบอร์อู่: ${r['garage_phone'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
-              const SizedBox(height: 12),
-              Text(r['description']?.toString().isNotEmpty == true
-                  ? r['description'].toString()
-                  : 'ไม่มีรายละเอียดเพิ่มเติม'),
-              const SizedBox(height: 12),
-              Text('ที่อยู่ที่แจ้ง: ${r['address'] ?? 'ไม่ระบุ'}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
-
-              if (status == 'rejected' && (r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xffFFEBEE),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('เหตุผลที่อู่ปฏิเสธ',
-                          style: TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(r['rejection_reason'].toString(),
-                          style: const TextStyle(color: Color(0xffE53935))),
-                    ],
-                  ),
-                ),
-              ],
-
-              if (photos.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 90,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: photos.map((url) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(url.toString(), width: 90, height: 90, fit: BoxFit.cover),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+  // ✅ เปิดหน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม) — มีข้อมูลครบ + ยืนยัน/
+  // ปฏิเสธใบเสนอราคา/จ่ายเงิน/รีวิว ได้ในตัว รีเฟรชลิสต์ทันทีถ้ามีการเปลี่ยนแปลง
+  Future<void> _openDetail(Map<String, dynamic> r) async {
+    final changed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomerRequestDetailPage(request: r, userData: widget.userData),
       ),
     );
+    if (changed == true) _fetchRequests();
   }
 }

@@ -18,6 +18,7 @@ class PaymentCard extends StatelessWidget {
   final String? bankName;
   final String? bankAccountNumber;
   final String? bankAccountName;
+  final String? promptpayId; // ✅ เบอร์/เลขบัตรพร้อมเพย์ของอู่ — ใช้สร้าง QR ให้ลูกค้าสแกนจ่าย
 
   /// สถานะการชำระเงินปัจจุบัน: null (ยังไม่จ่าย), pending_confirmation, rejected
   final String? paymentStatus;
@@ -34,6 +35,7 @@ class PaymentCard extends StatelessWidget {
     this.bankName,
     this.bankAccountNumber,
     this.bankAccountName,
+    this.promptpayId,
     this.paymentStatus,
     this.rejectionReason,
     this.onChanged,
@@ -51,6 +53,7 @@ class PaymentCard extends StatelessWidget {
           bankName: bankName,
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
+          promptpayId: promptpayId,
         ),
       ),
     );

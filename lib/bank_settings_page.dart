@@ -20,6 +20,7 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
   late final TextEditingController _bankNameController;
   late final TextEditingController _accountNumberController;
   late final TextEditingController _accountNameController;
+  late final TextEditingController _promptPayController; // ✅ เบอร์โทร/เลขบัตรประชาชน สำหรับ QR พร้อมเพย์
   bool _isSaving = false;
 
   static const List<String> _thaiBanks = [
@@ -43,6 +44,8 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
         TextEditingController(text: widget.userData['bank_account_number']?.toString() ?? '');
     _accountNameController =
         TextEditingController(text: widget.userData['bank_account_name']?.toString() ?? widget.userData['shop_name']?.toString() ?? '');
+    _promptPayController =
+        TextEditingController(text: widget.userData['promptpay_id']?.toString() ?? '');
   }
 
   @override
@@ -50,6 +53,7 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
     _bankNameController.dispose();
     _accountNumberController.dispose();
     _accountNameController.dispose();
+    _promptPayController.dispose();
     super.dispose();
   }
 
@@ -67,6 +71,7 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
       bankName: _bankNameController.text.trim(),
       bankAccountNumber: _accountNumberController.text.trim(),
       bankAccountName: _accountNameController.text.trim(),
+      promptpayId: _promptPayController.text.trim().isEmpty ? null : _promptPayController.text.trim(),
     );
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -153,6 +158,29 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
           ),
+
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              const Text('เบอร์พร้อมเพย์ (PromptPay)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(width: 6),
+              Text('(ไม่บังคับ)', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _promptPayController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('กรอกไว้เพื่อให้ลูกค้าสแกน QR พร้อมเพย์จ่ายเงินได้เลย ไม่ต้องพิมพ์เลขบัญชีเอง',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
 
           const SizedBox(height: 24),
           SizedBox(
