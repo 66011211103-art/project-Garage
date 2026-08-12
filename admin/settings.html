@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ตั้งค่าระบบ — Good Garage Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-shell.css">
+<style>
+  .settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 20px; }
+  .settings-card h3 { margin: 0 0 4px; font-size: 15px; }
+  .settings-card .desc { font-size: 13px; color: var(--text-mute); margin: 0 0 16px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 560px; }
+  .field label { display: block; font-size: 12.5px; color: var(--text-mute); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--text-main);
+  }
+</style>
+</head>
+<body>
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>ตั้งค่าระบบ</h1>
+        <p>ข้อมูลทั่วไปของแพลตฟอร์ม</p>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>ตั้งค่าทั่วไป</h3>
+      <p class="desc">ข้อมูลที่แสดงในระบบ Admin Panel</p>
+      <div class="field-grid">
+        <div class="field"><label>ชื่อระบบ</label><input value="Good Garage Admin Platform" readonly></div>
+        <div class="field"><label>อีเมลติดต่อฝ่ายสนับสนุน</label><input value="support@goodgarage.com" readonly></div>
+      </div>
+    </div>
+
+    <div class="panel-placeholder">
+      <strong>สิทธิ์การเข้าถึงระบบแบบละเอียด (Role & Permissions)</strong>
+      ตอนนี้ระบบรองรับบัญชี Admin แบบสิทธิ์เดียว (เข้าถึงได้ทุกฟังก์ชัน) — ถ้าต้องการแบ่งหลายระดับ
+      (เช่น Super Admin / Moderator ที่จำกัดสิทธิ์ต่างกัน) แจ้งได้เลยครับ ต้องเพิ่มตาราง roles/permissions
+      ในฐานข้อมูลและระบบตรวจสอบสิทธิ์ก่อนใช้งานจริง
+    </div>
+  </main>
+
+<script src="admin-shell.js"></script>
+<script>
+  requireAdmin();
+  mountSidebar('settings');
+</script>
+</body>
+</html>

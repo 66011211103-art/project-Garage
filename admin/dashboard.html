@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แดชบอร์ด — Good Garage Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-shell.css">
+<style>
+  .icon-badge { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .icon-badge svg { width: 19px; height: 19px; }
+  .badge-purple { background: rgba(124,108,240,0.14); color: var(--accent-1); }
+  .badge-blue { background: rgba(79,124,246,0.14); color: var(--accent-2); }
+  .badge-green { background: var(--success-bg); color: var(--success); }
+  .badge-amber { background: var(--warning-bg); color: var(--warning); }
+  .today-badge { font-size: 12px; color: var(--text-mute); background: var(--panel); border: 1px solid var(--border); padding: 7px 12px; border-radius: 10px; }
+  .stat-card .value { font-size: 30px; }
+</style>
+</head>
+<body>
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>ภาพรวมระบบ</h1>
+        <p>สรุปข้อมูลผู้ใช้งาน อู่ซ่อมรถ และงานซ่อมทั้งหมดในแพลตฟอร์ม</p>
+      </div>
+      <div class="today-badge" id="todayLabel">—</div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="icon-badge badge-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke-linecap="round"/></svg></div>
+        <div class="value" id="statCustomers">—</div>
+        <div class="label">ลูกค้าทั้งหมด</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-badge badge-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V9l9-6 9 6v12" stroke-linejoin="round"/><path d="M9 21v-7h6v7"/></svg></div>
+        <div class="value" id="statGarages">—</div>
+        <div class="label">อู่ซ่อมรถทั้งหมด</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-badge badge-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 17H4v-2a5 5 0 0 1 5-5h1M15 17h5v-2a5 5 0 0 0-5-5h-1M12 12V4m0 0-3 3m3-3 3 3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="value" id="statRequests">—</div>
+        <div class="label">งานซ่อมทั้งหมด</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-badge badge-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12.75 11 15l4-4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div class="value" id="statCompleted">—</div>
+        <div class="label">ซ่อมเสร็จแล้ว</div>
+      </div>
+    </div>
+
+    <div class="panel-placeholder">
+      <strong>เมนูด้านซ้ายใช้งานได้จริงทุกหน้าแล้ว</strong>
+      บัญชีผู้ใช้งาน / อู่ซ่อมรถ & อนุมัติ / ปรับสถานะงานซ่อม / รีวิว & ข้อร้องเรียน / สถิติ & กราฟ
+    </div>
+  </main>
+
+<script src="admin-shell.js"></script>
+<script>
+  requireAdmin();
+  mountSidebar('dashboard');
+
+  const API_BASE = window.location.origin + '/api';
+
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('th-TH', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+
+  async function loadStats() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/dashboard-stats`);
+      const data = await res.json();
+      if (!data.success) return;
+      const s = data.data;
+      document.getElementById('statCustomers').textContent = s.totalCustomers ?? 0;
+      document.getElementById('statGarages').textContent = s.totalGarages ?? 0;
+      document.getElementById('statRequests').textContent = s.totalRepairRequests ?? 0;
+      document.getElementById('statCompleted').textContent = s.completedRepairRequests ?? 0;
+    } catch (err) {
+      console.error('โหลดสถิติไม่สำเร็จ', err);
+    }
+  }
+
+  loadStats();
+</script>
+</body>
+</html>

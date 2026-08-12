@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายงาน & สถิติ — Good Garage Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-shell.css">
+<style>
+  .range-tabs { display: flex; gap: 8px; }
+  .chart-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 24px; }
+  .chart-card h3 { margin: 0 0 16px; font-size: 14px; }
+  .axis-labels { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>รายงาน & สถิติ</h1>
+        <p>ภาพรวมระบบในรูปแบบกราฟและตาราง แยกตามช่วงเวลา</p>
+      </div>
+      <div class="range-tabs">
+        <button class="pill-btn" id="btnDaily" onclick="setRange('daily')">รายวัน</button>
+        <button class="pill-btn active" id="btnMonthly" onclick="setRange('monthly')">รายเดือน</button>
+        <button class="pill-btn" id="btnYearly" onclick="setRange('yearly')">รายปี</button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="value" id="statTotalRepairs">—</div><div class="label">คำขอซ่อมทั้งหมด</div></div>
+      <div class="stat-card"><div class="value" id="statTotalUsers">—</div><div class="label">ผู้ใช้ทั้งหมด</div></div>
+      <div class="stat-card"><div class="value" id="statTotalGarages">—</div><div class="label">อู่ทั้งหมด</div></div>
+    </div>
+
+    <div class="chart-card">
+      <h3>แนวโน้มคำขอซ่อม</h3>
+      <svg id="trendChart" viewBox="0 0 600 180" style="width:100%;height:180px;" preserveAspectRatio="none"></svg>
+      <div class="axis-labels" id="axisLabels"></div>
+    </div>
+
+    <div class="table-card">
+      <table>
+        <thead><tr><th>อันดับ</th><th>ชื่ออู่</th><th>งานที่ทำ</th><th>คะแนนเฉลี่ย</th><th>จำนวนรีวิว</th></tr></thead>
+        <tbody id="topGaragesTbody"><tr><td colspan="5" class="empty-row">กำลังโหลด...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+<script src="admin-shell.js"></script>
+<script>
+  requireAdmin();
+  mountSidebar('reports');
+
+  const API_BASE = window.location.origin + '/api';
+  let currentRange = 'monthly';
+
+  function setRange(range) {
+    currentRange = range;
+    document.getElementById('btnDaily').classList.toggle('active', range === 'daily');
+    document.getElementById('btnMonthly').classList.toggle('active', range === 'monthly');
+    document.getElementById('btnYearly').classList.toggle('active', range === 'yearly');
+    loadReports();
+  }
+
+  function drawChart(trend) {
+    const svg = document.getElementById('trendChart');
+    const axis = document.getElementById('axisLabels');
+    svg.innerHTML = '';
+    axis.innerHTML = '';
+
+    if (!trend || trend.length === 0) {
+      svg.innerHTML = '<text x="300" y="90" fill="#6c6690" font-size="13" text-anchor="middle">ยังไม่มีข้อมูลในช่วงนี้</text>';
+      return;
+    }
+
+    const maxCount = Math.max(...trend.map(t => t.count), 1);
+    const w = 600, h = 180, pad = 10;
+    const stepX = trend.length > 1 ? (w - pad * 2) / (trend.length - 1) : 0;
+
+    const points = trend.map((t, i) => {
+      const x = pad + stepX * i;
+      const y = h - pad - ((t.count / maxCount) * (h - pad * 2));
+      return `${x},${y}`;
+    }).join(' ');
+
+    const areaPoints = `${pad},${h - pad} ${points} ${pad + stepX * (trend.length - 1)},${h - pad}`;
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#7c6cf0" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#7c6cf0" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points="${areaPoints}" fill="url(#areaFill)"/>
+      <polyline points="${points}" fill="none" stroke="#7c6cf0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${trend.map((t, i) => {
+        const x = pad + stepX * i;
+        const y = h - pad - ((t.count / maxCount) * (h - pad * 2));
+        return `<circle cx="${x}" cy="${y}" r="3" fill="#4f7cf6"/>`;
+      }).join('')}
+    `;
+
+    axis.innerHTML = trend.map(t => `<span>${escapeHtml(t.bucket)}</span>`).join('');
+  }
+
+  async function loadReports() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/reports?range=${currentRange}`);
+      const data = await res.json();
+      if (!data.success) return;
+
+      const d = data.data;
+      document.getElementById('statTotalRepairs').textContent = d.totals.totalRepairRequests ?? 0;
+      document.getElementById('statTotalUsers').textContent = d.totals.totalUsers ?? 0;
+      document.getElementById('statTotalGarages').textContent = d.totals.totalGarages ?? 0;
+
+      drawChart(d.trend);
+
+      const tbody = document.getElementById('topGaragesTbody');
+      if (!d.topGarages || d.topGarages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-row">ยังไม่มีข้อมูล</td></tr>';
+      } else {
+        tbody.innerHTML = d.topGarages.map((g, i) => `
+          <tr>
+            <td class="mono">#${i + 1}</td>
+            <td>${escapeHtml(g.shop_name)}</td>
+            <td class="muted">${g.job_count} งาน</td>
+            <td style="color:var(--warning);font-weight:600;">★ ${g.avg_rating}</td>
+            <td class="muted">${g.review_count} รีวิว</td>
+          </tr>`).join('');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  loadReports();
+</script>
+</body>
+</html>
