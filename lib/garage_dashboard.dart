@@ -225,19 +225,6 @@ class _GarageDashboardState extends State<GarageDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'โปรไฟล์'),
         ],
       ),
-      // ✅ เดิมซ่อน FAB แบบมี/ไม่มี widget (null สลับกับ FloatingActionButton) ตอนอยู่แท็บ
-      // "ประวัติ" ซึ่งทำให้โครงสร้าง Scaffold เปลี่ยนพร้อมกับตอน body สลับแท็บในเฟรม
-      // เดียวกัน — เป็นไปได้สูงว่าเป็นสาเหตุของ Flutter assertion error
-      // "!semantics.parentDataDirty" ที่เกิดซ้ำๆ เปลี่ยนมาใช้ Visibility ซ่อนแทน
-      // (FAB widget ยังอยู่ในทรีเสมอ แค่มองไม่เห็น/กดไม่ได้ ไม่กระทบ semantics tree)
-      floatingActionButton: Visibility(
-        visible: currentIndex == 0,
-        child: FloatingActionButton(
-          onPressed: () {},
-          backgroundColor: const Color(0xff2196F3),
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-      ),
     );
   }
 

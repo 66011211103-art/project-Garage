@@ -170,6 +170,10 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                     final status = p['status']?.toString();
                     final amount = double.tryParse(p['amount']?.toString() ?? '0') ?? 0;
                     final canConfirm = widget.isGarageView && status == 'pending_confirmation';
+                    // ✅ มีเฉพาะฝั่งอู่ (backend join มาให้เฉพาะตอน garageId) — เป็น null
+                    // ถ้ายังไม่เคยหักค่าคอมมิชชั่น (เช่น รายการที่ยังไม่ confirmed)
+                    final commissionAmount = double.tryParse(p['commission_amount']?.toString() ?? '');
+                    final netAmount = commissionAmount != null ? amount - commissionAmount : null;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -221,6 +225,11 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                               children: [
                                 Text('฿${amount.toStringAsFixed(0)}',
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                if (netAmount != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text('สุทธิ ฿${netAmount.toStringAsFixed(0)}',
+                                      style: const TextStyle(color: Color(0xff4CAF50), fontSize: 11, fontWeight: FontWeight.w600)),
+                                ],
                                 const SizedBox(height: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

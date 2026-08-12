@@ -1,8 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'request_repair_page.dart'; // ✅ หน้าส่งคำขอซ่อม
 import 'api_service.dart';
 import 'chat_screen.dart'; // ✅ แชทกับอู่
+import 'garage_reviews_page.dart'; // ✅ หน้าดูรีวิวทั้งหมดของอู่
 
 /// หน้ารายละเอียดอู่ซ่อมรถ (ฝั่งลูกค้า)
 /// รับข้อมูลอู่มาจากหน้า Search โดยตรง (ไม่ยิง API ซ้ำ เพราะข้อมูลชุดเดียวกันอยู่แล้ว)
@@ -19,12 +23,39 @@ class GarageDetailPage extends StatefulWidget {
 class _GarageDetailPageState extends State<GarageDetailPage> {
   bool _isFavorite = false; // ⚠️ เก็บแค่ในหน้าจอนี้ ยังไม่บันทึกลง DB (ยังไม่มีระบบ favorite)
 
+  // ✅ คะแนนรีวิวสรุป ดึงจาก API จริงมาโชว์ในหัวการ์ด (เดิมฝังข้อความ "ยังไม่มีรีวิว" ไว้ตายตัว)
+  double? _averageRating;
+  int _totalReviews = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReviewSummary();
+  }
+
+  Future<void> _fetchReviewSummary() async {
+    final garageId = _garageId;
+    if (garageId == null) return;
+    final result = await ApiService.getReviews(garageId: garageId);
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      setState(() {
+        _averageRating = (result.data!['averageRating'] as num?)?.toDouble();
+        _totalReviews = (result.data!['totalReviews'] as num?)?.toInt() ?? 0;
+      });
+    }
+  }
+
   String get _shopName => widget.garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
   String? get _avatar => widget.garage['avatar']?.toString();
   String get _address => widget.garage['address']?.toString() ?? 'ไม่ระบุที่อยู่';
   String get _phone => widget.garage['phone']?.toString() ?? '';
-  // ✅ garage_id ที่ใช้ทั่วทั้งระบบ คือ users.id ของอู่ (เท่ากับ garages.user_id)
-  int? get _garageId => widget.garage['id'] as int? ?? widget.garage['user_id'] as int?;
+  // ✅ garage_id ที่ใช้ทั่วทั้งระบบ คือ users.id ของอู่ (เท่ากับ garages.user_id) — ต้อง
+  // ลองอ่าน user_id ก่อนเสมอ ไม่ใช่ id (garages.id เป็นคนละค่ากับ garages.user_id เดิม
+  // โค้ดสลับลำดับผิด ทำให้ทุกอย่างที่พึ่ง _garageId — แชท, ดูรีวิว, คะแนนเฉลี่ยบนหัวการ์ด
+  // — ไป query ด้วยเลขผิด (garages.id) แทนที่จะเป็น garages.user_id ที่ถูกต้อง จึงว่างเปล่า
+  // ทุกครั้งแม้จะมีรีวิวจริงอยู่ในฐานข้อมูลก็ตาม)
+  int? get _garageId => widget.garage['user_id'] as int? ?? widget.garage['id'] as int?;
 
   bool _isOpeningChat = false;
 
@@ -122,6 +153,25 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
     return r * c;
   }
 
+  // ✅ พิกัดอู่ที่ปักหมุดไว้ — คืนค่า null ถ้าอู่ยังไม่ได้ตั้งพิกัด (จะได้ซ่อนแผนที่แทนโชว์แผนที่เปล่า)
+  LatLng? get _garageLatLng {
+    final lat = double.tryParse(widget.garage['latitude']?.toString() ?? '');
+    final lng = double.tryParse(widget.garage['longitude']?.toString() ?? '');
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
+  }
+
+  void _openFullMap() {
+    final point = _garageLatLng;
+    if (point == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _GarageMapPage(point: point, shopName: _shopName, address: _address),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final services = _services;
@@ -195,13 +245,22 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     ],
                                   ),
                                 const SizedBox(height: 8),
-                                // ⚠️ ยังไม่มีระบบรีวิว/คะแนนจริงในฐานข้อมูล แสดงสถานะที่ตรงความจริงไว้ก่อน
                                 Row(
-                                  children: [
-                                    Icon(Icons.star_border, color: Colors.grey.shade400, size: 20),
-                                    const SizedBox(width: 4),
-                                    Text('ยังไม่มีรีวิว', style: TextStyle(color: Colors.grey.shade500)),
-                                  ],
+                                  children: _totalReviews > 0
+                                      ? [
+                                          const Icon(Icons.star, color: Color(0xffFFC107), size: 20),
+                                          const SizedBox(width: 4),
+                                          Text(_averageRating!.toStringAsFixed(1),
+                                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          const SizedBox(width: 4),
+                                          Text('($_totalReviews รีวิว)',
+                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                                        ]
+                                      : [
+                                          Icon(Icons.star_border, color: Colors.grey.shade400, size: 20),
+                                          const SizedBox(width: 4),
+                                          Text('ยังไม่มีรีวิว', style: TextStyle(color: Colors.grey.shade500)),
+                                        ],
                                 ),
                               ],
                             ),
@@ -308,6 +367,58 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     ],
                                   ),
                                 ],
+                                if (_garageLatLng != null) ...[
+                                  const SizedBox(height: 12),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: GestureDetector(
+                                      onTap: _openFullMap,
+                                      behavior: HitTestBehavior.opaque,
+                                      child: SizedBox(
+                                        height: 150,
+                                        child: IgnorePointer(
+                                          // ✅ preview เฉยๆ ปิดการลาก/ซูมในนี้ กดเพื่อไปหน้าแผนที่เต็มจอแทน
+                                          child: FlutterMap(
+                                            options: MapOptions(
+                                              initialCenter: _garageLatLng!,
+                                              initialZoom: 15,
+                                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                            ),
+                                            children: [
+                                              TileLayer(
+                                                // ✅ CartoDB Voyager — ต้องตรงกับ garage_location_page.dart
+                                                // และ address_map_page.dart เสมอ ไม่งั้นแต่ละหน้าแผนที่ในแอป
+                                                // จะดูไม่เหมือนกัน (สลับไปมาแล้วรู้สึกแปลกๆ)
+                                                urlTemplate:
+                                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                                subdomains: const ['a', 'b', 'c', 'd'],
+                                                userAgentPackageName: 'com.goodgarage.app',
+                                              ),
+                                              MarkerLayer(markers: [
+                                                Marker(
+                                                  point: _garageLatLng!,
+                                                  width: 40,
+                                                  height: 40,
+                                                  child: const Icon(Icons.location_on, color: Color(0xffE53935), size: 40),
+                                                ),
+                                              ]),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.fullscreen, size: 14, color: Colors.grey.shade600),
+                                      const SizedBox(width: 4),
+                                      Text('แตะเพื่อดูแผนที่เต็มจอ',
+                                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -350,12 +461,17 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            // TODO: ต่อกับหน้ารีวิวจริงเมื่อมีระบบรีวิว (ตอนนี้ยังไม่มีตาราง reviews)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('ระบบรีวิวยังไม่เปิดใช้งาน')),
-                            );
-                          },
+                          onPressed: _garageId == null
+                              ? null
+                              : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => GarageReviewsPage(
+                                        garageId: _garageId!,
+                                        shopName: _shopName,
+                                      ),
+                                    ),
+                                  ),
                           icon: const Icon(Icons.star_border, size: 18),
                           label: const Text('ดูรีวิว'),
                           style: OutlinedButton.styleFrom(
@@ -429,6 +545,125 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
         const SizedBox(width: 8),
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ],
+    );
+  }
+}
+
+// ============================================================
+// หน้าแผนที่เต็มจอ — แตะจาก preview ในหน้ารายละเอียดอู่ ปักหมุดตำแหน่งอู่
+// (ใช้ flutter_map + OpenStreetMap ตัวเดียวกับที่ระบบนี้ใช้ทำ routing/แชร์
+// ตำแหน่งอยู่แล้ว ไม่ได้เพิ่ม map package ใหม่)
+// ============================================================
+class _GarageMapPage extends StatelessWidget {
+  final LatLng point;
+  final String shopName;
+  final String? address;
+
+  const _GarageMapPage({required this.point, required this.shopName, this.address});
+
+  // ✅ เปิดแอปแผนที่จริงของเครื่อง (Google Maps/Apple Maps) พาไปยังจุดที่ปักหมุดไว้ตรงๆ
+  Future<void> _openInMapsApp(BuildContext context) async {
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${point.latitude},${point.longitude}');
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เปิดแอปแผนที่ไม่สำเร็จ'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xff2196F3),
+        title: Text(shopName, style: const TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(initialCenter: point, initialZoom: 16),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.goodgarage.app',
+              ),
+              MarkerLayer(markers: [
+                Marker(
+                  point: point,
+                  width: 46,
+                  height: 46,
+                  child: const Icon(Icons.location_on, color: Color(0xffE53935), size: 46),
+                ),
+              ]),
+              // ✅ เครดิตตามข้อกำหนดการใช้งานฟรีของ CARTO + OpenStreetMap (มีจุดเดียวพอ —
+              // รอบก่อนใส่ซ้ำ 2 อันโดยไม่ตั้งใจ ทำให้ข้อความ attribution ซ้อนกันมุมล่างขวา)
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('© OpenStreetMap contributors'),
+                  TextSourceAttribution('© CARTO'),
+                ],
+              ),
+            ],
+          ),
+
+          // ✅ การ์ดชื่อร้าน+ที่อยู่ ลอยด้านล่าง ให้เห็นชัดว่าหมุดที่ปักคือที่ไหน
+          // พร้อมปุ่มนำทางออกไปแอปแผนที่จริงของเครื่อง
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 4))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Color(0xffE53935), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(shopName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                  if ((address ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(address!, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
+                  ],
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openInMapsApp(context),
+                      icon: const Icon(Icons.directions, color: Colors.white, size: 18),
+                      label: const Text('นำทางไปยังอู่นี้', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xff2196F3),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

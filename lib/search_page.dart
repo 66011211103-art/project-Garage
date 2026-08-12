@@ -20,8 +20,6 @@ const List<String> kSearchServiceFilters = [
 const List<int?> kSearchDistanceFilters = [null, 5, 10, 20];
 
 /// ตัวเลือกกรองคะแนนรีวิว — null หมายถึง "ทั้งหมด"
-/// หมายเหตุ: ยังไม่มีระบบรีวิว/คะแนนในฐานข้อมูลจริง ตัวกรองนี้จึงเป็น UI เตรียมไว้ก่อน
-/// ยังไม่ส่งผลต่อผลการค้นหาจนกว่าจะมีตารางรีวิวจริง
 const List<double?> kSearchRatingFilters = [null, 4.0, 4.5];
 
 class SearchPage extends StatefulWidget {
@@ -103,11 +101,17 @@ class _SearchPageState extends State<SearchPage> {
   double _deg2rad(double deg) => deg * (math.pi / 180);
 
   List<Map<String, dynamic>> get _filteredResults {
-    if (_selectedDistance == null) return _results;
-    return _results.where((g) {
-      final d = _distanceKmTo(g);
-      return d != null && d <= _selectedDistance!;
-    }).toList();
+    var list = _results;
+    if (_selectedDistance != null) {
+      list = list.where((g) {
+        final d = _distanceKmTo(g);
+        return d != null && d <= _selectedDistance!;
+      }).toList();
+    }
+    if (_selectedRating != null) {
+      list = list.where((g) => (g['rating'] as num? ?? 0) >= _selectedRating!).toList();
+    }
+    return list;
   }
 
   void _onServiceTap(String service) {
@@ -214,14 +218,7 @@ class _SearchPageState extends State<SearchPage> {
             ),
 
             const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text('คะแนนรีวิว', style: TextStyle(color: Colors.grey)),
-                const SizedBox(width: 6),
-                Text('(ยังไม่เปิดใช้งาน)',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
-              ],
-            ),
+            const Text('คะแนนรีวิว', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 8),
             Row(
               children: kSearchRatingFilters.map((rating) {
@@ -231,12 +228,11 @@ class _SearchPageState extends State<SearchPage> {
                   child: ChoiceChip(
                     label: Text(rating == null ? 'ทั้งหมด' : '$rating+'),
                     selected: selected,
-                    // ปิดใช้งานจริงไว้ก่อนเพราะยังไม่มีข้อมูลรีวิวในระบบ
-                    onSelected: null,
+                    onSelected: (_) => setState(() => _selectedRating = rating),
                     selectedColor: const Color(0xffE3F2FD),
-                    labelStyle: TextStyle(color: Colors.grey.shade400),
-                    side: BorderSide(color: Colors.grey.shade200),
-                    backgroundColor: Colors.grey.shade100,
+                    labelStyle: TextStyle(color: selected ? const Color(0xff2196F3) : Colors.black87),
+                    side: BorderSide(color: selected ? const Color(0xff2196F3) : Colors.grey.shade300),
+                    backgroundColor: Colors.white,
                   ),
                 );
               }).toList(),
@@ -299,6 +295,8 @@ class _SearchGarageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatar = garage['avatar']?.toString();
     final name = garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+    final rating = (garage['rating'] as num?)?.toDouble() ?? 0;
+    final reviewCount = (garage['review_count'] as num?)?.toInt() ?? 0;
 
     return Card(
       elevation: 3,
@@ -356,7 +354,35 @@ class _SearchGarageCard extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 12),
-            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                if (reviewCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffFFF8E1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Color(0xffFFC107)),
+                        const SizedBox(width: 3),
+                        Text(rating.toStringAsFixed(1),
+                            style: const TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xffB78103))),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
@@ -366,6 +392,13 @@ class _SearchGarageCard extends StatelessWidget {
                   distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} กม.' : 'ไม่ทราบระยะทาง',
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
                 ),
+                if (reviewCount > 0) ...[
+                  const SizedBox(width: 10),
+                  Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Text('$reviewCount รีวิว',
+                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                ],
               ],
             ),
             const SizedBox(height: 12),

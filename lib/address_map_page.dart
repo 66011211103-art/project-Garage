@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// หน้าจอแสดงตำแหน่งที่อยู่บนแผนที่ (ใช้ OpenStreetMap ผ่าน flutter_map — ฟรี ไม่ต้องใช้ Google API)
 /// ใช้ร่วมกันได้ทั้งที่อยู่ลูกค้าและที่อยู่อู่ซ่อม แค่เปลี่ยน title/subtitle ที่ส่งเข้ามา
@@ -62,10 +63,11 @@ class _AddressMapPageState extends State<AddressMapPage> {
               initialZoom: 16,
             ),
             children: [
-              // เลเยอร์ภาพแผนที่จาก OpenStreetMap (ฟรี ไม่ต้องใช้ API key)
+              // ✅ CartoDB Voyager — ต้องตรงกับ garage_detail_page.dart และ garage_location_page.dart เสมอ
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.flutter_goodgarage',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.goodgarage.app',
               ),
               // เลเยอร์หมุดปักตำแหน่ง
               MarkerLayer(
@@ -80,6 +82,13 @@ class _AddressMapPageState extends State<AddressMapPage> {
                       size: 50,
                     ),
                   ),
+                ],
+              ),
+              // ✅ เครดิตตามข้อกำหนดการใช้งานฟรีของ CARTO + OpenStreetMap
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('© OpenStreetMap contributors'),
+                  TextSourceAttribution('© CARTO'),
                 ],
               ),
             ],
@@ -127,17 +136,17 @@ class _AddressMapPageState extends State<AddressMapPage> {
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // ✅ จุดปรับ: ต่อกับแอปนำทางจริง (Google Maps / Apple Maps)
-                      // ผ่าน package url_launcher เช่น:
-                      // launchUrl(Uri.parse(
-                      //   'https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}',
-                      // ));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('เปิดแอปนำทาง (ต้องเพิ่ม url_launcher)'),
-                        ),
+                    onPressed: () async {
+                      // ✅ เปิดแอปแผนที่จริงของเครื่อง (Google Maps/Apple Maps)
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}',
                       );
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เปิดแอปแผนที่ไม่สำเร็จ'), backgroundColor: Colors.red),
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xff2196F3),

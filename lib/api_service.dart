@@ -11,7 +11,7 @@ class ApiResult {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://10.160.75.155:3000/api';
+  static const String baseUrl = 'http://10.160.61.17:3000/api';
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -45,7 +45,10 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -70,7 +73,10 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -89,7 +95,8 @@ class ApiService {
     String? ownerName,
     String? hoursWeekday,
     String? hoursWeekend,
-    List<dynamic>? services, // ✅ รองรับทั้ง List<String> เดิม และ List<Map> ใหม่ที่มีชื่อ+ราคา
+    List<dynamic>?
+    services, // ✅ รองรับทั้ง List<String> เดิม และ List<Map> ใหม่ที่มีชื่อ+ราคา
     double? latitude,
     double? longitude,
   }) async {
@@ -123,7 +130,10 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -148,7 +158,10 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -173,22 +186,30 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== SEARCH / LIST GARAGES (สำหรับหน้าค้นหาฝั่งลูกค้า) =====
   // service: กรองตามหมวดบริการ เช่น "ยาง" (null หรือ "" = ไม่กรอง)
   // keyword: ค้นหาจากชื่อร้าน
-  static Future<ApiResult> searchGarages({String? service, String? keyword}) async {
+  static Future<ApiResult> searchGarages({
+    String? service,
+    String? keyword,
+  }) async {
     try {
       final queryParams = <String, String>{};
-      if (service != null && service.isNotEmpty) queryParams['service'] = service;
-      if (keyword != null && keyword.isNotEmpty) queryParams['keyword'] = keyword;
+      if (service != null && service.isNotEmpty)
+        queryParams['service'] = service;
+      if (keyword != null && keyword.isNotEmpty)
+        queryParams['keyword'] = keyword;
 
-      final uri = Uri.parse('$baseUrl/garages').replace(
-        queryParameters: queryParams.isEmpty ? null : queryParams,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/garages',
+      ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -198,7 +219,10 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -220,7 +244,9 @@ class ApiService {
         http.MultipartFile.fromBytes('avatar', fileBytes, filename: fileName),
       );
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
       final body = jsonDecode(await response.stream.bytesToString());
 
       return ApiResult(
@@ -232,26 +258,31 @@ class ApiService {
       return ApiResult(success: false, message: 'อัปโหลดไม่สำเร็จ');
     }
   }
-  // ===== GET PROFILE =====
-static Future<ApiResult> getProfile({
-  required int userId,
-  required String userType,
-}) async {
-  try {
-    final response = await http
-        .get(Uri.parse('$baseUrl/user/profile?userId=$userId&userType=$userType'))
-        .timeout(const Duration(seconds: 15));
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    return ApiResult(
-      success: body['success'] == true,
-      message: body['message'] ?? '',
-      data: body['data'],
-    );
-  } catch (e) {
-    return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลได้');
+  // ===== GET PROFILE =====
+  static Future<ApiResult> getProfile({
+    required int userId,
+    required String userType,
+  }) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              '$baseUrl/user/profile?userId=$userId&userType=$userType',
+            ),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลได้');
+    }
   }
-}
 
   // ===== SUBMIT REPAIR REQUEST (ส่งคำขอซ่อมรถ พร้อมรูปภาพ) =====
   static Future<ApiResult> submitRepairRequest({
@@ -290,7 +321,9 @@ static Future<ApiResult> getProfile({
         );
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
       final body = jsonDecode(await response.stream.bytesToString());
 
       return ApiResult(
@@ -299,12 +332,19 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่');
+      return ApiResult(
+        success: false,
+        message: 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่',
+      );
     }
   }
 
   // ===== GET REPAIR REQUESTS (ฝั่งอู่ ดูคำขอที่ลูกค้าส่งเข้ามา) =====
-  static Future<ApiResult> getRepairRequests({int? garageId, int? customerId, int? technicianId}) async {
+  static Future<ApiResult> getRepairRequests({
+    int? garageId,
+    int? customerId,
+    int? technicianId,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl/repair-requests').replace(
         queryParameters: {
@@ -321,7 +361,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -349,7 +392,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -385,16 +431,19 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== ดูรายชื่อช่างในสังกัดอู่ =====
   static Future<ApiResult> getTechnicians({required int garageId}) async {
     try {
-      final uri = Uri.parse('$baseUrl/technicians').replace(
-        queryParameters: {'garageId': garageId.toString()},
-      );
+      final uri = Uri.parse(
+        '$baseUrl/technicians',
+      ).replace(queryParameters: {'garageId': garageId.toString()});
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -403,7 +452,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -427,7 +479,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -457,7 +512,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -481,7 +539,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -514,7 +575,9 @@ static Future<ApiResult> getProfile({
         );
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
       final body = jsonDecode(await response.stream.bytesToString());
       return ApiResult(
         success: body['success'] == true,
@@ -540,15 +603,20 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
-  static Future<ApiResult> getUnseenRequestCount({required int customerId}) async {
+  static Future<ApiResult> getUnseenRequestCount({
+    required int customerId,
+  }) async {
     try {
-      final uri = Uri.parse('$baseUrl/repair-requests/unseen-count').replace(
-        queryParameters: {'customerId': customerId.toString()},
-      );
+      final uri = Uri.parse(
+        '$baseUrl/repair-requests/unseen-count',
+      ).replace(queryParameters: {'customerId': customerId.toString()});
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -557,7 +625,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -578,7 +649,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -587,7 +661,8 @@ static Future<ApiResult> getProfile({
     required int repairRequestId,
     required List<Map<String, dynamic>> items,
     required double laborCost,
-    double? totalPrice, // ✅ ยอดรวมสุทธิที่รวม VAT 7% แล้ว (คำนวณจาก Flutter ฝั่งอู่)
+    double?
+    totalPrice, // ✅ ยอดรวมสุทธิที่รวม VAT 7% แล้ว (คำนวณจาก Flutter ฝั่งอู่)
     String? estimatedStartDate, // 'YYYY-MM-DD'
     String? estimatedEndDate,
     String? notes,
@@ -670,7 +745,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -698,7 +776,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -751,7 +832,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -786,7 +870,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -804,7 +891,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -826,7 +916,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -856,7 +949,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -873,13 +969,19 @@ static Future<ApiResult> getProfile({
     List<String> photoNames = const [],
   }) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/reviews'));
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/reviews'),
+      );
       request.fields['repairRequestId'] = repairRequestId.toString();
       request.fields['customerId'] = customerId.toString();
       request.fields['rating'] = rating.toString();
-      if (qualityRating != null) request.fields['qualityRating'] = qualityRating.toString();
-      if (priceRating != null) request.fields['priceRating'] = priceRating.toString();
-      if (serviceRating != null) request.fields['serviceRating'] = serviceRating.toString();
+      if (qualityRating != null)
+        request.fields['qualityRating'] = qualityRating.toString();
+      if (priceRating != null)
+        request.fields['priceRating'] = priceRating.toString();
+      if (serviceRating != null)
+        request.fields['serviceRating'] = serviceRating.toString();
       if (comment != null) request.fields['comment'] = comment;
 
       for (var i = 0; i < photos.length; i++) {
@@ -892,25 +994,36 @@ static Future<ApiResult> getProfile({
         );
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final body =
+          jsonDecode(await response.stream.bytesToString())
+              as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
         message: body['message'] ?? 'เกิดข้อผิดพลาด',
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่');
+      return ApiResult(
+        success: false,
+        message: 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่',
+      );
     }
   }
 
   // ===== ดูรีวิว — ส่ง repairRequestId (เช็กว่างานนี้รีวิวหรือยัง) หรือ garageId (รีวิวทั้งหมดของอู่ + คะแนนเฉลี่ย) =====
-  static Future<ApiResult> getReviews({int? garageId, int? repairRequestId}) async {
+  static Future<ApiResult> getReviews({
+    int? garageId,
+    int? repairRequestId,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl/reviews').replace(
         queryParameters: {
           if (garageId != null) 'garageId': garageId.toString(),
-          if (repairRequestId != null) 'repairRequestId': repairRequestId.toString(),
+          if (repairRequestId != null)
+            'repairRequestId': repairRequestId.toString(),
         },
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -921,7 +1034,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -947,7 +1063,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -962,32 +1081,49 @@ static Future<ApiResult> getProfile({
     required String slipName,
   }) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/payments'));
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/payments'),
+      );
       request.fields['repairRequestId'] = repairRequestId.toString();
       request.fields['customerId'] = customerId.toString();
       request.fields['garageId'] = garageId.toString();
       request.fields['amount'] = amount.toString();
       request.fields['method'] = method;
-      request.files.add(http.MultipartFile.fromBytes('slip', slipBytes, filename: slipName));
+      request.files.add(
+        http.MultipartFile.fromBytes('slip', slipBytes, filename: slipName),
+      );
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final body =
+          jsonDecode(await response.stream.bytesToString())
+              as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
         message: body['message'] ?? 'เกิดข้อผิดพลาด',
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'แจ้งชำระเงินไม่สำเร็จ กรุณาลองใหม่');
+      return ApiResult(
+        success: false,
+        message: 'แจ้งชำระเงินไม่สำเร็จ กรุณาลองใหม่',
+      );
     }
   }
 
   // ===== ดูข้อมูลการชำระเงิน — ระบุ repairRequestId, customerId, หรือ garageId =====
-  static Future<ApiResult> getPayments({int? repairRequestId, int? customerId, int? garageId}) async {
+  static Future<ApiResult> getPayments({
+    int? repairRequestId,
+    int? customerId,
+    int? garageId,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl/payments').replace(
         queryParameters: {
-          if (repairRequestId != null) 'repairRequestId': repairRequestId.toString(),
+          if (repairRequestId != null)
+            'repairRequestId': repairRequestId.toString(),
           if (customerId != null) 'customerId': customerId.toString(),
           if (garageId != null) 'garageId': garageId.toString(),
         },
@@ -1000,12 +1136,18 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== อู่ยืนยัน/ปฏิเสธการชำระเงิน =====
-  static Future<ApiResult> confirmPayment({required int paymentId, required int garageId}) async {
+  static Future<ApiResult> confirmPayment({
+    required int paymentId,
+    required int garageId,
+  }) async {
     try {
       final response = await http
           .put(
@@ -1015,9 +1157,16 @@ static Future<ApiResult> getProfile({
           )
           .timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'], // ✅ มี commissionAmount/walletBalanceAfter ติดมาด้วยตั้งแต่เพิ่มระบบ wallet
+      );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -1035,9 +1184,15 @@ static Future<ApiResult> getProfile({
           )
           .timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+      );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -1063,14 +1218,23 @@ static Future<ApiResult> getProfile({
           )
           .timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return ApiResult(success: body['success'] == true, message: body['message'] ?? 'เกิดข้อผิดพลาด');
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+      );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== แชท — หาบทสนทนาเดิม หรือสร้างใหม่ =====
-  static Future<ApiResult> getOrCreateConversation({required int customerId, required int garageId}) async {
+  static Future<ApiResult> getOrCreateConversation({
+    required int customerId,
+    required int garageId,
+  }) async {
     try {
       final response = await http
           .post(
@@ -1086,12 +1250,18 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== แชท — ลิสต์บทสนทนาทั้งหมด (ระบุ customerId หรือ garageId) =====
-  static Future<ApiResult> getConversations({int? customerId, int? garageId}) async {
+  static Future<ApiResult> getConversations({
+    int? customerId,
+    int? garageId,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl/conversations').replace(
         queryParameters: {
@@ -1107,15 +1277,24 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
   // ===== แชท — ดึงประวัติข้อความ (viewerType มาร์คข้อความของอีกฝ่ายว่าอ่านแล้ว) =====
-  static Future<ApiResult> getMessages({required int conversationId, required String viewerType}) async {
+  static Future<ApiResult> getMessages({
+    required int conversationId,
+    required String viewerType,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl/messages').replace(
-        queryParameters: {'conversationId': conversationId.toString(), 'viewerType': viewerType},
+        queryParameters: {
+          'conversationId': conversationId.toString(),
+          'viewerType': viewerType,
+        },
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1125,7 +1304,10 @@ static Future<ApiResult> getProfile({
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(
+        success: false,
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+      );
     }
   }
 
@@ -1139,26 +1321,40 @@ static Future<ApiResult> getProfile({
     String? imageName,
   }) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/messages'));
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/messages'),
+      );
       request.fields['conversationId'] = conversationId.toString();
       request.fields['senderId'] = senderId.toString();
       request.fields['senderType'] = senderType;
       if (message != null) request.fields['message'] = message;
       if (imageBytes != null) {
         request.files.add(
-          http.MultipartFile.fromBytes('image', imageBytes, filename: imageName ?? 'chat_image.jpg'),
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: imageName ?? 'chat_image.jpg',
+          ),
         );
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      final body = jsonDecode(await response.stream.bytesToString()) as Map<String, dynamic>;
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final body =
+          jsonDecode(await response.stream.bytesToString())
+              as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
         message: body['message'] ?? 'เกิดข้อผิดพลาด',
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่');
+      return ApiResult(
+        success: false,
+        message: 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่',
+      );
     }
   }
 }

@@ -20,8 +20,8 @@ class SocketNotificationService {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
   static bool _localNotifInitialized = false;
 
-  // ✅ เปลี่ยนเป็น URL ของ backend จริงตอน deploy (ตอนนี้ใช้ localhost สำหรับ dev)
-  static const String _serverUrl = 'http://172.20.10.2:3000';
+  // ✅ เปลี่ยนเป็น URL ของ backend จริงตอน deploy — ต้องตรงกับ baseUrl ใน api_service.dart เสมอ
+  static const String _serverUrl = 'http://10.160.61.17:3000';
 
   /// เรียกครั้งเดียวตอนแอปเปิด (ก่อน setup ก็ได้) เพื่อเตรียมระบบ local notification
   static Future<void> _initLocalNotifications() async {

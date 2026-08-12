@@ -395,13 +395,6 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'พิมพ์/วางที่อยู่ หรือวางพิกัด "ละติจูด,ลองจิจูด" ที่ก็อปมาจาก'
-              ' Google Maps ได้เลย (แม่นยำที่สุด โดยเฉพาะการหาชื่อร้าน)'
-              ' ถ้าค้นหาไม่เจอ ปิดหน้าต่างนี้แล้วแตะค้างบนแผนที่เพื่อปักหมุดเองได้',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
-            ),
 
             const SizedBox(height: 12),
 

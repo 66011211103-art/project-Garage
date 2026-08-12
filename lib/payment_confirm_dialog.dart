@@ -63,8 +63,21 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
+    // ✅ backend หักค่าคอมมิชชั่นจาก wallet ทันทีตอนยืนยันรับเงิน (ระบบ Grab-style)
+    // โชว์ให้อู่เห็นเลยว่าโดนหักไปเท่าไหร่ + wallet เหลือเท่าไหร่ กันงงว่าทำไมยอด wallet เปลี่ยน
+    String message = result.message;
+    if (result.success && result.data != null) {
+      final commissionAmount = (result.data!['commissionAmount'] as num?)?.toDouble();
+      final walletBalanceAfter = (result.data!['walletBalanceAfter'] as num?)?.toDouble();
+      if (commissionAmount != null && commissionAmount > 0 && walletBalanceAfter != null) {
+        message =
+            'ยืนยันรับเงินสำเร็จ — หักค่าคอมมิชชั่น ฿${commissionAmount.toStringAsFixed(2)} '
+            '(wallet คงเหลือ ฿${walletBalanceAfter.toStringAsFixed(2)})';
+      }
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message), backgroundColor: result.success ? Colors.green : Colors.red),
+      SnackBar(content: Text(message), backgroundColor: result.success ? Colors.green : Colors.red),
     );
     if (result.success) Navigator.pop(context, true);
   }

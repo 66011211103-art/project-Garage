@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'profile_page.dart';
 import 'chat_screen.dart';
@@ -6,6 +7,7 @@ import 'search_page.dart'; // ✅ หน้าค้นหาอู่ซ่อ�
 import 'socket_notification_service.dart'; // ✅ ระบบแจ้งเตือน real-time (Socket.IO)
 import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติคำขอซ่อม
 import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม (ปุ่ม "ติดตาม" ในการ์ดกำลังซ่อม)
+import 'garage_detail_page.dart'; // ✅ กดจากการ์ด "อู่แนะนำ" แล้วเปิดหน้ารายละเอียดอู่
 import 'api_service.dart'; // ✅ สำหรับนับ/มาร์คแจ้งเตือนที่ยังไม่อ่าน
 
 class HomePage extends StatefulWidget {
@@ -32,6 +34,24 @@ class _HomePageState extends State<HomePage> {
     _setupPushNotifications();
     _fetchUnseenCount();
     _fetchActiveJob();
+    _fetchRecommendedGarages();
+  }
+
+  // ✅ อู่แนะนำหน้าแรก — เรียงตามคะแนนรีวิวเฉลี่ยสูงสุดก่อน (4.9, 4.8, 4.7, ...)
+  List<Map<String, dynamic>> _recommendedGarages = [];
+
+  Future<void> _fetchRecommendedGarages() async {
+    final result = await ApiService.searchGarages();
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      final garages = List<Map<String, dynamic>>.from(result.data!['garages'] ?? []);
+      garages.sort((a, b) {
+        final ra = (a['rating'] as num?)?.toDouble() ?? 0;
+        final rb = (b['rating'] as num?)?.toDouble() ?? 0;
+        return rb.compareTo(ra);
+      });
+      setState(() => _recommendedGarages = garages.take(5).toList());
+    }
   }
 
   // ✅ งานที่กำลังซ่อมอยู่ตอนนี้ (มีช่างรับผิดชอบแล้ว ยังไม่เสร็จ) — ใช้โชว์ในการ์ด "กำลังซ่อม" หน้าแรก
@@ -159,6 +179,7 @@ class _HomePageState extends State<HomePage> {
         onNotificationTap: _openNotifications,
         activeJob: _activeJob,
         onTrackTap: _openTracking,
+        recommendedGarages: _recommendedGarages,
       ), // ✅ ใช้ _userData แทน widget.userData
       MyRepairRequestsPage(
         userData: _userData,
@@ -224,6 +245,7 @@ class HomeContent extends StatelessWidget {
   final VoidCallback? onNotificationTap;
   final Map<String, dynamic>? activeJob; // ✅ งานที่กำลังซ่อมอยู่ตอนนี้ (ถ้ามี)
   final VoidCallback? onTrackTap; // ✅ กดปุ่ม "ติดตาม" ในการ์ดกำลังซ่อม
+  final List<Map<String, dynamic>> recommendedGarages; // ✅ อู่แนะนำ เรียงตามคะแนนรีวิว
 
   const HomeContent({
     super.key,
@@ -232,7 +254,26 @@ class HomeContent extends StatelessWidget {
     this.onNotificationTap,
     this.activeJob,
     this.onTrackTap,
+    this.recommendedGarages = const [],
   });
+
+  // ===== คำนวณระยะทางจากตำแหน่งลูกค้า -> อู่ ด้วยสูตร Haversine (แบบเดียวกับ search_page.dart) =====
+  double? _distanceKmTo(Map<String, dynamic> garage) {
+    final myLat = double.tryParse(userData['latitude']?.toString() ?? '');
+    final myLng = double.tryParse(userData['longitude']?.toString() ?? '');
+    final gLat = double.tryParse(garage['latitude']?.toString() ?? '');
+    final gLng = double.tryParse(garage['longitude']?.toString() ?? '');
+    if (myLat == null || myLng == null || gLat == null || gLng == null) return null;
+
+    const r = 6371.0;
+    double deg2rad(double d) => d * (math.pi / 180);
+    final dLat = deg2rad(gLat - myLat);
+    final dLon = deg2rad(gLng - myLng);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(deg2rad(myLat)) * math.cos(deg2rad(gLat)) * math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +493,100 @@ class HomeContent extends StatelessWidget {
                         ],
                       ),
                     ),
+
+                  // ===== อู่แนะนำ — เรียงตามคะแนนรีวิวสูงสุด =====
+                  if (recommendedGarages.isNotEmpty) ...[
+                    const SizedBox(height: 30),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('อู่แนะนำ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => SearchPage(userData: userData)),
+                          ),
+                          child: const Text('ดูทั้งหมด', style: TextStyle(color: Color(0xff2196F3), fontSize: 14)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...recommendedGarages.map((garage) {
+                      final avatar = garage['avatar']?.toString();
+                      final name = garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+                      final rating = (garage['rating'] as num?)?.toDouble() ?? 0;
+                      final reviewCount = (garage['review_count'] as num?)?.toInt() ?? 0;
+                      final distanceKm = _distanceKmTo(garage);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => GarageDetailPage(garage: garage, userData: userData),
+                            ),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                                  child: (avatar != null && avatar.isNotEmpty)
+                                      ? Image.network(avatar, height: 130, width: double.infinity, fit: BoxFit.cover)
+                                      : Container(
+                                          height: 130,
+                                          width: double.infinity,
+                                          color: Colors.grey.shade200,
+                                          child: Icon(Icons.home_repair_service, size: 40, color: Colors.grey.shade400),
+                                        ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          if (reviewCount > 0) ...[
+                                            const Icon(Icons.star, size: 16, color: Color(0xffFFC107)),
+                                            const SizedBox(width: 4),
+                                            Text(rating.toStringAsFixed(1),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                            const SizedBox(width: 4),
+                                            Text('($reviewCount)',
+                                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                                          ],
+                                          const Spacer(),
+                                          if (distanceKm != null) ...[
+                                            Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                                            const SizedBox(width: 2),
+                                            Text('${distanceKm.toStringAsFixed(1)} กม.',
+                                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
 
                 ],
               ),
