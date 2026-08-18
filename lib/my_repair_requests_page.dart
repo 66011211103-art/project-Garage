@@ -6,6 +6,7 @@ import 'review_card.dart'; // ✅ การ์ดให้คะแนนอู�
 import 'payment_card.dart'; // ✅ การ์ดชำระเงิน — ต้องจ่ายก่อนถึงจะรีวิวได้
 import 'chat_screen.dart'; // ✅ แชทกับอู่
 import 'customer_request_detail_page.dart'; // ✅ หน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม)
+import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -90,18 +91,11 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
     );
   }
 
-  String _vehicleLabel(String? value) {
-    switch (value) {
-      case 'sedan':
-        return 'รถเก๋ง';
-      case 'suv':
-        return 'SUV';
-      case 'pickup':
-        return 'กระบะ';
-      default:
-        return 'ไม่ระบุ';
-    }
-  }
+  // ✅ เดิมรองรับแค่ sedan/suv/pickup แล้ว fallback เป็น "ไม่ระบุ" — พอมีตัวเลือก
+  // รถตู้/มอเตอร์ไซค์/อื่นๆ เพิ่มเข้ามา (จาก car_type ที่ผูกกับ "รถของฉัน") คำขอที่
+  // ใช้รถประเภทเหล่านี้เลยโชว์ "ไม่ระบุ" ทั้งที่จริงมีข้อมูลอยู่ — ใช้ vehicleTypeLabel
+  // กลางแทน ซึ่งรองรับครบทุกประเภท
+  String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
     switch (status) {
@@ -353,7 +347,11 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
 
               // ✅ โชว์ใบเสนอราคาให้ยืนยัน/ปฏิเสธตรงในการ์ดเลย
               if (status == 'quoted' || status == 'confirmed')
-                QuotationCard(repairRequestId: r['id'], onResponded: _fetchRequests),
+                QuotationCard(
+                  repairRequestId: r['id'],
+                  customerId: widget.userData['id'],
+                  onResponded: _fetchRequests,
+                ),
 
               // ✅ กำลังซ่อมอยู่ (มอบหมายช่างแล้วแต่ยังไม่เสร็จ) — ไปหน้าติดตามสถานะแบบเต็ม
               if (_inRepairStatuses.contains(status)) ...[

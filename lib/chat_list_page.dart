@@ -61,7 +61,7 @@ class _ChatListPageState extends State<ChatListPage> {
   }
 
   String _timeAgo(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
     if (diff.inDays >= 1) return '${diff.inDays} วันที่แล้ว';

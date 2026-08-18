@@ -6,7 +6,7 @@ import 'package:latlong2/latlong.dart';
 /// ขอ permission + ดึงตำแหน่งปัจจุบันของอุปกรณ์ (GPS บนมือถือ หรือ browser location บนเว็บ)
 /// คืนค่า Position ถ้าสำเร็จ หรือโยน Exception พร้อมข้อความอธิบายถ้าไม่สำเร็จ
 /// (ผู้ใช้ปิด location service, ไม่ให้สิทธิ์ ฯลฯ)
-/// ใช้ร่วมกันได้ทุกหน้าที่ต้องรู้ตำแหน่งปัจจุบันของผู้ใช้ (เลือกที่อยู่ / ดูแผนที่)
+/// ใช้ร่วมกันได้ทุกหน้าที่ต้องรู้ตำแหน่งปัจจุบันของผู้ใช้ (เลือกที่อยู่ / ดูแผนที่ / ค้นหาอู่ใกล้ฉัน)
 Future<Position> getCurrentPosition() async {
   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {

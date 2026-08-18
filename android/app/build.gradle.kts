@@ -13,6 +13,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // ✅ ปลั๊กอิน flutter_local_notifications ต้องการ core library desugaring
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -37,6 +39,32 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // ✅ เพิ่มส่วนนี้ — กันบั๊กที่รู้จักของ Android Gradle Plugin ที่ทำให้ task
+    // mergeReleaseJavaResource พัง (VerifyException) เวลามีไฟล์ META-INF ซ้ำกัน
+    // จากไลบรารีหลายตัวที่ดึงเข้ามาผ่าน dependency หลายชั้น
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module",
+                "META-INF/versions/9/module-info.class",
+                "META-INF/INDEX.LIST"
+            )
+        }
+    }
+}
+
+dependencies {
+    // ✅ คู่กับ isCoreLibraryDesugaringEnabled ด้านบน
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

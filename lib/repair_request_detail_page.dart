@@ -11,6 +11,7 @@
 
 import 'package:flutter/material.dart';
 import 'quotation_card.dart'; // ✅ การ์ดใบเสนอราคา (ยืนยัน/ปฏิเสธ)
+import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
 
 const List<String> _detailThaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -24,18 +25,9 @@ class RepairRequestDetailPage extends StatelessWidget {
 
   const RepairRequestDetailPage({super.key, required this.request, this.onQuotationResponded});
 
-  String _vehicleLabel(String? value) {
-    switch (value) {
-      case 'sedan':
-        return 'รถเก๋ง';
-      case 'suv':
-        return 'SUV';
-      case 'pickup':
-        return 'กระบะ';
-      default:
-        return 'ไม่ระบุ';
-    }
-  }
+  // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย (ของเดิมรองรับแค่
+  // sedan/suv/pickup แล้ว fallback เป็น "ไม่ระบุ" ทั้งที่มีข้อมูลจริง)
+  String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
     switch (status) {
@@ -296,6 +288,7 @@ class RepairRequestDetailPage extends StatelessWidget {
             ),
             QuotationCard(
               repairRequestId: request['id'],
+              customerId: request['customer_id'],
               onResponded: onQuotationResponded,
             ),
           ],

@@ -300,7 +300,12 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                     ? NetworkImage(tech['avatar'])
                     : null,
                 child: (tech['avatar']?.toString().isEmpty ?? true)
-                    ? Text((tech['name']?.toString() ?? '?').substring(0, 1).toUpperCase(),
+                    // ✅ (name ?? '?') กัน null ได้ แต่ถ้า name เป็น "" (ว่างแต่ไม่ null)
+                    // .substring(0,1) จะ throw RangeError — เช็คว่างด้วยแล้วค่อย fallback '?'
+                    ? Text(
+                        ((tech['name']?.toString().isNotEmpty ?? false) ? tech['name'].toString() : '?')
+                            .substring(0, 1)
+                            .toUpperCase(),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                     : null,
               ),

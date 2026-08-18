@@ -86,7 +86,8 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
   }
 
   String _formatDateTime(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    // ✅ backend ส่งเวลาเป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน .hour/.day
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '

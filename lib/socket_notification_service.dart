@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:socket_io_client/socket_io_client.dart' as socket_io;
+import 'app_config.dart';
 
 /// ระบบแจ้งเตือนแบบ real-time โดยใช้ Socket.IO (แทน Firebase Cloud Messaging)
 ///
@@ -20,8 +21,9 @@ class SocketNotificationService {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
   static bool _localNotifInitialized = false;
 
-  // ✅ เปลี่ยนเป็น URL ของ backend จริงตอน deploy — ต้องตรงกับ baseUrl ใน api_service.dart เสมอ
-  static const String _serverUrl = 'http://10.160.61.17:3000';
+  // ✅ ย้ายไป app_config.dart จุดเดียว — เดิม hardcode แยกจาก api_service.dart ทำให้ต้อง
+  // แก้ 2 ที่ให้ตรงกันเองเวลาเปลี่ยน IP/host ตอนนี้อ้างอิงจุดเดียวกันแล้ว ไม่มีทางลืมแก้ไฟล์ใดไฟล์หนึ่ง
+  static const String _serverUrl = AppConfig.socketUrl;
 
   /// เรียกครั้งเดียวตอนแอปเปิด (ก่อน setup ก็ได้) เพื่อเตรียมระบบ local notification
   static Future<void> _initLocalNotifications() async {

@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'api_service.dart';
 import 'garage_detail_page.dart'; // ✅ หน้ารายละเอียดอู่
+import 'location_service.dart'; // ✅ ขอ permission + ดึงตำแหน่งปัจจุบันจริงจาก GPS
 
 /// หมวดบริการที่ใช้กรอง ตรงกับที่อู่เลือกไว้ในหน้าแก้ไขข้อมูลอู่
 const List<String> kSearchServiceFilters = [
@@ -42,6 +44,12 @@ class _SearchPageState extends State<SearchPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _results = [];
 
+  // ✅ ตำแหน่งปัจจุบันจริงจาก GPS — ต้องขอ permission ก่อนถึงจะรู้ว่าอู่ไหนใกล้ลูกค้าที่สุด
+  // (เดิมใช้แค่พิกัดที่บันทึกไว้ตอนสมัคร ซึ่งอาจไม่ตรงกับตำแหน่งจริง ณ ตอนค้นหา)
+  Position? _myPosition;
+  bool _isRequestingLocation = true;
+  String? _locationError;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +57,31 @@ class _SearchPageState extends State<SearchPage> {
         kSearchServiceFilters.contains(widget.initialService)) {
       _selectedService = widget.initialService!;
     }
+    _requestLocation();
     _fetchGarages();
+  }
+
+  Future<void> _requestLocation() async {
+    setState(() {
+      _isRequestingLocation = true;
+      _locationError = null;
+    });
+    try {
+      final position = await getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _myPosition = position;
+        _isRequestingLocation = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        // ✅ ขอไม่สำเร็จ (ปฏิเสธสิทธิ์/ปิด GPS) — ยัง fallback ไปใช้พิกัดที่บันทึกไว้ตอน
+        // สมัครสมาชิกได้ ไม่ต้องบล็อกการค้นหาทั้งหมด แค่ระยะทางอาจไม่แม่นเท่าตำแหน่งจริง
+        _locationError = e.toString().replaceFirst('Exception: ', '');
+        _isRequestingLocation = false;
+      });
+    }
   }
 
   @override
@@ -76,9 +108,13 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   // ===== คำนวณระยะทางจากตำแหน่งลูกค้า -> อู่ ด้วยสูตร Haversine =====
+  // ✅ ใช้ตำแหน่ง GPS จริง (_myPosition) เป็นหลักก่อนเสมอ ถ้าขอ permission ไม่สำเร็จ
+  // ค่อย fallback ไปใช้พิกัดที่บันทึกไว้ในโปรไฟล์ตอนสมัครสมาชิกแทน
   double? _distanceKmTo(Map<String, dynamic> garage) {
-    final myLat = double.tryParse(widget.userData['latitude']?.toString() ?? '');
-    final myLng = double.tryParse(widget.userData['longitude']?.toString() ?? '');
+    final myLat = _myPosition?.latitude ??
+        double.tryParse(widget.userData['latitude']?.toString() ?? '');
+    final myLng = _myPosition?.longitude ??
+        double.tryParse(widget.userData['longitude']?.toString() ?? '');
     final gLat = double.tryParse(garage['latitude']?.toString() ?? '');
     final gLng = double.tryParse(garage['longitude']?.toString() ?? '');
     if (myLat == null || myLng == null || gLat == null || gLng == null) return null;
@@ -111,7 +147,19 @@ class _SearchPageState extends State<SearchPage> {
     if (_selectedRating != null) {
       list = list.where((g) => (g['rating'] as num? ?? 0) >= _selectedRating!).toList();
     }
-    return list;
+
+    // ✅ เรียงตามระยะทางใกล้สุดก่อนเสมอ — อู่ที่คำนวณระยะทางไม่ได้ (ไม่รู้พิกัดตัวเองหรือ
+    // อู่ยังไม่ตั้งพิกัด) ให้ตกไปอยู่ท้ายลิสต์ ไม่ปนกับอู่ที่รู้ระยะทางจริงแล้วสับสน
+    final sorted = [...list];
+    sorted.sort((a, b) {
+      final da = _distanceKmTo(a);
+      final db = _distanceKmTo(b);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da.compareTo(db);
+    });
+    return sorted;
   }
 
   void _onServiceTap(String service) {
@@ -141,7 +189,7 @@ class _SearchPageState extends State<SearchPage> {
               controller: _searchController,
               onSubmitted: (_) => _fetchGarages(),
               decoration: InputDecoration(
-                hintText: 'ค้นหาชื่ออู่ซ่อมรถ',
+                hintText: 'ค้นหาชื่ออู่ หรืออาการรถ เช่น "ยางรั่ว"',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -159,6 +207,46 @@ class _SearchPageState extends State<SearchPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // ✅ แจ้งสถานะการขอสิทธิ์เข้าถึงตำแหน่ง — ลูกค้าจะได้เข้าใจว่าทำไมระยะทาง
+            // อาจไม่แม่น (ถ้าปฏิเสธสิทธิ์) หรือกำลังโหลดอยู่
+            if (_isRequestingLocation)
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(12)),
+                child: const Row(
+                  children: [
+                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text('กำลังขอสิทธิ์เข้าถึงตำแหน่ง เพื่อหาอู่ที่ใกล้คุณที่สุด...',
+                          style: TextStyle(color: Color(0xff2196F3), fontSize: 12.5)),
+                    ),
+                  ],
+                ),
+              )
+            else if (_locationError != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_off, size: 16, color: Color(0xffE65100)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('$_locationError — ระยะทางที่แสดงอาจไม่ตรงกับตำแหน่งปัจจุบัน',
+                          style: const TextStyle(color: Color(0xffE65100), fontSize: 12)),
+                    ),
+                    TextButton(
+                      onPressed: _requestLocation,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                      child: const Text('ลองอีกครั้ง', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+
             const Text('กรองผลการค้นหา',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),

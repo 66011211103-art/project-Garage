@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import ' myCarPage.dart' show vehicleTypeLabel;
 
 /// หน้าสร้างใบเสนอราคา ให้อู่กรอกหลังจากกด "รับงาน" คำขอซ่อมแล้ว
 /// ✅ ใช้หน้าเดียวกันนี้ทำโหมด "แก้ไข" ได้ด้วย — ส่ง existingQuotation มา
 /// (ข้อมูลใบเสนอราคาเดิมจาก ApiService.getQuotation) เพื่อพรีฟิลข้อมูลและ
 /// เปลี่ยนไปเรียก ApiService.updateQuotation ตอนกดบันทึกแทนการสร้างใหม่
+/// ✅ carInfo / garageServices (ไม่บังคับ) — "เชื่อมต่อ" ใบเสนอราคาเข้ากับ
+/// ข้อมูลรถของลูกค้า (แสดงการ์ดข้อมูลรถ) และรายการบริการของอู่เอง
+/// (เลือกจากบริการที่อู่ตั้งไว้แทนการพิมพ์ชื่อ/ราคาใหม่ทุกครั้ง)
 class CreateQuotationPage extends StatefulWidget {
   final int repairRequestId;
   final String customerName;
   final Map<String, dynamic>? existingQuotation;
+  final Map<String, dynamic>? carInfo;
+  final List<dynamic>? garageServices;
 
   const CreateQuotationPage({
     super.key,
     required this.repairRequestId,
     required this.customerName,
     this.existingQuotation,
+    this.carInfo,
+    this.garageServices,
   });
 
   @override
@@ -112,8 +120,10 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       _laborItems.add(labor);
     }
 
-    _startDate = DateTime.tryParse(q['estimated_start_date']?.toString() ?? '');
-    _endDate = DateTime.tryParse(q['estimated_end_date']?.toString() ?? '');
+    // ✅ .toLocal() กัน backend ตอบเป็น UTC ISO ("...T00:00:00.000Z") แล้วพอ
+    // แปลงกลับมาเป็นเวลาไทย (+7) วันที่เลื่อนข้ามมาอีกวันจากที่อู่เลือกไว้จริง
+    _startDate = DateTime.tryParse(q['estimated_start_date']?.toString() ?? '')?.toLocal();
+    _endDate = DateTime.tryParse(q['estimated_end_date']?.toString() ?? '')?.toLocal();
     _notesController.text = q['notes']?.toString() ?? '';
   }
 
@@ -175,6 +185,87 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   String? _isoDate(DateTime? d) => d == null
       ? null
       : '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  // ✅ "เชื่อมกับบริการของอู่" — ให้อู่เลือกรายการจากบริการที่ตั้งไว้ในโปรไฟล์
+  // (editprofile_shop_page.dart) แทนการพิมพ์ชื่อ/ราคาใหม่ทุกครั้ง รองรับทั้ง
+  // รูปแบบเก่า {name, price} และรูปแบบใหม่ {category, name, priceMin, priceMax,
+  // details, active} — แสดงเฉพาะรายการที่เปิดใช้งานอยู่ (active ไม่ระบุ = ถือว่าเปิด)
+  Future<void> _pickGarageService(_QuoteItem item) async {
+    final services = (widget.garageServices ?? [])
+        .whereType<Map>()
+        .where((s) {
+          final name = s['name']?.toString().trim() ?? '';
+          final active = s['active'] is bool ? s['active'] as bool : true;
+          return name.isNotEmpty && active;
+        })
+        .toList();
+    if (services.isEmpty) return;
+
+    final picked = await showModalBottomSheet<Map>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('เลือกจากบริการของอู่',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: services.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final s = services[i];
+                      final name = s['name']?.toString() ?? '';
+                      final min = s['priceMin'];
+                      final max = s['priceMax'];
+                      final legacyPrice = s['price'];
+                      String priceLabel = '';
+                      final minStr = min?.toString() ?? '';
+                      final maxStr = max?.toString() ?? '';
+                      if (minStr.isNotEmpty && maxStr.isNotEmpty) {
+                        priceLabel = '฿$minStr - ฿$maxStr';
+                      } else if (minStr.isNotEmpty) {
+                        priceLabel = 'เริ่มต้น ฿$minStr';
+                      } else if (maxStr.isNotEmpty) {
+                        priceLabel = 'สูงสุด ฿$maxStr';
+                      } else if (legacyPrice != null && legacyPrice.toString().isNotEmpty) {
+                        priceLabel = '฿$legacyPrice';
+                      }
+                      return ListTile(
+                        title: Text(name),
+                        subtitle: priceLabel.isNotEmpty ? Text(priceLabel) : null,
+                        onTap: () => Navigator.pop(context, s),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      item.nameCtrl.text = picked['name']?.toString() ?? '';
+      final min = picked['priceMin']?.toString() ?? '';
+      final max = picked['priceMax']?.toString() ?? '';
+      final legacyPrice = picked['price']?.toString() ?? '';
+      final priceValue = min.isNotEmpty ? min : (max.isNotEmpty ? max : legacyPrice);
+      if (priceValue.isNotEmpty) item.priceCtrl.text = priceValue;
+    });
+  }
 
   Future<void> _handleSubmit() async {
     final validItems = _items
@@ -305,6 +396,65 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       ),
                     ),
 
+                    // ✅ ข้อมูลรถ — แสดงเมื่อคำขอนี้ผูกกับรถจาก "รถของฉัน" ของลูกค้า
+                    if (widget.carInfo != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xffE8F5E9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.directions_car, color: Color(0xff4CAF50), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('ข้อมูลรถ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Builder(builder: (context) {
+                                    final brandModel =
+                                        '${widget.carInfo!['car_brand'] ?? ''} ${widget.carInfo!['car_model'] ?? ''}'
+                                            .trim();
+                                    return Text(
+                                      brandModel.isEmpty ? 'ไม่ระบุ' : brandModel,
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                    );
+                                  }),
+                                  const SizedBox(height: 2),
+                                  Builder(builder: (context) {
+                                    final plate = widget.carInfo!['car_plate']?.toString() ?? '';
+                                    final color = widget.carInfo!['car_color']?.toString() ?? '';
+                                    final parts = [
+                                      vehicleTypeLabel(widget.carInfo!['car_type']?.toString()),
+                                      if (plate.isNotEmpty) 'ทะเบียน $plate',
+                                      if (color.isNotEmpty) color,
+                                    ];
+                                    return Text(parts.join(' • '),
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey));
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 20),
 
                     // รายการอะไหล่
@@ -323,9 +473,32 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       return _sectionCard(
                         onDelete: _items.length > 1 ? () => _removeItem(index) : null,
                         children: [
-                          TextField(
-                            controller: item.nameCtrl,
-                            decoration: _fieldDecoration('ชื่อรายการ'),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: item.nameCtrl,
+                                  decoration: _fieldDecoration('ชื่อรายการ'),
+                                ),
+                              ),
+                              if ((widget.garageServices ?? []).isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => _pickGarageService(item),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xffE3F2FD),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.playlist_add_check,
+                                        color: Color(0xff2196F3), size: 20),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 10),
                           Row(

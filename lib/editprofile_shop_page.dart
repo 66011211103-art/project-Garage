@@ -6,17 +6,22 @@ import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่�
 import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
 import 'change_email_sheet.dart'; // ✅ เปลี่ยนอีเมลผ่าน OTP
 
-/// รายการบริการที่อู่สามารถเลือกให้บริการได้
-const List<String> kGarageServiceOptions = [
+/// หมวดบริการมาตรฐาน — ใช้เป็นตัวเลือก "หมวด" ในฟอร์มเพิ่ม/แก้ไขบริการ และเป็นปุ่มเพิ่มด่วนด้านบน
+/// ส่วนชื่อเฉพาะของแต่ละบริการ (เช่น "เปลี่ยนน้ำมันเครื่อง") อู่ยังพิมพ์เองได้อิสระเสมอ
+/// 'อื่นๆ' ไว้รองรับบริการที่ไม่เข้าหมวดไหนเลย และรองรับข้อมูลเก่าก่อนแยกหมวด/ชื่อบริการออกจากกัน
+const List<String> kGarageCategories = [
   'เครื่องยนต์',
-  'ยาง',
-  'แบตเตอรี่',
-  'ซ่อมสี',
   'เบรก',
   'ช่วงล่าง',
-  'ตัวถัง',
-  'ระบบไฟ',
+  'ยางและล้อ',
+  'แบตเตอรี่',
+  'ระบบไฟฟ้า',
+  'แอร์รถยนต์',
+  'ตัวถังและสี',
+  'บริการฉุกเฉิน',
+  'อื่นๆ',
 ];
+const String kGarageOtherCategory = 'อื่นๆ';
 
 /// หน้าแก้ไขข้อมูล "อู่ซ่อมรถ" แบบรวมเดียว
 /// รวมทั้งข้อมูลส่วนตัว (ชื่อร้าน, เจ้าของร้าน, เบอร์, ที่อยู่, อีเมล, รูป)
@@ -49,8 +54,10 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
   // ===== ข้อมูลธุรกิจของอู่ (ไม่มีฝั่งลูกค้า) =====
   String _weekdayHours = '08:00-18:00';
   String _weekendHours = '09:00-17:00';
-  late Set<String> _selectedServices;
-  final Map<String, TextEditingController> _priceControllers = {}; // ✅ ราคาโดยประมาณต่อบริการ (พิมพ์อิสระ)
+  // ✅ อู่เพิ่ม/ลบ/แก้ไข/จัดลำดับ "บริการ" ของตัวเองได้อิสระ ผ่านฟอร์มเพิ่ม/แก้ไขแบบ bottom sheet
+  // แต่ละรายการมีหมวดบริการ (เลือกจากรายการมาตรฐาน) + ชื่อบริการเฉพาะ (พิมพ์อิสระ) +
+  // ช่วงราคาโดยประมาณ + รายละเอียดเพิ่มเติม + สวิตช์เปิด/ปิดการแสดงผล เก็บเป็น List<Map> ส่งไป backend
+  late List<_ServiceEntry> _services;
 
   // ===== พิกัดที่อยู่ (ได้จากการค้นหาที่อยู่แบบแชท) =====
   double? _latitude;
@@ -70,20 +77,61 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
     _weekendHours = u['hours_weekend'] ?? _weekendHours;
 
     final existingServices = u['services'];
-    _selectedServices = <String>{};
+    _services = [];
     if (existingServices is List) {
       for (final item in existingServices) {
-        // ✅ รองรับข้อมูลเก่า (เป็น String ล้วน) และข้อมูลใหม่ (เป็น Map ที่มี name/price)
         if (item is Map) {
-          final name = item['name']?.toString() ?? '';
+          final name = item['name']?.toString().trim() ?? '';
           if (name.isEmpty) continue;
-          _selectedServices.add(name);
-          _priceControllers[name] =
-              TextEditingController(text: item['price']?.toString() ?? '');
+
+          // ✅ รองรับข้อมูลเก่าก่อนแยก "หมวด" ออกจาก "ชื่อบริการ" — ถ้าไม่มีหมวด/หมวดไม่ตรงรายการ
+          // มาตรฐาน ให้ลองจับคู่ชื่อเดิมกับหมวดที่ตรงกันพอดี ไม่งั้น fallback เป็น 'อื่นๆ'
+          var category = item['category']?.toString() ?? '';
+          if (!kGarageCategories.contains(category)) {
+            category = kGarageCategories.firstWhere(
+              (c) => c.toLowerCase() == name.toLowerCase(),
+              orElse: () => kGarageOtherCategory,
+            );
+          }
+
+          // ✅ รองรับข้อมูลเก่าที่เก็บราคาเป็นข้อความอิสระช่องเดียว (price) แทนช่วงต่ำสุด-สูงสุด
+          var priceMin = item['priceMin']?.toString().trim() ?? '';
+          var priceMax = item['priceMax']?.toString().trim() ?? '';
+          if (priceMin.isEmpty && priceMax.isEmpty) {
+            final legacyPrice = item['price']?.toString().trim() ?? '';
+            if (legacyPrice.isNotEmpty) {
+              final parts = legacyPrice.split('-');
+              final lo = parts.isNotEmpty ? double.tryParse(parts[0].trim()) : null;
+              final hi = parts.length > 1 ? double.tryParse(parts[1].trim()) : null;
+              if (lo != null && hi != null) {
+                priceMin = parts[0].trim();
+                priceMax = parts[1].trim();
+              } else {
+                // พิมพ์ไว้แบบข้อความอิสระ (เช่น "เริ่มต้น 500 บาท") เก็บไว้ในช่องราคาต่ำสุดไปก่อน
+                priceMin = legacyPrice;
+              }
+            }
+          }
+
+          // ✅ ข้อมูลเก่าไม่มีฟิลด์นี้ -> ถือว่าเปิดใช้งานอยู่เสมอ กันบริการเดิมหายไปจากโปรไฟล์ทันที
+          final active = item['active'] is bool ? item['active'] as bool : true;
+
+          _services.add(_ServiceEntry(
+            category: category,
+            name: name,
+            priceMin: priceMin,
+            priceMax: priceMax,
+            details: item['details']?.toString() ?? '',
+            active: active,
+          ));
         } else {
-          final name = item.toString();
-          _selectedServices.add(name);
-          _priceControllers[name] = TextEditingController();
+          final name = item.toString().trim();
+          if (name.isEmpty) continue;
+          final category = kGarageCategories.firstWhere(
+            (c) => c.toLowerCase() == name.toLowerCase(),
+            orElse: () => kGarageOtherCategory,
+          );
+          _services.add(_ServiceEntry(category: category, name: name));
         }
       }
     }
@@ -99,26 +147,233 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
     _phoneController.dispose();
     _emailController.dispose();
     _addressController.dispose();
-    for (final c in _priceControllers.values) {
-      c.dispose();
-    }
     super.dispose();
   }
 
-  // ✅ ดึง/สร้าง controller ราคาให้บริการที่เลือกไว้
-  TextEditingController _priceControllerFor(String service) {
-    return _priceControllers.putIfAbsent(service, () => TextEditingController());
+  void _removeService(int index) {
+    setState(() => _services.removeAt(index));
   }
 
-  // ✅ รวมบริการ + ราคาที่พิมพ์ไว้ ให้เป็น List<Map> พร้อมส่งไป backend
-  List<Map<String, dynamic>> get _servicesWithPrices {
-    return _selectedServices.map((service) {
-      return {
-        'name': service,
-        'price': _priceControllers[service]?.text.trim() ?? '',
-      };
-    }).toList();
+  // ✅ ข้อความช่วงราคาที่จะโชว์ในการ์ดรายการ — รองรับกรณีมีแค่ค่าเดียว หรือไม่มีเลย
+  String _priceLabel(_ServiceEntry s) {
+    final min = s.priceMin.trim();
+    final max = s.priceMax.trim();
+    if (min.isEmpty && max.isEmpty) return '';
+    if (min.isNotEmpty && max.isNotEmpty && min != max) return '$min - $max บาท';
+    return '${min.isNotEmpty ? min : max} บาท';
   }
+
+  // ✅ เปิดฟอร์มเพิ่ม/แก้ไขบริการแบบ bottom sheet
+  // editIndex != null = แก้ไขรายการเดิม (แก้ทับ object เดิมเพื่อให้ key ตอน reorder ยังนิ่งอยู่)
+  // presetCategory = พรีฟิลหมวดไว้ล่วงหน้า เผื่อเปิดจากปุ่มเพิ่มด่วนของหมวดนั้น
+  Future<void> _openServiceForm({int? editIndex, String? presetCategory}) async {
+    final existing = editIndex != null ? _services[editIndex] : null;
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final minCtrl = TextEditingController(text: existing?.priceMin ?? '');
+    final maxCtrl = TextEditingController(text: existing?.priceMax ?? '');
+    final detailsCtrl = TextEditingController(text: existing?.details ?? '');
+    String category = existing?.category ?? presetCategory ?? kGarageCategories.first;
+    bool active = existing?.active ?? true;
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 12,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            existing != null ? 'แก้ไขบริการ' : 'เพิ่มบริการใหม่',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(sheetContext, false),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('เลือกหมวดบริการ',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: category,
+                        items: kGarageCategories
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFF5F6FA),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (v) => setSheetState(() => category = v ?? category),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('ชื่อบริการ',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: profileInputDeco(
+                            hint: 'เช่น เปลี่ยนน้ำมันเครื่อง', icon: Icons.build_outlined),
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อบริการ' : null,
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('ราคาโดยประมาณ (บาท)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: minCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: profileInputDeco(
+                                  hint: 'ราคาต่ำสุด', icon: Icons.sell_outlined),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('-'),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              controller: maxCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: profileInputDeco(
+                                  hint: 'ราคาสูงสุด', icon: Icons.sell_outlined),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'ใส่เฉพาะตัวเลข เช่น 800 กับ 1,500 (เว้นว่างได้ถ้ายังไม่ระบุราคา)',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('รายละเอียดเพิ่มเติม (ไม่บังคับ)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: detailsCtrl,
+                        maxLines: 2,
+                        decoration: profileInputDeco(
+                            hint: 'เช่น รองรับรถเก๋งและรถกระบะ', icon: Icons.notes_outlined),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('เปิดให้บริการ',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          Switch(
+                            value: active,
+                            activeColor: const Color(0xff2196F3),
+                            onChanged: (v) => setSheetState(() => active = v),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (!(formKey.currentState?.validate() ?? false)) return;
+                            Navigator.pop(sheetContext, true);
+                          },
+                          icon: const Icon(Icons.save_outlined, color: Colors.white),
+                          label: const Text('บันทึกบริการ',
+                              style:
+                                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xff2196F3),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (saved == true) {
+      setState(() {
+        if (existing != null) {
+          existing
+            ..category = category
+            ..name = nameCtrl.text.trim()
+            ..priceMin = minCtrl.text.trim()
+            ..priceMax = maxCtrl.text.trim()
+            ..details = detailsCtrl.text.trim()
+            ..active = active;
+        } else {
+          _services.add(_ServiceEntry(
+            category: category,
+            name: nameCtrl.text.trim(),
+            priceMin: minCtrl.text.trim(),
+            priceMax: maxCtrl.text.trim(),
+            details: detailsCtrl.text.trim(),
+            active: active,
+          ));
+        }
+      });
+    }
+
+    // ⚠️ ห้าม dispose() ตรงนี้ทันที — showModalBottomSheet คืนค่ากลับมาตอนที่ route ถูก pop
+    // แล้ว แต่ตัว sheet ยังอยู่ระหว่างเล่นแอนิเมชันปิด (เลื่อนลง) จึงยังมี TextFormField
+    // อ้างอิง controller พวกนี้อยู่ ถ้า dispose ทันทีจะเจอ "used after being disposed"
+    // กลางแอนิเมชัน (บั๊กที่เจอ) ปล่อยให้ garbage collector เก็บทีหลังแทน ปลอดภัยกว่า
+    // เพราะ controller ระยะสั้นพวกนี้ไม่ได้ผูก listener ค้างไว้ที่ไหน
+  }
+
+  // ✅ แปลงเป็น List<Map> พร้อมส่งไป backend (เก็บครบทุกฟิลด์ใหม่ backend เก็บเป็น JSON blob อยู่แล้ว)
+  List<Map<String, dynamic>> get _servicesWithPrices =>
+      _services.map((s) => s.toJson()).toList();
 
   // ✅ รูปเดียว ใช้ทั้งเป็นรูปโปรไฟล์และรูปอู่ (เดิมมี 2 ฟิลด์ซ้ำกัน: avatar กับ garage_photo)
   ImageProvider? get _shopImage {
@@ -509,91 +764,171 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       const SizedBox(height: 16),
                       const Text('บริการที่ให้บริการ',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: kGarageServiceOptions.map((service) {
-                            final selected = _selectedServices.contains(service);
-                            return FilterChip(
-                              label: Text(service),
-                              selected: selected,
-                              showCheckmark: false,
-                              avatar: selected
-                                  ? const Icon(Icons.check, size: 16, color: Color(0xff2196F3))
-                                  : null,
-                              labelStyle: TextStyle(
-                                color: selected ? const Color(0xff2196F3) : Colors.black87,
-                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                              ),
-                              backgroundColor: const Color(0xffF5F5F5),
-                              selectedColor: const Color(0xffE3F2FD),
-                              side: BorderSide(
-                                color: selected ? const Color(0xff2196F3) : Colors.grey.shade300,
-                              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'เพิ่มบริการของอู่เอง พร้อมราคาโดยประมาณ — ลูกค้าจะเห็นเฉพาะบริการที่เปิดให้บริการเท่านั้น',
+                        style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ✅ ปุ่มหมวดบริการ — แตะเพื่อเปิดฟอร์มเพิ่มบริการโดยพรีฟิลหมวดนั้นไว้ล่วงหน้า
+                      // (ไม่มีไอคอน/รูปประกอบ ใช้ข้อความล้วนตามที่ขอ)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: kGarageCategories.map((category) {
+                          return OutlinedButton(
+                            onPressed: () => _openServiceForm(presetCategory: category),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xff2196F3),
+                              backgroundColor: const Color(0xffE3F2FD),
+                              side: BorderSide.none,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              onSelected: (value) {
-                                setState(() {
-                                  if (value) {
-                                    _selectedServices.add(service);
-                                    _priceControllerFor(service); // เตรียม controller ไว้
-                                  } else {
-                                    _selectedServices.remove(service);
-                                    _priceControllers.remove(service)?.dispose();
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                            child: Text(category,
+                                style:
+                                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          );
+                        }).toList(),
                       ),
 
-                      // ✅ ราคาโดยประมาณต่อบริการ (ตามข้อ 1.3.2.5 ของสโคปโครงงาน)
-                      // อู่พิมพ์เองอิสระ เช่น "500-800 บาท" หรือ "เริ่มต้น 500 บาท"
-                      if (_selectedServices.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Text('ราคาโดยประมาณ',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
+                      const SizedBox(height: 16),
+
+                      if (_services.isEmpty)
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.grey.shade300),
                           ),
                           child: Column(
-                            children: _selectedServices.map((service) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: TextField(
-                                  controller: _priceControllerFor(service),
-                                  decoration: InputDecoration(
-                                    labelText: service,
-                                    hintText: 'เช่น 500-800 บาท หรือ เริ่มต้น 500 บาท',
-                                    prefixIcon: const Icon(Icons.sell_outlined, size: 20),
-                                    filled: true,
-                                    fillColor: const Color(0xFFF5F6FA),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
+                            children: [
+                              Icon(Icons.build_outlined, color: Colors.grey.shade400, size: 28),
+                              const SizedBox(height: 8),
+                              Text(
+                                'ยังไม่มีบริการ — กด "เพิ่มบริการใหม่" ด้านล่าง หรือแตะหมวดบริการด้านบน',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        )
+                      else ...[
+                        Text('บริการที่เพิ่มแล้ว (${_services.length})',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        ReorderableListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          buildDefaultDragHandles: false,
+                          itemCount: _services.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex -= 1;
+                              final item = _services.removeAt(oldIndex);
+                              _services.insert(newIndex, item);
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            final s = _services[index];
+                            final priceLabel = _priceLabel(s);
+                            return Container(
+                              key: ObjectKey(s),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Row(
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 10),
+                                      child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
                                     ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                s.name,
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600, fontSize: 15),
+                                              ),
+                                            ),
+                                            if (!s.active)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text('ปิดใช้งาน',
+                                                    style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey.shade600)),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(s.category,
+                                            style: TextStyle(
+                                                fontSize: 12.5, color: Colors.grey.shade600)),
+                                        if (priceLabel.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(priceLabel,
+                                              style: const TextStyle(
+                                                  color: Color(0xff2196F3),
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13)),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 20, color: Color(0xff2196F3)),
+                                    tooltip: 'แก้ไขบริการนี้',
+                                    onPressed: () => _openServiceForm(editIndex: index),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline,
+                                        size: 20, color: Colors.red.shade400),
+                                    tooltip: 'ลบบริการนี้',
+                                    onPressed: () => _removeService(index),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
+                        const SizedBox(height: 8),
                       ],
+
+                      OutlinedButton.icon(
+                        onPressed: () => _openServiceForm(),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('เพิ่มบริการใหม่'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xff2196F3),
+                          side: const BorderSide(color: Color(0xff2196F3)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
 
                       const SizedBox(height: 16),
                       Container(
@@ -701,6 +1036,36 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
       ),
     );
   }
+}
+
+/// บริการหนึ่งรายการที่อู่กำหนดเอง — แก้ไขผ่านฟอร์ม bottom sheet เท่านั้น (ไม่มี controller
+/// ค้างอยู่ในลิสต์หลัก) ฟิลด์ไม่ final เพราะแก้ไขทับ object เดิมตอนกด "แก้ไข" เพื่อให้
+/// ObjectKey ที่ใช้กับ ReorderableListView ยังนิ่งอยู่ ไม่กระพริบ/สลับตำแหน่งตอนแก้ไข
+class _ServiceEntry {
+  String category;
+  String name;
+  String priceMin;
+  String priceMax;
+  String details;
+  bool active;
+
+  _ServiceEntry({
+    required this.category,
+    required this.name,
+    this.priceMin = '',
+    this.priceMax = '',
+    this.details = '',
+    this.active = true,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'category': category,
+        'name': name,
+        'priceMin': priceMin,
+        'priceMax': priceMax,
+        'details': details,
+        'active': active,
+      };
 }
 
 class _HoursCard extends StatelessWidget {

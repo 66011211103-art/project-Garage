@@ -160,7 +160,8 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
 
   String _formatThaiDateTime(String? isoString) {
     if (isoString == null) return '-';
-    final dt = DateTime.tryParse(isoString);
+    // ✅ backend ส่งเวลาเป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน .hour/.day
+    final dt = DateTime.tryParse(isoString)?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
     final month = _thaiMonthsAbbr[dt.month - 1];

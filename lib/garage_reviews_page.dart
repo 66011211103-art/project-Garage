@@ -60,7 +60,8 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
   String get _shopLabel => widget.shopName ?? 'อู่ของคุณ';
 
   String _formatDate(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    // ✅ backend ส่งเวลาเป็น UTC ISO string — ไม่ .toLocal() ก่อน วันที่จะเพี้ยนได้
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     const months = [
       'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',

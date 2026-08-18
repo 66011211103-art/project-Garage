@@ -98,13 +98,38 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
     );
   }
 
+  // ✅ รองรับทั้งข้อมูลเก่า {name, price} และรูปแบบใหม่ {category, name, priceMin, priceMax,
+  // details, active} จากหน้าแก้ไขข้อมูลอู่ — แปลงให้เหลือแค่ name/price (ข้อความพร้อมแสดงผล)
+  // เหมือนเดิม เพื่อไม่ต้องแก้ส่วนอื่นของหน้านี้ และซ่อนบริการที่อู่ปิดใช้งานไว้ (active == false)
+  // ข้อมูลเก่าที่ไม่มีฟิลด์ active ให้ถือว่าเปิดใช้งานอยู่เสมอ กันบริการเดิมหายจากโปรไฟล์ทันที
   List<Map<String, dynamic>> get _services {
     final raw = widget.garage['services'];
     if (raw is! List) return [];
-    return raw.map((e) {
-      if (e is Map) return {'name': e['name']?.toString() ?? '', 'price': e['price']?.toString() ?? ''};
-      return {'name': e.toString(), 'price': ''};
-    }).toList();
+    return raw
+        .map((e) {
+          if (e is Map) {
+            final active = e['active'] is bool ? e['active'] as bool : true;
+            final name = e['name']?.toString() ?? '';
+
+            final priceMin = e['priceMin']?.toString().trim() ?? '';
+            final priceMax = e['priceMax']?.toString().trim() ?? '';
+            String price;
+            if (priceMin.isNotEmpty || priceMax.isNotEmpty) {
+              if (priceMin.isNotEmpty && priceMax.isNotEmpty && priceMin != priceMax) {
+                price = '$priceMin - $priceMax บาท';
+              } else {
+                price = '${priceMin.isNotEmpty ? priceMin : priceMax} บาท';
+              }
+            } else {
+              price = e['price']?.toString() ?? ''; // ข้อมูลเก่า
+            }
+
+            return {'name': name, 'price': price, 'active': active};
+          }
+          return {'name': e.toString(), 'price': '', 'active': true};
+        })
+        .where((s) => s['active'] == true && (s['name'] as String).isNotEmpty)
+        .toList();
   }
 
   // ===== เช็คว่าตอนนี้เปิดทำการอยู่ไหม จากเวลาทำการที่อู่ตั้งไว้ =====

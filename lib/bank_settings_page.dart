@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'garage_wallet_page.dart'; // ✅ ลิงก์ไปหน้า Wallet — เตือนเรื่องค่าคอมมิชชั่นตรงนี้เลย
 
 class BankSettingsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -108,12 +109,56 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
                 Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
                 SizedBox(width: 8),
                 Expanded(
-                  child: Text('ข้อมูลนี้จะแสดงให้ลูกค้าเห็นตอนโอนเงินชำระค่าซ่อม กรุณากรอกให้ถูกต้อง',
-                      style: TextStyle(color: Color(0xff2196F3), fontSize: 12)),
+                  child: Text(
+                    'บัญชีนี้จะแสดงให้ลูกค้าเห็นตอนโอนเงินชำระค่าซ่อม (รับเต็มจำนวน ไม่หักอะไรเลย) '
+                    'ส่วนค่าคอมมิชชั่นแพลตฟอร์มจะถูกหักแยกต่างหากจาก Wallet ของอู่ทีหลัง กรอกให้ถูกต้อง',
+                    style: TextStyle(color: Color(0xff2196F3), fontSize: 12),
+                  ),
                 ),
               ],
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          // ✅ ลิงก์ไปหน้า Wallet — หน้านี้กับ Wallet เป็นเรื่อง "การเงินของอู่" คู่กัน
+          // (บัญชีนี้ = รับเงินจากลูกค้า / Wallet = จ่ายค่าคอมมิชชั่นให้แพลตฟอร์ม)
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GarageWalletPage(garageId: widget.userData['id'])),
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xffF3E5F5), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xff9C27B0), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Wallet & ค่าคอมมิชชั่น', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                        Text('ดูยอดคงเหลือและเติมเงิน', style: TextStyle(color: Colors.grey, fontSize: 11.5)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 20),
 
           const Text('ธนาคาร', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),

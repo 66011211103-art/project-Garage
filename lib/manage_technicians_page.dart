@@ -143,8 +143,12 @@ class _ManageTechniciansPageState extends State<ManageTechniciansPage> {
                     ? NetworkImage(tech['avatar'])
                     : null,
                 child: (tech['avatar']?.toString().isEmpty ?? true)
+                    // ✅ กัน RangeError เวลา name เป็น "" (ว่างแต่ไม่ null) — .substring(0,1)
+                    // บนสตริงว่างจะ throw ถ้าไม่เช็ค isNotEmpty ก่อน
                     ? Text(
-                        (tech['name']?.toString() ?? '?').substring(0, 1).toUpperCase(),
+                        ((tech['name']?.toString().isNotEmpty ?? false) ? tech['name'].toString() : '?')
+                            .substring(0, 1)
+                            .toUpperCase(),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       )
                     : null,

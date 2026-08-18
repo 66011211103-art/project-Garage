@@ -121,9 +121,14 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     setState(() => _isSending = false);
 
+    // ✅ เดิม force-unwrap result.data!['message'] โดยเช็คแค่ result.success — ถ้า
+    // backend ตอบ success:true แต่ไม่มี data.message (เคสขอบๆ/response ผิดปกติ)
+    // จะ crash ด้วย null-check exception ทันทีตอนส่งข้อความ
     if (result.success) {
       setState(() {
-        _messages.add(Map<String, dynamic>.from(result.data!['message']));
+        if (result.data != null && result.data['message'] != null) {
+          _messages.add(Map<String, dynamic>.from(result.data['message']));
+        }
         _messageController.clear();
         _pendingImage = null;
         _pendingImageName = null;
@@ -137,7 +142,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _formatTime(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    // ✅ backend ตอบ created_at เป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน
+    // .hour/.minute ไม่งั้นเวลาที่โชว์ในแชทจะช้ากว่าเวลาไทยจริง 7 ชั่วโมง
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
@@ -206,10 +213,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemBuilder: (context, index) {
                           final m = _messages[index];
                           final isMe = m['sender_type']?.toString() == widget.myType;
-                          final dt = DateTime.tryParse(m['created_at']?.toString() ?? '');
+                          // ✅ .toLocal() ทั้งสองฝั่ง กันเส้นคั่น "วันนี้/เมื่อวาน" เพี้ยนตอน
+                          // เทียบวันที่แบบ UTC กับเวลาไทยปัจจุบัน (ช่วงเที่ยงคืน-7โมงเช้า)
+                          final dt = DateTime.tryParse(m['created_at']?.toString() ?? '')?.toLocal();
                           final showDayDivider = index == 0 ||
                               (dt != null &&
-                                  !_isSameDay(dt, DateTime.tryParse(_messages[index - 1]['created_at']?.toString() ?? '') ?? dt));
+                                  !_isSameDay(dt,
+                                      DateTime.tryParse(_messages[index - 1]['created_at']?.toString() ?? '')?.toLocal() ?? dt));
 
                           return Column(
                             children: [

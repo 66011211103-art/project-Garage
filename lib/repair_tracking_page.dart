@@ -107,13 +107,14 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
   }
 
   String _formatTime(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    // ✅ backend ส่งเวลาเป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน .hour/.minute
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
   }
 
   String _formatDateTime(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
@@ -128,7 +129,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
     if (stepIndex == 0) {
       final assignmentDate = widget.job['assignment_date']?.toString();
       if (assignmentDate != null && assignmentDate.isNotEmpty) {
-        final dt = DateTime.tryParse(assignmentDate);
+        final dt = DateTime.tryParse(assignmentDate)?.toLocal();
         if (dt != null) {
           final buddhistYear2Digit = (dt.year + 543) % 100;
           return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')}';

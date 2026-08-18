@@ -92,10 +92,16 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   // ✅ คำนวณยอดที่ต้องจ่ายจริงเอง (รวม VAT 7%) แทนการอ่าน total_price ตรงๆ จาก
   // backend เพราะ backend เก็บ total_price = ค่าอะไหล่+ค่าแรง โดยไม่ได้บวก VAT
   // เข้าไปเลย ต้องคำนวณให้ตรงกับยอดที่ quotation_card.dart แสดงให้ลูกค้าดูก่อนหน้านี้
+  // ✅ ราคาต่อรายการต้องคูณจำนวน (quantity) เสมอ — ของเดิมบวกแค่ 'price' เฉยๆ
+  // ทำให้รายการที่ quantity > 1 (เช่น ผ้าเบรก 4 ชิ้น ชิ้นละ 500) คิดเงินขาดไป
+  // และยอดที่ลูกค้าโอนจริงน้อยกว่ายอดในใบเสนอราคาที่อู่ตกลงไว้
+  double _itemSubtotal(dynamic it) =>
+      (double.tryParse(it['price']?.toString() ?? '0') ?? 0) *
+      (double.tryParse(it['quantity']?.toString() ?? '1') ?? 1);
+
   double get _totalAmount {
     final items = (_quotation?['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
-    final partsCost = items.fold<double>(
-        0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0));
+    final partsCost = items.fold<double>(0, (sum, it) => sum + _itemSubtotal(it));
     final laborCost = double.tryParse(_quotation?['labor_cost']?.toString() ?? '0') ?? 0;
     final subTotal = partsCost + laborCost;
     return subTotal + (subTotal * 0.07);
@@ -346,10 +352,10 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                 children: [
                   ...items.map((it) => _costRow(
                       '${it['name']} x${it['quantity'] ?? 1}',
-                      double.tryParse(it['price']?.toString() ?? '0') ?? 0)),
+                      _itemSubtotal(it))),
                   if (laborCost > 0) _costRow('ค่าแรง', laborCost),
                   _costRow('ภาษีมูลค่าเพิ่ม 7%',
-                      (items.fold<double>(0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0)) + laborCost) * 0.07),
+                      (items.fold<double>(0, (sum, it) => sum + _itemSubtotal(it)) + laborCost) * 0.07),
                   const Divider(height: 16),
                   _costRow('รวมทั้งหมด', _totalAmount, bold: true),
                 ],

@@ -248,6 +248,14 @@ class _RegisterPageState extends State<RegisterPage> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: customInput(hint: '0xx-xxx-xxxx', icon: Icons.phone_outlined),
+                  // ✅ เดิมไม่มี validator เลย ทำให้ฟอร์มผ่านและสมัครได้ทั้งที่เบอร์โทรว่าง
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'กรุณากรอกเบอร์โทรศัพท์';
+                    if (!RegExp(r'^[0-9]{9,10}$').hasMatch(v.trim().replaceAll('-', ''))) {
+                      return 'เบอร์โทรศัพท์ไม่ถูกต้อง';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 16),

@@ -17,6 +17,7 @@ import 'payment_card.dart';
 import 'review_card.dart';
 import 'repair_tracking_page.dart';
 import 'chat_screen.dart';
+import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
 
 class CustomerRequestDetailPage extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -63,18 +64,9 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
   String get _status => _request['status']?.toString() ?? 'pending';
   String get _shopName => _request['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
 
-  String _vehicleLabel(String? value) {
-    switch (value) {
-      case 'sedan':
-        return 'รถเก๋ง';
-      case 'suv':
-        return 'SUV';
-      case 'pickup':
-        return 'กระบะ';
-      default:
-        return 'ไม่ระบุ';
-    }
-  }
+  // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย (ของเดิมรองรับแค่
+  // sedan/suv/pickup แล้ว fallback เป็น "ไม่ระบุ" ทั้งที่มีข้อมูลจริง)
+  String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
     switch (status) {
@@ -366,6 +358,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
               if (_status == 'quoted' || _status == 'confirmed')
                 QuotationCard(
                   repairRequestId: _request['id'],
+                  customerId: widget.userData['id'],
                   onResponded: _refresh,
                 ),
 

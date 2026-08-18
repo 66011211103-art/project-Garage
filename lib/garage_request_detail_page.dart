@@ -17,6 +17,7 @@ import 'assign_technician_page.dart';
 import 'repair_tracking_page.dart';
 import 'payment_confirm_dialog.dart';
 import 'chat_screen.dart';
+import ' myCarPage.dart' show vehicleTypeLabel;
 
 class GarageRequestDetailPage extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -35,6 +36,8 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
   Map<String, dynamic>? _quotation;
   bool _isLoadingQuotation = true;
   bool _changed = false; // ✅ แจ้งหน้าลิสต์ว่าต้องรีเฟรชตอนกลับไปไหม
+  // ✅ กันกดปุ่ม "รับงาน"/"ปฏิเสธ" รัวๆ ยิง request ซ้ำซ้อน (เดิมไม่มี guard เลย)
+  bool _isResponding = false;
 
   @override
   void initState() {
@@ -83,8 +86,34 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
     }
   }
 
+  // ✅ คำขอซ่อมใหม่จะผูกกับรถจริงจาก "รถของฉัน" (มี car_id / cars.car_type) —
+  // ใช้ vehicleTypeLabel ที่รองรับประเภทรถครบกว่า ส่วนคำขอเก่าก่อนอัปเดตแอป
+  // ที่ไม่มีรถผูกไว้ ให้ fallback ไปใช้ vehicle_type แบบเดิม
+  bool get _hasCarInfo => (_request['car_model']?.toString().trim().isNotEmpty ?? false);
+
+  String get _vehicleTypeDisplay {
+    final carType = _request['car_type']?.toString();
+    if (carType != null && carType.isNotEmpty) return vehicleTypeLabel(carType);
+    return _vehicleLabel(_request['vehicle_type']?.toString());
+  }
+
+  Map<String, dynamic>? get _carInfo {
+    if (!_hasCarInfo) return null;
+    return {
+      'car_brand': _request['car_brand'],
+      'car_model': _request['car_model'],
+      'car_type': _request['car_type'],
+      'car_plate': _request['car_plate'],
+      'car_color': _request['car_color'],
+      'car_year': _request['car_year'],
+    };
+  }
+
   String _formatDateTime(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    // ✅ backend ตอบวันที่กลับมาเป็น UTC ISO string (เช่น "...T10:00:00.000Z")
+    // ถ้าไม่ .toLocal() ก่อน ตัวเลข .hour/.day ที่อ่านออกมาจะเป็นเวลา UTC ตรงๆ
+    // ซึ่งช้ากว่าเวลาไทยจริง 7 ชั่วโมง (เวลาที่โชว์ในแอปเลยดู "ไม่ตรงกับปัจจุบัน")
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
@@ -151,12 +180,16 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
   }
 
   Future<void> _respond(String status, {String? reason}) async {
+    if (_isResponding) return; // ✅ กันกดซ้ำระหว่าง request ก่อนหน้ายังไม่เสร็จ
+    setState(() => _isResponding = true);
     final result = await ApiService.updateRepairRequestStatus(
       requestId: _request['id'],
+      garageId: widget.userData['id'],
       status: status,
       reason: reason,
     );
     if (!mounted) return;
+    setState(() => _isResponding = false);
     if (result.success) {
       setState(() {
         _request = {..._request, 'status': status};
@@ -184,6 +217,10 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
           repairRequestId: _request['id'],
           customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
           existingQuotation: _quotation, // ✅ null = สร้างใหม่, มีค่า = แก้ไข
+          carInfo: _carInfo, // ✅ ข้อมูลรถของลูกค้า (ถ้าคำขอนี้ผูกกับรถใน "รถของฉัน")
+          garageServices: (widget.userData['services'] is List)
+              ? List<dynamic>.from(widget.userData['services'])
+              : null, // ✅ รายการบริการของอู่ ให้เลือกใส่ในใบเสนอราคาได้แทนการพิมพ์เอง
         ),
       ),
     );
@@ -286,7 +323,18 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                   children: [
                     _infoRow(Icons.person_outline, 'ลูกค้า', name.isEmpty ? 'ไม่ระบุชื่อ' : name),
                     const Divider(height: 20),
-                    _infoRow(Icons.directions_car_outlined, 'ประเภทรถ', _vehicleLabel(_request['vehicle_type']?.toString())),
+                    _infoRow(Icons.directions_car_outlined, 'ประเภทรถ', _vehicleTypeDisplay),
+                    if (_hasCarInfo) ...[
+                      const Divider(height: 20),
+                      _infoRow(Icons.badge_outlined, 'ยี่ห้อ/รุ่น',
+                          '${_request['car_brand'] ?? ''} ${_request['car_model'] ?? ''}'.trim().isEmpty
+                              ? 'ไม่ระบุ'
+                              : '${_request['car_brand'] ?? ''} ${_request['car_model'] ?? ''}'.trim()),
+                      if ((_request['car_plate']?.toString() ?? '').isNotEmpty) ...[
+                        const Divider(height: 20),
+                        _infoRow(Icons.pin_outlined, 'ทะเบียนรถ', _request['car_plate'].toString()),
+                      ],
+                    ],
                     const Divider(height: 20),
                     _infoRow(Icons.build_outlined, 'ประเภทปัญหา', _request['problem_category']?.toString() ?? '-'),
                     const Divider(height: 20),
@@ -577,7 +625,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
       return bar([
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _handleReject,
+            onPressed: _isResponding ? null : _handleReject,
             icon: const Icon(Icons.close, size: 16, color: Colors.red),
             label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
             style: OutlinedButton.styleFrom(
@@ -590,7 +638,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
         const SizedBox(width: 10),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => _respond('accepted'),
+            onPressed: _isResponding ? null : () => _respond('accepted'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               padding: const EdgeInsets.symmetric(vertical: 13),

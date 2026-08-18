@@ -52,7 +52,12 @@ class _SettingsPageState extends State<SettingsPage> {
       userId: widget.userData['id'],
     );
     if (newEmail != null && mounted) {
-      _emailChanged = true;
+      // ✅ เดิมไม่อัปเดต widget.userData['email'] เลย ทำให้ subtitle ใต้หัวข้อ
+      // "เปลี่ยนอีเมล" ยังโชว์อีเมลเก่าค้างอยู่จนกว่าจะออกจากหน้านี้แล้วเข้าใหม่
+      setState(() {
+        _emailChanged = true;
+        widget.userData['email'] = newEmail;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('เปลี่ยนอีเมลสำเร็จ'),

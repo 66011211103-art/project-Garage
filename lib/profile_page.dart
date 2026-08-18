@@ -49,6 +49,9 @@ class _ProfilePageState extends State<ProfilePage> {
       userId: _userData['id'],
       userType: _userData['userType'] ?? 'customer',
     );
+    // ✅ เดิมไม่เช็ค mounted ก่อน setState — ถ้าผู้ใช้ออกจากหน้านี้ (เช่น สลับแท็บ)
+    // ระหว่างที่ getProfile ยังโหลดไม่เสร็จ จะ crash ตอน request เสร็จแล้วมาเรียก setState
+    if (!mounted) return;
     if (result.success && result.data != null) {
       final updatedUser = result.data!['user'];
       setState(() => _userData = updatedUser);

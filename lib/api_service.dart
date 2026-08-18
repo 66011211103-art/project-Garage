@@ -1,17 +1,25 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'app_config.dart';
 
 class ApiResult {
   final bool success;
   final String message;
-  final Map<String, dynamic>? data;
+  // ✅ เดิมเป็น Map<String, dynamic>? — แต่บาง endpoint (เช่น wallet_routes.js
+  // /wallet/topups, /wallet/:garageId/unpaid-commissions) ส่ง data กลับมาเป็น
+  // List ตรงๆ ไม่ได้ห่อด้วย Map เหมือน endpoint อื่น ทำให้การ assign
+  // "data: body['data']" throw type error ตอน runtime แล้วโดน catch เงียบๆ
+  // กลายเป็น "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้" ทั้งที่ยิง request สำเร็จ —
+  // เปลี่ยนเป็น dynamic เพื่อรองรับได้ทั้งรูปแบบ Map และ List
+  final dynamic data;
 
   ApiResult({required this.success, required this.message, this.data});
 }
 
 class ApiService {
-  static const String baseUrl = 'http://10.160.61.17:3000/api';
+  // ✅ ย้ายไป app_config.dart จุดเดียว — ดูคอมเมนต์ในไฟล์นั้นก่อนแก้ IP/host
+  static const String baseUrl = AppConfig.apiBaseUrl;
 
   // ===== REGISTER =====
   static Future<ApiResult> register({
@@ -288,7 +296,8 @@ class ApiService {
   static Future<ApiResult> submitRepairRequest({
     required int customerId,
     required int garageId,
-    required String vehicleType,
+    int? carId, // ✅ อ้างอิงรถที่เลือกจาก "รถของฉัน" — backend จะ derive vehicleType จาก car_type ของรถคันนี้ให้เอง
+    String? vehicleType, // ⚠️ เผื่อกรณีไม่มี carId (fallback เก่า) ไม่บังคับอีกต่อไปถ้ามี carId
     required String problemCategory,
     required String description,
     required String address,
@@ -304,7 +313,8 @@ class ApiService {
       );
       request.fields['customerId'] = customerId.toString();
       request.fields['garageId'] = garageId.toString();
-      request.fields['vehicleType'] = vehicleType;
+      if (carId != null) request.fields['carId'] = carId.toString();
+      if (vehicleType != null) request.fields['vehicleType'] = vehicleType;
       request.fields['problemCategory'] = problemCategory;
       request.fields['description'] = description;
       request.fields['address'] = address;
@@ -371,6 +381,7 @@ class ApiService {
   // ===== UPDATE REPAIR REQUEST STATUS (รับงาน / ปฏิเสธ / เสร็จงาน) =====
   static Future<ApiResult> updateRepairRequestStatus({
     required int requestId,
+    required int garageId, // ✅ ต้องส่งไปให้ backend เช็คว่าอู่ที่เรียกเป็นเจ้าของคำขอนี้จริง
     required String status, // 'accepted' | 'rejected' | 'done'
     String? reason, // ใช้ตอน status == 'rejected' เท่านั้น
   }) async {
@@ -381,6 +392,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'status': status,
+              'garageId': garageId,
               if (reason != null) 'reason': reason,
             }),
           )
@@ -755,6 +767,7 @@ class ApiService {
   // ===== RESPOND TO QUOTATION (ลูกค้ายืนยัน/ปฏิเสธใบเสนอราคา) =====
   static Future<ApiResult> respondToQuotation({
     required int quotationId,
+    required int customerId, // ✅ ให้ backend เช็คว่าลูกค้าที่ตอบเป็นเจ้าของคำขอซ่อมที่ผูกกับใบเสนอราคานี้จริง
     required String status, // 'confirmed' | 'rejected'
     String? reason,
   }) async {
@@ -765,6 +778,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'status': status,
+              'customerId': customerId,
               if (reason != null) 'reason': reason,
             }),
           )
@@ -808,6 +822,7 @@ class ApiService {
     String? carBrand,
     String? carColor,
     int? carYear,
+    String? carType, // ✅ sedan | suv | pickup | van | motorcycle | other
   }) async {
     try {
       final response = await http
@@ -821,6 +836,7 @@ class ApiService {
               'carBrand': carBrand,
               'carColor': carColor,
               'carYear': carYear,
+              'carType': carType,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -847,6 +863,7 @@ class ApiService {
     String? carBrand,
     String? carColor,
     int? carYear,
+    String? carType,
   }) async {
     try {
       final response = await http
@@ -859,6 +876,7 @@ class ApiService {
               'carBrand': carBrand,
               'carColor': carColor,
               'carYear': carYear,
+              'carType': carType,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -1227,6 +1245,110 @@ class ApiService {
         success: false,
         message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
       );
+    }
+  }
+
+  // ===== ✅ Wallet & ค่าคอมมิชชั่น — จุดที่ขาดหายไปมาตลอด ทำให้แอปอู่ไม่เคยเห็นยอด
+  // wallet ของตัวเองเลย (มีแต่ Admin Panel ที่มองเห็น) เชื่อมกับ wallet_routes.js ที่มีอยู่แล้ว =====
+
+  /// อู่ดูยอดเครดิตคงเหลือ + อัตราค่าคอมมิชชั่นของตัวเอง
+  static Future<ApiResult> getWallet({required int garageId}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/wallet/$garageId'))
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  /// อู่ดูรายการค่าคอมมิชชั่นที่ยัง "ค้างจ่าย" ทีละงาน (payment_status = 'unpaid')
+  /// — ให้เลือกงานที่จะจ่ายแทนการพิมพ์ยอดเติมเงินเอง (ตรงกับ
+  /// GET /wallet/:garageId/unpaid-commissions ใน wallet_routes.js)
+  static Future<ApiResult> getUnpaidCommissions({required int garageId}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/wallet/$garageId/unpaid-commissions'))
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  /// อู่ส่งชำระค่าคอมมิชชั่นของงานที่เลือก (โอนเข้าบัญชีแพลตฟอร์ม + แนบสลิป รอแอดมินตรวจ)
+  /// ✅ ยอดที่ต้องจ่ายคำนวณจากฝั่ง backend เสมอจากรายการ id ที่ส่งไป (ไม่รับยอดจาก
+  /// client ตรงๆ) — ให้ตรงกับ POST /wallet/topup ใน wallet_routes.js ที่ parse
+  /// commissionTransactionIds เป็น JSON array จาก req.body
+  static Future<ApiResult> submitWalletTopup({
+    required int garageId,
+    required List<int> commissionTransactionIds,
+    Uint8List? slipBytes,
+    String? slipFileName,
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/wallet/topup'));
+      request.fields['garageId'] = garageId.toString();
+      request.fields['commissionTransactionIds'] = jsonEncode(commissionTransactionIds);
+      if (slipBytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes('slip', slipBytes, filename: slipFileName ?? 'slip.jpg'),
+        );
+      }
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final body = jsonDecode(await response.stream.bytesToString());
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  /// อู่ดูประวัติการเติมเงินของตัวเอง (รอตรวจสอบ/ยืนยันแล้ว/ถูกปฏิเสธ)
+  static Future<ApiResult> getWalletTopups({required int garageId}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/wallet/topups?garageId=$garageId'))
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  /// ดูบัญชีรับเงินของแพลตฟอร์ม (ให้อู่โอนเข้าตอนเติมเงิน Wallet)
+  static Future<ApiResult> getPlatformBankAccount() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/platform/bank-account'))
+          .timeout(const Duration(seconds: 15));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
     }
   }
 

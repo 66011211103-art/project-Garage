@@ -112,7 +112,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
   }
 
   String _timeAgo(String? isoString) {
-    final dt = DateTime.tryParse(isoString ?? '');
+    final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
     if (diff.inDays >= 7) return '${(diff.inDays / 7).floor()} สัปดาห์ที่แล้ว';

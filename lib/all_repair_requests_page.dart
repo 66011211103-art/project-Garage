@@ -31,6 +31,8 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _requests = [];
   _RequestTab _selectedTab = _RequestTab.all;
+  // ✅ กันกดปุ่ม "รับงาน"/"ปฏิเสธ" รัวๆ ยิง request ซ้ำซ้อนต่อ 1 คำขอ (เดิมไม่มี guard)
+  final Set<int> _respondingIds = {};
 
   @override
   void initState() {
@@ -80,12 +82,16 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   }
 
   Future<void> _respondToRequest(int requestId, String status, {String? reason}) async {
+    if (_respondingIds.contains(requestId)) return; // ✅ กันกดซ้ำระหว่างรอผลก่อนหน้า
+    setState(() => _respondingIds.add(requestId));
     final result = await ApiService.updateRepairRequestStatus(
       requestId: requestId,
+      garageId: widget.userData['id'],
       status: status,
       reason: reason,
     );
     if (!mounted) return;
+    setState(() => _respondingIds.remove(requestId));
     if (result.success) {
       _fetchRequests();
     } else {
@@ -166,7 +172,9 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
 
   String _formatThaiDateTime(String? isoString) {
     if (isoString == null) return '-';
-    final dt = DateTime.tryParse(isoString);
+    // ✅ backend ส่งเวลาเป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน .hour/.day
+    // ไม่งั้นเวลาที่โชว์จะช้ากว่าเวลาไทยจริง 7 ชั่วโมง
+    final dt = DateTime.tryParse(isoString)?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
     final month = _thaiMonthsAbbr[dt.month - 1];
@@ -448,7 +456,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _handleReject(id),
+                    onPressed: _respondingIds.contains(id) ? null : () => _handleReject(id),
                     icon: const Icon(Icons.close, size: 16, color: Colors.red),
                     label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
                     style: OutlinedButton.styleFrom(
@@ -460,7 +468,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _respondToRequest(id, 'accepted'),
+                    onPressed: _respondingIds.contains(id) ? null : () => _respondToRequest(id, 'accepted'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

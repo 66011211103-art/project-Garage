@@ -20,9 +20,15 @@ const List<String> kQuoteRejectionReasons = [
 /// การ์ดแสดงใบเสนอราคา พร้อมปุ่มยืนยัน/ปฏิเสธ (ใช้ในหน้าประวัติคำขอซ่อมของลูกค้า)
 class QuotationCard extends StatefulWidget {
   final int repairRequestId;
+  final int customerId; // ✅ ให้ backend เช็คว่าลูกค้าที่ตอบเป็นเจ้าของคำขอซ่อมนี้จริง
   final VoidCallback? onResponded;
 
-  const QuotationCard({super.key, required this.repairRequestId, this.onResponded});
+  const QuotationCard({
+    super.key,
+    required this.repairRequestId,
+    required this.customerId,
+    this.onResponded,
+  });
 
   @override
   State<QuotationCard> createState() => _QuotationCardState();
@@ -55,6 +61,7 @@ class _QuotationCardState extends State<QuotationCard> {
 
     final result = await ApiService.respondToQuotation(
       quotationId: _quotation!['id'],
+      customerId: widget.customerId,
       status: status,
       reason: reason,
     );
@@ -161,6 +168,12 @@ class _QuotationCardState extends State<QuotationCard> {
       ),
     );
 
+    // ✅ เดิม customController ไม่ถูก dispose เลย (leak) — แต่ dispose ทันทีตรงนี้จะ
+    // ชนบั๊กเดียวกับที่เคยแก้ใน editprofile_shop_page.dart (TextField ในชีทยังไม่ถูก
+    // unmount จริงจนกว่า animation ปิดชีทจะเล่นจบ ทำให้ "used after being disposed"
+    // ได้) — หน่วงเวลาสั้นๆ ให้ animation จบก่อนค่อย dispose ปลอดภัยกว่า
+    Future.delayed(const Duration(milliseconds: 300), customController.dispose);
+
     if (reason != null) _respond('rejected', reason: reason);
   }
 
@@ -181,9 +194,15 @@ class _QuotationCardState extends State<QuotationCard> {
     final endDate = _quotation!['estimated_end_date']?.toString();
     final notes = _quotation!['notes']?.toString() ?? '';
 
-    // ยอดรวมค่าอะไหล่ (รวมจากราคาต่อรายการที่ backend ส่งมา)
-    final partsCost = items.fold<double>(
-        0, (sum, it) => sum + (double.tryParse(it['price']?.toString() ?? '0') ?? 0));
+    // ✅ ราคาต่อรายการต้องคูณจำนวน (quantity) เสมอ — ของเดิมบวกแค่ 'price' เฉยๆ
+    // ทำให้รายการที่ quantity > 1 คิดเงินขาดไป ไม่ตรงกับยอดที่ customer_payment_page.dart
+    // ใช้เรียกเก็บเงินจริงจากลูกค้า (แก้ไปพร้อมกันทั้งสองที่ให้คิดแบบเดียวกัน)
+    double itemSubtotal(dynamic it) =>
+        (double.tryParse(it['price']?.toString() ?? '0') ?? 0) *
+        (double.tryParse(it['quantity']?.toString() ?? '1') ?? 1);
+
+    // ยอดรวมค่าอะไหล่ (รวมจากราคา x จำนวนต่อรายการที่ backend ส่งมา)
+    final partsCost = items.fold<double>(0, (sum, it) => sum + itemSubtotal(it));
 
     // ✅ คำนวณภาษีมูลค่าเพิ่ม 7% "บวกเพิ่มจริง" บนยอดค่าอะไหล่+ค่าแรง แล้วคำนวณ
     // ยอดรวมสุทธิเองจากตรงนี้เสมอ (ไม่ใช้ total_price ที่ backend เก็บไว้โดยตรง)
@@ -235,7 +254,7 @@ class _QuotationCardState extends State<QuotationCard> {
             ...items.map((it) => _lineItemCard(
                   title: '${it['name']}',
                   subtitle: 'จำนวน ${it['quantity']}${(it['unit'] ?? '').toString().isNotEmpty ? ' ${it['unit']}' : ''}',
-                  price: double.tryParse(it['price']?.toString() ?? '0') ?? 0,
+                  price: itemSubtotal(it),
                 )),
             _subtotalRow('รวมค่าอะไหล่', partsCost),
             const SizedBox(height: 10),

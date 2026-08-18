@@ -12,6 +12,8 @@ import 'payment_history_page.dart'; // ✅ จัดการ/ยืนยัน
 import 'bank_settings_page.dart'; // ✅ ตั้งค่าบัญชีธนาคารรับชำระเงิน
 import 'garage_chat_list_page.dart'; // ✅ แชทกับลูกค้า
 import 'garage_tracking_list_page.dart'; // ✅ อัปเดตสถานะ/ติดตามงานที่กำลังซ่อม
+import 'garage_wallet_page.dart'; // ✅ Wallet ของอู่ — ดูยอดคงเหลือ/เติมเงิน
+import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -26,12 +28,26 @@ class _GarageDashboardState extends State<GarageDashboard> {
   int currentIndex = 0;
   late Map<String, dynamic> _userData; // ✅ เก็บ userData เป็น state ของหน้านี้เอง
 
+  // ✅ ยอด wallet — โชว์ banner เตือนบนแดชบอร์ดถ้าติดลบ (จุดที่ขาดหายไปเดิม)
+  double? _walletBalance;
+
   @override
   void initState() {
     super.initState();
     _userData = widget.userData;
     _fetchRequests();
     _setupPushNotifications();
+    _fetchWalletBalance();
+  }
+
+  Future<void> _fetchWalletBalance() async {
+    final result = await ApiService.getWallet(garageId: _userData['id']);
+    if (!mounted) return;
+    if (result.success && result.data != null) {
+      setState(() {
+        _walletBalance = double.tryParse(result.data!['wallet_balance']?.toString() ?? '0') ?? 0;
+      });
+    }
   }
 
   // ✅ ขอ permission + เก็บ FCM token + ตั้งค่าให้กดแจ้งเตือนแล้วพาไปหน้ารายการคำขอซ่อม
@@ -59,6 +75,8 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
   bool _isLoadingRequests = true;
   List<Map<String, dynamic>> _requests = []; // คำขอทั้งหมดที่ดึงมาจาก server
+  // ✅ กันกดปุ่ม "รับงาน"/"ปฏิเสธ" รัวๆ ยิง request ซ้ำซ้อนต่อ 1 คำขอ
+  final Set<int> _respondingIds = {};
 
   Future<void> _fetchRequests() async {
     setState(() => _isLoadingRequests = true);
@@ -73,12 +91,16 @@ class _GarageDashboardState extends State<GarageDashboard> {
   }
 
   Future<void> _respondToRequest(int requestId, String status, {String? reason}) async {
+    if (_respondingIds.contains(requestId)) return; // ✅ กันกดซ้ำระหว่างรอผลก่อนหน้า
+    setState(() => _respondingIds.add(requestId));
     final result = await ApiService.updateRepairRequestStatus(
       requestId: requestId,
+      garageId: _userData['id'],
       status: status,
       reason: reason,
     );
     if (!mounted) return;
+    setState(() => _respondingIds.remove(requestId));
     if (result.success) {
       _fetchRequests(); // โหลดรายการใหม่หลังอัปเดตสถานะ
     } else {
@@ -88,24 +110,17 @@ class _GarageDashboardState extends State<GarageDashboard> {
     }
   }
 
-  // ===== แปลงชื่อประเภทรถให้อ่านง่าย =====
-  String _vehicleLabel(String? value) {
-    switch (value) {
-      case 'sedan':
-        return 'รถเก๋ง';
-      case 'suv':
-        return 'SUV';
-      case 'pickup':
-        return 'กระบะ';
-      default:
-        return 'ไม่ระบุ';
-    }
-  }
+  // ===== แปลงชื่อประเภทรถให้อ่านง่าย — ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/
+  // อื่นๆ ด้วย (ของเดิมรองรับแค่ sedan/suv/pickup แล้ว fallback เป็น "ไม่ระบุ") =====
+  String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   // ===== ข้อความเวลาแบบ "x นาทีที่แล้ว" =====
   String _timeAgo(String? createdAt) {
     if (createdAt == null) return '';
-    final created = DateTime.tryParse(createdAt);
+    // ✅ .toLocal() ไม่จำเป็นสำหรับผลต่างเวลา (DateTime.difference คำนวณจาก
+    // instant จริงอยู่แล้ว ไม่ว่าจะเป็น UTC หรือ local) แต่ใส่ไว้ให้สอดคล้องกับ
+    // จุดอื่นๆ ที่ต้องแปลงเป็นเวลาไทยก่อนใช้งานเสมอ กันสับสน/ลืมทีหลัง
+    final created = DateTime.tryParse(createdAt)?.toLocal();
     if (created == null) return '';
     final diff = DateTime.now().difference(created);
     if (diff.inMinutes < 1) return 'เมื่อสักครู่';
@@ -161,7 +176,10 @@ class _GarageDashboardState extends State<GarageDashboard> {
   int get _todayCount {
     final now = DateTime.now();
     return _requests.where((r) {
-      final created = DateTime.tryParse(r['created_at']?.toString() ?? '');
+      // ✅ ต้อง .toLocal() ก่อนเทียบ year/month/day — created_at จาก backend เป็น
+      // UTC ISO string ถ้าไม่แปลงก่อน ช่วง 00:00-07:00 เวลาไทยจะถูกนับเป็น "เมื่อวาน"
+      // (เพราะวันที่แบบ UTC ยังไม่ข้ามวัน) ทำให้ยอด "วันนี้" ขาดหายไปช่วงเช้ามืด
+      final created = DateTime.tryParse(r['created_at']?.toString() ?? '')?.toLocal();
       return created != null &&
           created.year == now.year &&
           created.month == now.month &&
@@ -185,12 +203,29 @@ class _GarageDashboardState extends State<GarageDashboard> {
     final now = DateTime.now();
     return _requests.where((r) {
       if (r['payment_status']?.toString() != 'confirmed') return false;
-      final submitted = DateTime.tryParse(r['payment_submitted_at']?.toString() ?? '');
+      // ✅ .toLocal() เหตุผลเดียวกับ _todayCount — payment_submitted_at เป็น UTC
+      final submitted = DateTime.tryParse(r['payment_submitted_at']?.toString() ?? '')?.toLocal();
       return submitted != null &&
           submitted.year == now.year &&
           submitted.month == now.month &&
           submitted.day == now.day;
     }).fold<double>(0, (sum, r) => sum + (double.tryParse(r['payment_amount']?.toString() ?? '0') ?? 0));
+  }
+
+  // ✅ ค่าคอมมิชชั่นที่ระบบหักจาก wallet ไปแล้ววันนี้ — แยกจาก "รายได้วันนี้" ข้างบน
+  // เพราะเป็นคนละบัญชีกัน (รายได้ = เงินเต็มจำนวนที่เข้าธนาคารอู่ / คอมมิชชั่น = หักจาก
+  // wallet ต่างหาก) โชว์คู่กันให้เห็นชัดว่าเงินหายไปไหน กันงงเวลาเทียบกับ wallet ที่ติดลบ
+  double get _todayCommission {
+    final now = DateTime.now();
+    return _requests.where((r) {
+      if (r['payment_status']?.toString() != 'confirmed') return false;
+      // ✅ .toLocal() เหตุผลเดียวกับ _todayCount — payment_submitted_at เป็น UTC
+      final submitted = DateTime.tryParse(r['payment_submitted_at']?.toString() ?? '')?.toLocal();
+      return submitted != null &&
+          submitted.year == now.year &&
+          submitted.month == now.month &&
+          submitted.day == now.day;
+    }).fold<double>(0, (sum, r) => sum + (double.tryParse(r['commission_amount']?.toString() ?? '0') ?? 0));
   }
 
   @override
@@ -308,10 +343,53 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   _statCard(icon: Icons.calendar_today, value: '$_todayCount', label: 'งานวันนี้', color: const Color(0xff2196F3)),
                   _statCard(icon: Icons.build, value: '$_inProgressCount', label: 'กำลังดำเนินการ', color: const Color(0xffFF9800)),
                   _statCard(icon: Icons.check_circle, value: '$_doneCount', label: 'เสร็จแล้ว', color: const Color(0xff4CAF50)),
-                  _statCard(icon: Icons.attach_money, value: '฿${_todayRevenue.toStringAsFixed(0)}', label: 'รายได้วันนี้', color: const Color(0xff9C27B0)),
+                  _statCard(
+                    icon: Icons.attach_money,
+                    value: '฿${_todayRevenue.toStringAsFixed(0)}',
+                    label: 'รายได้วันนี้',
+                    color: const Color(0xff9C27B0),
+                    subtitle: _todayCommission > 0
+                        ? 'สุทธิ ฿${(_todayRevenue - _todayCommission).toStringAsFixed(0)}'
+                        : null,
+                  ),
                 ],
               ),
             ),
+
+            // ✅ Banner เตือนทันทีถ้า wallet ติดลบ — จุดที่ขาดหายไปเดิม (เดิมอู่ไม่มีทาง
+            // รู้เลยว่าตัวเองติดค้างค่าคอมมิชชั่นอยู่ จนกว่าจะโดนบล็อกไม่ให้รับงานใหม่)
+            if (_walletBalance != null && _walletBalance! < 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => GarageWalletPage(garageId: _userData['id'])),
+                  ).then((_) => _fetchWalletBalance()),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffFFEBEE),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xffE53935).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xffE53935), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Wallet ติดลบ ฿${_walletBalance!.abs().toStringAsFixed(2)} — แตะเพื่อเติมเงิน ก่อนถูกระงับรับงานใหม่',
+                            style: const TextStyle(color: Color(0xffC62828), fontSize: 12.5, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Color(0xffE53935), size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
             // ===== คำขอซ่อมล่าสุด =====
             Padding(
@@ -429,6 +507,21 @@ class _GarageDashboardState extends State<GarageDashboard> {
                       }
                     },
                   ),
+                  // ✅ Wallet ของอู่ — ดูยอดคงเหลือ/เติมเงิน (จุดที่ขาดหายไปเดิม อู่ไม่เคย
+                  // เห็นยอด wallet ของตัวเองเลย ทั้งที่ระบบหักค่าคอมมิชชั่นอัตโนมัติทุกงาน)
+                  _quickMenu(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Wallet',
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GarageWalletPage(garageId: _userData['id']),
+                        ),
+                      );
+                      _fetchWalletBalance();
+                    },
+                  ),
                 ],
               ),
             ),
@@ -466,7 +559,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
     );
   }
 
-  Widget _statCard({required IconData icon, required String value, required String label, required Color color}) {
+  Widget _statCard({required IconData icon, required String value, required String label, required Color color, String? subtitle}) {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.only(right: 8),
@@ -482,6 +575,13 @@ class _GarageDashboardState extends State<GarageDashboard> {
             const SizedBox(height: 6),
             Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+            // ✅ ยอดสุทธิหลังหักค่าคอมมิชชั่น — โชว์เฉพาะการ์ดที่ส่ง subtitle มา (การ์ดรายได้)
+            // ให้เห็นชัดว่าเงินส่วนหนึ่งถูกหักไป wallet แล้ว ไม่ใช่ตัวเลขเดียวกับที่เข้าธนาคารสุทธิ
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(subtitle, textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 9.5, color: Color(0xff4CAF50), fontWeight: FontWeight.w600)),
+            ],
           ],
         ),
       ),
@@ -553,7 +653,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _handleReject(id),
+                  onPressed: _respondingIds.contains(id) ? null : () => _handleReject(id),
                   icon: const Icon(Icons.close, size: 16, color: Colors.red),
                   label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
                   style: OutlinedButton.styleFrom(
@@ -565,7 +665,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _respondToRequest(id, 'accepted'),
+                  onPressed: _respondingIds.contains(id) ? null : () => _respondToRequest(id, 'accepted'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
