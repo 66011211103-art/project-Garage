@@ -9,6 +9,8 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'payment_confirm_dialog.dart'; // ✅ ให้อู่ยืนยัน/ปฏิเสธได้ตรงจากหน้าประวัติเลย
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class PaymentHistoryPage extends StatefulWidget {
   final int? customerId;
@@ -37,6 +39,17 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
   void initState() {
     super.initState();
     _fetchPayments();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchPayments() async {
@@ -58,11 +71,11 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
   String _methodLabel(String? method) {
     switch (method) {
       case 'bank_transfer':
-        return 'โอนเงินผ่านธนาคาร';
+        return AppLocale.instance.t('php_method_bank_transfer');
       case 'qr':
-        return 'QR Payment';
+        return AppLocale.instance.t('php_method_qr');
       case 'credit_card':
-        return 'บัตรเครดิต/เดบิต';
+        return AppLocale.instance.t('php_method_credit_card');
       default:
         return method ?? '-';
     }
@@ -71,11 +84,11 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
   String _statusLabel(String? status) {
     switch (status) {
       case 'confirmed':
-        return 'ยืนยันแล้ว';
+        return AppLocale.instance.t('qc_status_confirmed');
       case 'pending_confirmation':
-        return 'รอตรวจสอบ';
+        return AppLocale.instance.t('php_status_pending');
       case 'rejected':
-        return 'ถูกปฏิเสธ';
+        return AppLocale.instance.t('track_status_rejected');
       default:
         return status ?? '-';
     }
@@ -114,7 +127,7 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: InteractiveViewer(child: Image.network(url)),
+              child: InteractiveViewer(child: NetImage(url)),
             ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
@@ -129,6 +142,7 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final body = RefreshIndicator(
       onRefresh: _fetchPayments,
       child: _isLoading
@@ -145,23 +159,23 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                   ),
                   child: Column(
                     children: [
-                      Text(widget.isGarageView ? 'รายได้ที่ยืนยันแล้วทั้งหมด' : 'ยอดที่ชำระแล้วทั้งหมด',
+                      Text(widget.isGarageView ? loc.t('php_total_income_confirmed') : loc.t('php_total_paid'),
                           style: const TextStyle(color: Colors.white70, fontSize: 13)),
                       const SizedBox(height: 6),
                       Text('฿${_totalConfirmed.toStringAsFixed(0)}',
                           style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('${_payments.length} รายการ', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text(loc.t('php_items_count').replaceAll('%s', '${_payments.length}'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text('ประวัติการชำระเงินทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                Text(loc.t('php_all_history_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
                 const SizedBox(height: 12),
                 if (_payments.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Center(child: Text('ยังไม่มีประวัติการชำระเงิน', style: TextStyle(color: Colors.grey))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: Text(loc.t('php_empty_state'), style: const TextStyle(color: Colors.grey))),
                   )
                 else
                   ..._payments.map((p) {
@@ -215,8 +229,8 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                                       style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                   if (canConfirm) ...[
                                     const SizedBox(height: 4),
-                                    const Text('แตะเพื่อตรวจสอบและยืนยัน',
-                                        style: TextStyle(color: Color(0xffFF9800), fontSize: 11, fontWeight: FontWeight.w600)),
+                                    Text(loc.t('php_tap_to_review'),
+                                        style: const TextStyle(color: Color(0xffFF9800), fontSize: 11, fontWeight: FontWeight.w600)),
                                   ],
                                 ],
                               ),
@@ -228,7 +242,7 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                 if (netAmount != null) ...[
                                   const SizedBox(height: 2),
-                                  Text('สุทธิ ฿${netAmount.toStringAsFixed(0)}',
+                                  Text(loc.t('php_net_prefix').replaceAll('%s', netAmount.toStringAsFixed(0)),
                                       style: const TextStyle(color: Color(0xff4CAF50), fontSize: 11, fontWeight: FontWeight.w600)),
                                 ],
                                 const SizedBox(height: 6),
@@ -264,7 +278,7 @@ class _PaymentHistoryPageState extends State<PaymentHistoryPage> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ประวัติการชำระเงิน', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('profile_payment_history'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

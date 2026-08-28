@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom sheet เลือก/ถ่ายรูป) ร่วมกัน
+import 'app_locale.dart';
 
 /// รายการบริการที่อู่สามารถเลือกให้บริการได้
 const List<String> kGarageServiceOptions = [
@@ -14,6 +15,23 @@ const List<String> kGarageServiceOptions = [
   'ตัวถัง',
   'ระบบไฟ',
 ];
+
+// ✅ kGarageServiceOptions ยังคงเป็นภาษาไทยเสมอ (ใช้เทียบ/บันทึกค่าใน _selectedServices) —
+// ฟังก์ชันนี้ใช้แค่แปลข้อความที่แสดงผลบน FilterChip เท่านั้น
+String _garageServiceDisplayLabel(String service) {
+  const map = {
+    'เครื่องยนต์': 'cat_engine',
+    'ยาง': 'cat_tires',
+    'แบตเตอรี่': 'cat_battery',
+    'ซ่อมสี': 'cat_paint',
+    'เบรก': 'svc_brakes',
+    'ช่วงล่าง': 'svc_suspension',
+    'ตัวถัง': 'svc_body',
+    'ระบบไฟ': 'svc_electrical',
+  };
+  final key = map[service];
+  return key != null ? AppLocale.instance.t(key) : service;
+}
 
 /// หน้าแก้ไข "ข้อมูลอู่" (รูปภาพ, ที่อยู่, เวลาทำการ, บริการ)
 /// แยกจากหน้า "แก้ไขข้อมูลส่วนตัว" — ใช้สำหรับข้อมูลธุรกิจ/หน้าร้านที่แสดงในโปรไฟล์อู่
@@ -47,6 +65,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     final u = widget.userData;
     _garageNameController =
         TextEditingController(text: u['shop_name'] ?? u['garage_name'] ?? '');
@@ -64,10 +83,15 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _garageNameController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   ImageProvider? get _coverImage {
@@ -103,13 +127,13 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(isWeekday ? 'เวลาทำการ จันทร์-ศุกร์' : 'เวลาทำการ เสาร์-อาทิตย์'),
+              title: Text(isWeekday ? AppLocale.instance.t('gie_hours_weekday_title') : AppLocale.instance.t('gie_hours_weekend_title')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('เวลาเปิด'),
+                    title: Text(AppLocale.instance.t('gie_open_time_label')),
                     trailing: TextButton(
                       child: Text(tempStart.format(context)),
                       onPressed: () async {
@@ -125,7 +149,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('เวลาปิด'),
+                    title: Text(AppLocale.instance.t('gie_close_time_label')),
                     trailing: TextButton(
                       child: Text(tempEnd.format(context)),
                       onPressed: () async {
@@ -144,7 +168,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('ยกเลิก'),
+                  child: Text(AppLocale.instance.t('cancel')),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -152,7 +176,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                         '${_fmt(tempStart)}-${_fmt(tempEnd)}';
                     Navigator.pop(context, formatted);
                   },
-                  child: const Text('ตกลง'),
+                  child: Text(AppLocale.instance.t('gie_confirm_button')),
                 ),
               ],
             );
@@ -201,7 +225,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('อัปโหลดรูปไม่สำเร็จ: ${photoResult.message}'),
+            content: Text(AppLocale.instance.t('ep_avatar_upload_failed').replaceAll('%s', photoResult.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -246,11 +270,12 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แก้ไขข้อมูลอู่', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('profile_edit_shop'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -268,38 +293,38 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('รูปภาพอู่',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('gie_photo_title'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 10),
                       _buildCoverImage(),
 
                       const SizedBox(height: 20),
-                      const Text('ชื่ออู่',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('gie_shop_name_label'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _garageNameController,
                         decoration: profileInputDeco(
-                            hint: 'ชื่ออู่ซ่อมรถ', icon: Icons.store_outlined),
+                            hint: loc.t('reg_shop_name_hint'), icon: Icons.store_outlined),
                         validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'กรุณากรอกชื่ออู่' : null,
+                            v == null || v.trim().isEmpty ? loc.t('gie_shop_name_required') : null,
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('ที่อยู่',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('garage_address_prefix'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _addressController,
                         maxLines: 2,
                         decoration: profileInputDeco(
-                            hint: 'ที่อยู่อู่ซ่อมรถ',
+                            hint: loc.t('gie_address_hint'),
                             icon: Icons.location_on_outlined),
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('เบอร์โทรศัพท์',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('reg_phone_label'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _phoneController,
@@ -309,14 +334,14 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('เวลาทำการ',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('gd_business_hours'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: _HoursCard(
-                              label: 'จ-ศ:',
+                              label: loc.t('gie_weekday_label'),
                               value: _weekdayHours,
                               onTap: () => _editHours(isWeekday: true),
                             ),
@@ -324,7 +349,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _HoursCard(
-                              label: 'ส-อา:',
+                              label: loc.t('gie_weekend_label'),
                               value: _weekendHours,
                               onTap: () => _editHours(isWeekday: false),
                             ),
@@ -333,8 +358,8 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('บริการที่ให้บริการ',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(loc.t('gie_services_title'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -349,7 +374,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                           children: kGarageServiceOptions.map((service) {
                             final selected = _selectedServices.contains(service);
                             return FilterChip(
-                              label: Text(service),
+                              label: Text(_garageServiceDisplayLabel(service)),
                               selected: selected,
                               showCheckmark: false,
                               avatar: selected
@@ -389,14 +414,14 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                           color: const Color(0xffE3F2FD),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: Color(0xff2196F3), size: 20),
-                            SizedBox(width: 10),
+                            const Icon(Icons.info_outline, color: Color(0xff2196F3), size: 20),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'ข้อมูลที่แก้ไขจะแสดงในโปรไฟล์อู่ของคุณทันที',
-                                style: TextStyle(color: Color(0xff1976D2), fontSize: 13),
+                                loc.t('gie_info_banner'),
+                                style: const TextStyle(color: Color(0xff1976D2), fontSize: 13),
                               ),
                             ),
                           ],
@@ -432,7 +457,7 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                       )
                     : const Icon(Icons.save_outlined, color: Colors.white),
                 label: Text(
-                  _isLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
+                  _isLoading ? loc.t('cqp_saving') : loc.t('gie_save_button'),
                   style: const TextStyle(
                       color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
@@ -469,13 +494,13 @@ class _GarageInfoEditPageState extends State<GarageInfoEditPage> {
                       color: const Color(0xff2196F3).withOpacity(0.9),
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Text('เปลี่ยนรูปภาพ',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                        const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text(AppLocale.instance.t('gie_change_photo'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),

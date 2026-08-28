@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 const int kMaxLogPhotos = 5;
 
@@ -23,10 +24,21 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
   bool _isSubmitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _noteController.dispose();
     _partsController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickPhotos() async {
@@ -59,7 +71,7 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
   Future<void> _handleSubmit() async {
     if (_noteController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายละเอียดความคืบหน้า'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('arl_note_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -87,11 +99,12 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('บันทึกความคืบหน้า', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('arl_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -103,13 +116,13 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('รายละเอียดที่ทำไป', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(loc.t('arl_details_label'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextField(
               controller: _noteController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'เช่น ถอดเครื่องยนต์ตรวจเช็ค พบว่าปั๊มน้ำรั่ว...',
+                hintText: loc.t('arl_details_hint'),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -120,13 +133,13 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
             ),
 
             const SizedBox(height: 16),
-            const Text('อะไหล่ที่ใช้ (ถ้ามี)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(loc.t('arl_parts_label'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextField(
               controller: _partsController,
               maxLines: 2,
               decoration: InputDecoration(
-                hintText: 'เช่น ปั๊มน้ำ 1 ชิ้น, สายพานราวลิ้น 1 เส้น',
+                hintText: loc.t('arl_parts_hint'),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -139,7 +152,7 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('รูปภาพความคืบหน้า', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(loc.t('arl_photos_label'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 6),
                 Text('(${_photos.length}/$kMaxLogPhotos)',
                     style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
@@ -195,7 +208,7 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
                           children: [
                             Icon(Icons.camera_alt_outlined, color: Colors.grey.shade400),
                             const SizedBox(height: 6),
-                            Text('เพิ่มรูปภาพ', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                            Text(loc.t('req_add_photo_label'), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                           ],
                         ),
                       ),
@@ -222,7 +235,7 @@ class _AddRepairLogPageState extends State<AddRepairLogPage> {
                       )
                     : const Icon(Icons.save_outlined, color: Colors.white),
                 label: Text(
-                  _isSubmitting ? 'กำลังบันทึก...' : 'บันทึกความคืบหน้า',
+                  _isSubmitting ? loc.t('arl_saving') : loc.t('arl_page_title'),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),

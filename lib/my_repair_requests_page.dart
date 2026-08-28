@@ -7,6 +7,7 @@ import 'payment_card.dart'; // ✅ การ์ดชำระเงิน — �
 import 'chat_screen.dart'; // ✅ แชทกับอู่
 import 'customer_request_detail_page.dart'; // ✅ หน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม)
 import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
+import 'app_locale.dart';
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -41,6 +42,17 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
   void initState() {
     super.initState();
     _fetchRequests();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchRequests() async {
@@ -72,7 +84,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
     if (!mounted) return;
     if (!result.success || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('gd_chat_open_failed')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -84,7 +96,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
           conversationId: result.data!['conversationId'],
           myId: widget.userData['id'],
           myType: 'customer',
-          otherPartyName: r['shop_name']?.toString() ?? 'อู่ซ่อมรถ',
+          otherPartyName: r['shop_name']?.toString() ?? AppLocale.instance.t('profile_type_repair'),
           otherPartyAvatar: r['garage_avatar']?.toString(),
         ),
       ),
@@ -98,29 +110,30 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
   String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'pending':
-        return 'รอดำเนินการ';
+        return loc.t('myreq_status_pending');
       case 'accepted':
-        return 'อู่รับงานแล้ว';
+        return loc.t('myreq_status_accepted');
       case 'quoted':
-        return 'มีใบเสนอราคาใหม่';
+        return loc.t('myreq_status_quoted');
       case 'confirmed':
-        return 'ยืนยันแล้ว รอมอบหมายช่าง';
+        return loc.t('myreq_status_confirmed');
       case 'assigned':
-        return 'มอบหมายช่างแล้ว';
+        return loc.t('myreq_status_assigned');
       case 'checking':
-        return 'ช่างกำลังเดินทาง';
+        return loc.t('dash_status_checking');
       case 'in_progress':
-        return 'กำลังซ่อม';
+        return loc.t('dash_status_in_progress');
       case 'waiting_parts':
-        return 'รอรับอะไหล่';
+        return loc.t('dash_status_waiting_parts');
       case 'completed':
-        return 'ซ่อมเสร็จแล้ว';
+        return loc.t('tech_status_completed');
       case 'rejected':
-        return 'อู่ปฏิเสธ';
+        return loc.t('myreq_status_rejected');
       case 'done':
-        return 'เสร็จสิ้น';
+        return loc.t('myreq_status_done');
       default:
         return status;
     }
@@ -197,11 +210,12 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ประวัติคำขอซ่อม', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('myreq_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: widget.onBack ?? () => Navigator.pop(context),
@@ -214,15 +228,15 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
             ? const Center(child: CircularProgressIndicator())
             : _requests.isEmpty
                 ? ListView(
-                    children: const [
+                    children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(vertical: 80),
+                        padding: const EdgeInsets.symmetric(vertical: 80),
                         child: Center(
                           child: Column(
                             children: [
-                              Icon(Icons.inbox_outlined, size: 56, color: Colors.grey),
-                              SizedBox(height: 12),
-                              Text('ยังไม่มีคำขอซ่อม', style: TextStyle(color: Colors.grey)),
+                              const Icon(Icons.inbox_outlined, size: 56, color: Colors.grey),
+                              const SizedBox(height: 12),
+                              Text(loc.t('myreq_empty_state'), style: const TextStyle(color: Colors.grey)),
                             ],
                           ),
                         ),
@@ -239,8 +253,9 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
   }
 
   Widget _requestCard(Map<String, dynamic> r) {
+    final loc = AppLocale.instance;
     final status = r['status']?.toString() ?? 'pending';
-    final shopName = r['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
+    final shopName = r['shop_name']?.toString() ?? loc.t('myreq_shop_name_fallback');
     final isHighlighted = widget.highlightRequestId != null && r['id'] == widget.highlightRequestId;
 
     return Container(
@@ -336,7 +351,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'เหตุผล: ${r['rejection_reason']}',
+                          loc.t('myreq_rejection_reason_prefix').replaceAll('%s', '${r['rejection_reason']}'),
                           style: const TextStyle(color: Color(0xffE53935), fontSize: 13),
                         ),
                       ),
@@ -364,7 +379,7 @@ class _MyRepairRequestsPageState extends State<MyRepairRequestsPage> {
                       MaterialPageRoute(builder: (context) => RepairTrackingPage(job: r, isCustomerView: true)),
                     ),
                     icon: const Icon(Icons.timeline, size: 16),
-                    label: const Text('ติดตามสถานะการซ่อม'),
+                    label: Text(loc.t('myreq_track_status_button')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xff2196F3),
                       side: const BorderSide(color: Color(0xff2196F3)),

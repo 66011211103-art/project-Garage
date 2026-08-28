@@ -9,6 +9,8 @@
 
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class GarageJobDetailPage extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -27,6 +29,17 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
   void initState() {
     super.initState();
     _fetchQuotation();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchQuotation() async {
@@ -47,28 +60,30 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
   String _repairCode(dynamic id) => '#REQ${(id ?? 0).toString().padLeft(6, '0')}';
 
   String _vehicleLabel(String? value) {
+    final loc = AppLocale.instance;
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return loc.t('tech_vehicle_sedan');
       case 'suv':
         return 'SUV';
       case 'pickup':
-        return 'กระบะ';
+        return loc.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return loc.t('garage_address_fallback');
     }
   }
 
   String _paymentStatusLabel(String? status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'confirmed':
-        return 'ชำระเงินแล้ว';
+        return loc.t('gcj_payment_confirmed');
       case 'pending_confirmation':
-        return 'รอตรวจสอบสลิป';
+        return loc.t('gcj_payment_pending');
       case 'rejected':
-        return 'ปฏิเสธสลิปแล้ว';
+        return loc.t('gcj_payment_rejected');
       default:
-        return 'ยังไม่ชำระเงิน';
+        return loc.t('gcj_payment_unpaid');
     }
   }
 
@@ -90,12 +105,14 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
+    final timeSuffix = AppLocale.instance.isThai ? ' น.' : '';
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}$timeSuffix';
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final job = widget.job;
     final name = '${job['first_name'] ?? ''} ${job['last_name'] ?? ''}'.trim();
     final photos = (job['photos'] is List) ? List<dynamic>.from(job['photos']) : [];
@@ -126,8 +143,8 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                   child: const Icon(Icons.task_alt, color: Color(0xff4CAF50), size: 22),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('ซ่อมเสร็จเรียบร้อยแล้ว', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(loc.t('track_desc_completed'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -149,14 +166,14 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow(Icons.person_outline, 'ลูกค้า', name.isEmpty ? 'ไม่ระบุชื่อ' : name),
+                _infoRow(Icons.person_outline, loc.t('profile_type_customer'), name.isEmpty ? loc.t('profile_name_fallback') : name),
                 const Divider(height: 20),
-                _infoRow(Icons.directions_car_outlined, 'ประเภทรถ', _vehicleLabel(job['vehicle_type']?.toString())),
+                _infoRow(Icons.directions_car_outlined, loc.t('car_type_label'), _vehicleLabel(job['vehicle_type']?.toString())),
                 const Divider(height: 20),
-                _infoRow(Icons.build_outlined, 'ประเภทปัญหา', job['problem_category']?.toString() ?? '-'),
+                _infoRow(Icons.build_outlined, loc.t('req_problem_section_title'), job['problem_category']?.toString() ?? '-'),
                 if (job['technician_name'] != null) ...[
                   const Divider(height: 20),
-                  _infoRow(Icons.engineering_outlined, 'ช่างที่รับผิดชอบ', job['technician_name'].toString()),
+                  _infoRow(Icons.engineering_outlined, loc.t('gjd_label_technician'), job['technician_name'].toString()),
                 ],
               ],
             ),
@@ -169,13 +186,13 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('รายละเอียดที่ลูกค้าแจ้ง',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                Text(loc.t('gjd_reported_details_title'),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                 const SizedBox(height: 8),
                 Text(
                   job['description']?.toString().isNotEmpty == true
                       ? job['description'].toString()
-                      : 'ไม่มีรายละเอียดเพิ่มเติม',
+                      : loc.t('crd_no_description'),
                   style: const TextStyle(fontSize: 14, height: 1.5),
                 ),
               ],
@@ -193,7 +210,7 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    job['address']?.toString().isNotEmpty == true ? job['address'].toString() : 'ไม่ระบุที่อยู่',
+                    job['address']?.toString().isNotEmpty == true ? job['address'].toString() : loc.t('crd_no_address'),
                     style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                   ),
                 ),
@@ -208,8 +225,8 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('รูปภาพประกอบ',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                  Text(loc.t('crd_photos_title'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 96,
@@ -219,7 +236,7 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
                       itemBuilder: (context, i) => ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.network(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
+                        child: NetImage(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
                       ),
                     ),
                   ),
@@ -235,12 +252,12 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('ใบเสนอราคา', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                Text(loc.t('rrd_quotation_title'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                 const SizedBox(height: 10),
                 if (_isLoadingQuotation)
                   const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
                 else if (_quotation == null)
-                  const Text('ไม่พบข้อมูลใบเสนอราคา', style: TextStyle(color: Colors.grey, fontSize: 13))
+                  Text(loc.t('gjd_no_quotation'), style: const TextStyle(color: Colors.grey, fontSize: 13))
                 else ...[
                   ...((_quotation!['items'] is List) ? List<dynamic>.from(_quotation!['items']) : []).map(
                     (it) => Padding(
@@ -259,7 +276,7 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
                         children: [
-                          const Expanded(child: Text('ค่าแรง', style: TextStyle(fontSize: 13))),
+                          Expanded(child: Text(loc.t('gjd_labor_cost'), style: const TextStyle(fontSize: 13))),
                           Text('฿${double.tryParse(_quotation!['labor_cost']?.toString() ?? '0')?.toStringAsFixed(0)}',
                               style: const TextStyle(fontSize: 13)),
                         ],
@@ -281,7 +298,7 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                           padding: const EdgeInsets.symmetric(vertical: 3),
                           child: Row(
                             children: [
-                              const Expanded(child: Text('ภาษีมูลค่าเพิ่ม 7%', style: TextStyle(fontSize: 13))),
+                              Expanded(child: Text(loc.t('common_vat_7'), style: const TextStyle(fontSize: 13))),
                               Text('฿${vatAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13)),
                             ],
                           ),
@@ -289,7 +306,7 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
                         const Divider(height: 16),
                         Row(
                           children: [
-                            const Expanded(child: Text('รวมทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                            Expanded(child: Text(loc.t('common_grand_total'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
                             Text('฿${totalPrice.toStringAsFixed(0)}',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff4CAF50))),
                           ],
@@ -309,16 +326,16 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('สลิปการชำระเงิน',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                  Text(loc.t('gjd_payment_slip_title'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                   const SizedBox(height: 10),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.network(job['payment_slip'].toString(), fit: BoxFit.contain),
+                    child: NetImage(job['payment_slip'].toString(), fit: BoxFit.contain),
                   ),
                   if (amount > 0) ...[
                     const SizedBox(height: 8),
-                    Text('ยอดที่แจ้งโอน: ฿${amount.toStringAsFixed(0)}',
+                    Text(loc.t('gjd_transferred_amount_prefix').replaceAll('%s', amount.toStringAsFixed(0)),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   ],
                 ],
@@ -333,9 +350,9 @@ class _GarageJobDetailPageState extends State<GarageJobDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow(Icons.event_outlined, 'วันที่แจ้งซ่อม', _formatDateTime(job['created_at']?.toString())),
+                _infoRow(Icons.event_outlined, loc.t('crd_label_request_date'), _formatDateTime(job['created_at']?.toString())),
                 const Divider(height: 20),
-                _infoRow(Icons.task_alt, 'ซ่อมเสร็จเมื่อ', _formatDateTime(job['completed_at']?.toString())),
+                _infoRow(Icons.task_alt, loc.t('gjd_label_completed_at'), _formatDateTime(job['completed_at']?.toString())),
               ],
             ),
           ),

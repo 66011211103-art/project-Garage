@@ -7,6 +7,8 @@ import 'request_repair_page.dart'; // ✅ หน้าส่งคำขอซ�
 import 'api_service.dart';
 import 'chat_screen.dart'; // ✅ แชทกับอู่
 import 'garage_reviews_page.dart'; // ✅ หน้าดูรีวิวทั้งหมดของอู่
+import 'network_image_helper.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 /// หน้ารายละเอียดอู่ซ่อมรถ (ฝั่งลูกค้า)
 /// รับข้อมูลอู่มาจากหน้า Search โดยตรง (ไม่ยิง API ซ้ำ เพราะข้อมูลชุดเดียวกันอยู่แล้ว)
@@ -31,6 +33,17 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
   void initState() {
     super.initState();
     _fetchReviewSummary();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchReviewSummary() async {
@@ -46,9 +59,9 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
     }
   }
 
-  String get _shopName => widget.garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+  String get _shopName => widget.garage['shop_name']?.toString() ?? AppLocale.instance.t('profile_shop_fallback');
   String? get _avatar => widget.garage['avatar']?.toString();
-  String get _address => widget.garage['address']?.toString() ?? 'ไม่ระบุที่อยู่';
+  String get _address => widget.garage['address']?.toString() ?? AppLocale.instance.t('gd_address_fallback');
   String get _phone => widget.garage['phone']?.toString() ?? '';
   // ✅ garage_id ที่ใช้ทั่วทั้งระบบ คือ users.id ของอู่ (เท่ากับ garages.user_id) — ต้อง
   // ลองอ่าน user_id ก่อนเสมอ ไม่ใช่ id (garages.id เป็นคนละค่ากับ garages.user_id เดิม
@@ -64,7 +77,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
     final garageId = _garageId;
     if (garageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่พบข้อมูลอู่ ไม่สามารถเปิดแชทได้'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('gd_no_garage_chat_fail')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -79,7 +92,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
 
     if (!result.success || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('gd_chat_open_failed')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -116,9 +129,9 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
             String price;
             if (priceMin.isNotEmpty || priceMax.isNotEmpty) {
               if (priceMin.isNotEmpty && priceMax.isNotEmpty && priceMin != priceMax) {
-                price = '$priceMin - $priceMax บาท';
+                price = '$priceMin - $priceMax ${AppLocale.instance.t('gd_baht')}';
               } else {
-                price = '${priceMin.isNotEmpty ? priceMin : priceMax} บาท';
+                price = '${priceMin.isNotEmpty ? priceMin : priceMax} ${AppLocale.instance.t('gd_baht')}';
               }
             } else {
               price = e['price']?.toString() ?? ''; // ข้อมูลเก่า
@@ -199,6 +212,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final services = _services;
     final servicesWithPrice = services.where((s) => (s['price'] ?? '').isNotEmpty).toList();
     final isOpen = _isOpenNow;
@@ -217,7 +231,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                     Stack(
                       children: [
                         _avatar != null && _avatar!.isNotEmpty
-                            ? Image.network(_avatar!, height: 240, width: double.infinity, fit: BoxFit.cover)
+                            ? NetImage(_avatar!, height: 240, width: double.infinity, fit: BoxFit.cover)
                             : Container(
                                 height: 240,
                                 width: double.infinity,
@@ -264,7 +278,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     children: [
                                       Icon(Icons.circle, size: 10, color: isOpen ? Colors.green : Colors.red),
                                       const SizedBox(width: 6),
-                                      Text(isOpen ? 'เปิดทำการ' : 'ปิดทำการ',
+                                      Text(isOpen ? loc.t('gd_open_now') : loc.t('gd_closed_now'),
                                           style: TextStyle(
                                               color: isOpen ? Colors.green.shade700 : Colors.red.shade700)),
                                     ],
@@ -278,13 +292,13 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                           Text(_averageRating!.toStringAsFixed(1),
                                               style: const TextStyle(fontWeight: FontWeight.bold)),
                                           const SizedBox(width: 4),
-                                          Text('($_totalReviews รีวิว)',
+                                          Text('(${loc.t('search_reviews_count').replaceAll('%s', '$_totalReviews')})',
                                               style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                                         ]
                                       : [
                                           Icon(Icons.star_border, color: Colors.grey.shade400, size: 20),
                                           const SizedBox(width: 4),
-                                          Text('ยังไม่มีรีวิว', style: TextStyle(color: Colors.grey.shade500)),
+                                          Text(loc.t('gd_no_reviews_yet'), style: TextStyle(color: Colors.grey.shade500)),
                                         ],
                                 ),
                               ],
@@ -299,7 +313,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _cardHeader(Icons.build_outlined, 'ประเภทบริการ'),
+                                  _cardHeader(Icons.build_outlined, loc.t('gd_service_types')),
                                   const SizedBox(height: 12),
                                   Wrap(
                                     spacing: 8,
@@ -325,7 +339,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _cardHeader(Icons.sell_outlined, 'ราคาโดยประมาณ'),
+                                  _cardHeader(Icons.sell_outlined, loc.t('gd_estimated_prices')),
                                   const SizedBox(height: 12),
                                   ...servicesWithPrice.map((s) => Padding(
                                         padding: const EdgeInsets.only(bottom: 8),
@@ -350,21 +364,21 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _cardHeader(Icons.access_time, 'เวลาทำการ'),
+                                _cardHeader(Icons.access_time, loc.t('gd_business_hours')),
                                 const SizedBox(height: 12),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text('จันทร์ - ศุกร์'),
-                                    Text(widget.garage['hours_weekday']?.toString() ?? 'ไม่ระบุ'),
+                                    Text(loc.t('gd_mon_fri')),
+                                    Text(widget.garage['hours_weekday']?.toString() ?? loc.t('garage_address_fallback')),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text('เสาร์ - อาทิตย์'),
-                                    Text(widget.garage['hours_weekend']?.toString() ?? 'ไม่ระบุ'),
+                                    Text(loc.t('gd_sat_sun')),
+                                    Text(widget.garage['hours_weekend']?.toString() ?? loc.t('garage_address_fallback')),
                                   ],
                                 ),
                               ],
@@ -378,7 +392,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _cardHeader(Icons.location_on_outlined, 'ที่ตั้ง'),
+                                _cardHeader(Icons.location_on_outlined, loc.t('gd_location')),
                                 const SizedBox(height: 12),
                                 Text(_address),
                                 if (_distanceKm != null) ...[
@@ -387,7 +401,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     children: [
                                       Icon(Icons.near_me, size: 14, color: Colors.grey.shade600),
                                       const SizedBox(width: 4),
-                                      Text('ห่างจากคุณ ${_distanceKm!.toStringAsFixed(1)} กม.',
+                                      Text(loc.t('gd_distance_from_you').replaceAll('%s', _distanceKm!.toStringAsFixed(1)),
                                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                                     ],
                                   ),
@@ -439,7 +453,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     children: [
                                       Icon(Icons.fullscreen, size: 14, color: Colors.grey.shade600),
                                       const SizedBox(width: 4),
-                                      Text('แตะเพื่อดูแผนที่เต็มจอ',
+                                      Text(loc.t('gd_tap_fullscreen_map'),
                                           style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                                     ],
                                   ),
@@ -474,7 +488,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                   width: 16, height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.chat_bubble_outline, size: 18),
-                          label: const Text('แชท'),
+                          label: Text(loc.t('nav_chat')),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xff2196F3),
                             side: const BorderSide(color: Color(0xff2196F3)),
@@ -498,7 +512,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                                     ),
                                   ),
                           icon: const Icon(Icons.star_border, size: 18),
-                          label: const Text('ดูรีวิว'),
+                          label: Text(loc.t('gd_view_reviews')),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.grey.shade700,
                             side: BorderSide(color: Colors.grey.shade400),
@@ -525,7 +539,7 @@ class _GarageDetailPageState extends State<GarageDetailPage> {
                         );
                       },
                       icon: const Icon(Icons.build, color: Colors.white, size: 18),
-                      label: const Text('ส่งคำขอซ่อม', style: TextStyle(color: Colors.white)),
+                      label: Text(loc.t('gd_send_repair_request'), style: const TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff2196F3),
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -592,7 +606,7 @@ class _GarageMapPage extends StatelessWidget {
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เปิดแอปแผนที่ไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('gd_open_maps_failed')), backgroundColor: Colors.red),
       );
     }
   }
@@ -675,7 +689,7 @@ class _GarageMapPage extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: () => _openInMapsApp(context),
                       icon: const Icon(Icons.directions, color: Colors.white, size: 18),
-                      label: const Text('นำทางไปยังอู่นี้', style: TextStyle(color: Colors.white)),
+                      label: Text(AppLocale.instance.t('gd_navigate_here'), style: const TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff2196F3),
                         padding: const EdgeInsets.symmetric(vertical: 12),

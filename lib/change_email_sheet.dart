@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 /// เปิด bottom sheet ให้เปลี่ยนอีเมล ยืนยันตัวตนด้วย OTP ที่ส่งไปอีเมลใหม่
 /// คืนค่าอีเมลใหม่ (String) เมื่อเปลี่ยนสำเร็จ หรือ null ถ้าปิดโดยไม่สำเร็จ
@@ -35,7 +36,18 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
   String? _errorText;
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _emailController.dispose();
     _otpController.dispose();
     super.dispose();
@@ -44,7 +56,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
   Future<void> _handleSendOtp() async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorText = 'กรุณากรอกอีเมลให้ถูกต้อง');
+      setState(() => _errorText = AppLocale.instance.t('change_email_invalid'));
       return;
     }
 
@@ -71,7 +83,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
   Future<void> _handleConfirmOtp() async {
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
-      setState(() => _errorText = 'กรุณากรอกรหัส OTP');
+      setState(() => _errorText = AppLocale.instance.t('change_email_otp_required'));
       return;
     }
 
@@ -97,6 +109,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
@@ -110,7 +123,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
                 const Icon(Icons.mark_email_read_outlined, color: Color(0xff2196F3)),
                 const SizedBox(width: 8),
                 Text(
-                  _step == 1 ? 'เปลี่ยนอีเมล' : 'ยืนยันรหัส OTP',
+                  _step == 1 ? loc.t('change_email') : loc.t('change_email_step2_title'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
@@ -123,9 +136,9 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
             const SizedBox(height: 4),
 
             if (_step == 1) ...[
-              const Text(
-                'กรอกอีเมลใหม่ที่ต้องการใช้ ระบบจะส่งรหัส OTP ไปยืนยันที่อีเมลนี้',
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+              Text(
+                loc.t('change_email_step1_instructions'),
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -133,7 +146,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
                 keyboardType: TextInputType.emailAddress,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'อีเมลใหม่ เช่น example@email.com',
+                  hintText: loc.t('change_email_hint'),
                   prefixIcon: const Icon(Icons.email_outlined),
                   filled: true,
                   fillColor: const Color(0xFFF5F6FA),
@@ -165,13 +178,13 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text('ส่งรหัส OTP',
-                          style: TextStyle(color: Colors.white, fontSize: 16)),
+                      : Text(loc.t('forgot_pw_send_otp'),
+                          style: const TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
             ] else ...[
               Text(
-                'กรอกรหัส OTP ที่ส่งไปที่ ${_emailController.text.trim()}',
+                loc.t('change_email_otp_sent_to').replaceAll('%s', _emailController.text.trim()),
                 style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -210,7 +223,7 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
                             _otpController.clear();
                           });
                         },
-                  child: const Text('ส่งรหัสใหม่ / แก้ไขอีเมล'),
+                  child: Text(loc.t('change_email_resend')),
                 ),
               ),
               const SizedBox(height: 8),
@@ -231,8 +244,8 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text('ยืนยันการเปลี่ยนอีเมล',
-                          style: TextStyle(color: Colors.white, fontSize: 16)),
+                      : Text(loc.t('change_email_confirm'),
+                          style: const TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],

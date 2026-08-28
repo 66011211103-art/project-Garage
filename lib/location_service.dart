@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 /// ขอ permission + ดึงตำแหน่งปัจจุบันของอุปกรณ์ (GPS บนมือถือ หรือ browser location บนเว็บ)
 /// คืนค่า Position ถ้าสำเร็จ หรือโยน Exception พร้อมข้อความอธิบายถ้าไม่สำเร็จ
@@ -10,7 +11,7 @@ import 'package:latlong2/latlong.dart';
 Future<Position> getCurrentPosition() async {
   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
-    throw Exception('กรุณาเปิดบริการตำแหน่ง (Location Service) ก่อน');
+    throw Exception(AppLocale.instance.t('loc_svc_disabled'));
   }
 
   var permission = await Geolocator.checkPermission();
@@ -18,14 +19,12 @@ Future<Position> getCurrentPosition() async {
     // ✅ ตรงนี้คือจุดที่จะเด้ง popup "อนุญาตให้เข้าถึงตำแหน่งหรือไม่" ของ browser/OS
     permission = await Geolocator.requestPermission();
     if (permission == LocationPermission.denied) {
-      throw Exception('ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง');
+      throw Exception(AppLocale.instance.t('loc_permission_denied'));
     }
   }
 
   if (permission == LocationPermission.deniedForever) {
-    throw Exception(
-      'ตำแหน่งถูกปฏิเสธถาวร กรุณาไปเปิดสิทธิ์ในตั้งค่าเบราว์เซอร์/อุปกรณ์',
-    );
+    throw Exception(AppLocale.instance.t('loc_permission_denied_forever'));
   }
 
   return Geolocator.getCurrentPosition(

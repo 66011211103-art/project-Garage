@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import ' myCarPage.dart' show vehicleTypeLabel;
+import 'app_locale.dart';
 
 /// หน้าสร้างใบเสนอราคา ให้อู่กรอกหลังจากกด "รับงาน" คำขอซ่อมแล้ว
 /// ✅ ใช้หน้าเดียวกันนี้ทำโหมด "แก้ไข" ได้ด้วย — ส่ง existingQuotation มา
@@ -34,6 +35,26 @@ const List<String> kPartUnits = ['ชิ้น', 'ลิตร', 'ขวด', '�
 
 /// หน่วยเวลาสำหรับรายการค่าแรง
 const List<String> kLaborTimeUnits = ['ชั่วโมง', 'นาที', 'วัน', 'ครั้ง'];
+
+// ✅ ค่าใน kPartUnits/kLaborTimeUnits ยังคงเป็นภาษาไทยเสมอ (เก็บเป็น unit/timeUnit
+// ที่ส่งไป backend และรวมอยู่ในหมายเหตุค่าแรงที่บันทึกจริง) — ใช้ตัวนี้แค่ตอนแสดงผล
+// ใน dropdown เท่านั้น
+String _unitDisplayLabel(String unit) {
+  const map = {
+    'ชิ้น': 'cqp_unit_piece',
+    'ลิตร': 'cqp_unit_liter',
+    'ขวด': 'cqp_unit_bottle',
+    'เมตร': 'cqp_unit_meter',
+    'ชุด': 'cqp_unit_set',
+    'ครั้ง': 'cqp_unit_time',
+    'อัน': 'cqp_unit_item',
+    'ชั่วโมง': 'cqp_unit_hour',
+    'นาที': 'cqp_unit_minute',
+    'วัน': 'cqp_unit_day',
+  };
+  final key = map[unit];
+  return key != null ? AppLocale.instance.t(key) : unit;
+}
 
 class _QuoteItem {
   final TextEditingController nameCtrl;
@@ -92,6 +113,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     final q = widget.existingQuotation;
     if (q == null) return;
 
@@ -115,7 +137,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     if (laborCost > 0) {
       _laborItems.clear();
       final labor = _LaborItem();
-      labor.nameCtrl.text = 'ค่าแรงรวม';
+      labor.nameCtrl.text = AppLocale.instance.t('qc_labor_total_label');
       labor.priceCtrl.text = laborCost.toStringAsFixed(0);
       _laborItems.add(labor);
     }
@@ -136,7 +158,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       item.dispose();
     }
     _notesController.dispose();
+    AppLocale.instance.removeListener(_onLocaleChanged);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   double get _partsCost => _items.fold(0, (sum, item) => sum + item.subtotal);
@@ -181,7 +208,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     });
   }
 
-  String _fmtDate(DateTime? d) => d == null ? 'เลือกวันที่' : '${d.day}/${d.month}/${d.year}';
+  String _fmtDate(DateTime? d) => d == null ? AppLocale.instance.t('cqp_select_date') : '${d.day}/${d.month}/${d.year}';
   String? _isoDate(DateTime? d) => d == null
       ? null
       : '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -208,15 +235,19 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return SafeArea(
+        // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น
+        // warning เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+        return Material(
+          color: Colors.white,
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('เลือกจากบริการของอู่',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(AppLocale.instance.t('cqp_pick_service_title'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
@@ -236,9 +267,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       if (minStr.isNotEmpty && maxStr.isNotEmpty) {
                         priceLabel = '฿$minStr - ฿$maxStr';
                       } else if (minStr.isNotEmpty) {
-                        priceLabel = 'เริ่มต้น ฿$minStr';
+                        priceLabel = AppLocale.instance.t('cqp_price_from_prefix').replaceAll('%s', minStr);
                       } else if (maxStr.isNotEmpty) {
-                        priceLabel = 'สูงสุด ฿$maxStr';
+                        priceLabel = AppLocale.instance.t('cqp_price_upto_prefix').replaceAll('%s', maxStr);
                       } else if (legacyPrice != null && legacyPrice.toString().isNotEmpty) {
                         priceLabel = '฿$legacyPrice';
                       }
@@ -252,6 +283,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                 ),
               ],
             ),
+          ),
           ),
         );
       },
@@ -286,7 +318,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
 
     if (validItems.isEmpty && _laborCost == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายการอะไหล่หรือค่าแรงอย่างน้อย 1 รายการ'),
+        SnackBar(content: Text(AppLocale.instance.t('cqp_validation_msg')),
             backgroundColor: Colors.red),
       );
       return;
@@ -300,7 +332,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         .join(', ');
     final notesText = _notesController.text.trim();
     final combinedNotes = [
-      if (laborBreakdown.isNotEmpty) 'รายการค่าแรง: $laborBreakdown',
+      if (laborBreakdown.isNotEmpty) "${AppLocale.instance.t('cqp_labor_breakdown_prefix')}$laborBreakdown",
       if (notesText.isNotEmpty) notesText,
     ].join('\n');
 
@@ -339,11 +371,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F6FA),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: Text(_isEditMode ? 'แก้ไขใบเสนอราคา' : 'สร้างใบเสนอราคา',
+        title: Text(_isEditMode ? loc.t('grd_edit_quotation_button') : loc.t('grd_create_quotation_button'),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -385,8 +418,8 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('ข้อมูลลูกค้า',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(loc.t('cqp_customer_info_label'),
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               Text(widget.customerName,
                                   style: const TextStyle(
                                       fontSize: 16, fontWeight: FontWeight.bold)),
@@ -425,13 +458,13 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('ข้อมูลรถ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text(loc.t('cqp_car_info_label'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                   Builder(builder: (context) {
                                     final brandModel =
                                         '${widget.carInfo!['car_brand'] ?? ''} ${widget.carInfo!['car_model'] ?? ''}'
                                             .trim();
                                     return Text(
-                                      brandModel.isEmpty ? 'ไม่ระบุ' : brandModel,
+                                      brandModel.isEmpty ? loc.t('garage_address_fallback') : brandModel,
                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                     );
                                   }),
@@ -441,7 +474,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                                     final color = widget.carInfo!['car_color']?.toString() ?? '';
                                     final parts = [
                                       vehicleTypeLabel(widget.carInfo!['car_type']?.toString()),
-                                      if (plate.isNotEmpty) 'ทะเบียน $plate',
+                                      if (plate.isNotEmpty) loc.t('cqp_plate_prefix').replaceAll('%s', plate),
                                       if (color.isNotEmpty) color,
                                     ];
                                     return Text(parts.join(' • '),
@@ -461,9 +494,15 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('รายการอะไหล่',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        _addButton('เพิ่มอะไหล่', _addItem),
+                        Row(
+                          children: [
+                            const Icon(Icons.build_outlined, size: 18, color: Color(0xff2196F3)),
+                            const SizedBox(width: 6),
+                            Text(loc.t('qc_parts_list_title'),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        _addButton(loc.t('cqp_add_part_button'), _addItem),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -479,7 +518,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               Expanded(
                                 child: TextField(
                                   controller: item.nameCtrl,
-                                  decoration: _fieldDecoration('ชื่อรายการ'),
+                                  decoration: _fieldDecoration(loc.t('cqp_item_name_hint')),
                                 ),
                               ),
                               if ((widget.garageServices ?? []).isNotEmpty) ...[
@@ -507,7 +546,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               Expanded(
                                 flex: 3,
                                 child: _labeledField(
-                                  label: 'จำนวน',
+                                  label: loc.t('ujs_part_qty_label'),
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -533,7 +572,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               Expanded(
                                 flex: 3,
                                 child: _labeledField(
-                                  label: 'ราคา/หน่วย',
+                                  label: loc.t('cqp_price_per_unit_label'),
                                   child: TextField(
                                     controller: item.priceCtrl,
                                     keyboardType:
@@ -551,7 +590,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       );
                     }),
 
-                    _totalPill('รวมค่าอะไหล่', _partsCost),
+                    _totalPill(loc.t('qc_parts_subtotal_label'), _partsCost),
 
                     const SizedBox(height: 20),
 
@@ -559,9 +598,15 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('ค่าแรง',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        _addButton('เพิ่มค่าแรง', _addLaborItem),
+                        Row(
+                          children: [
+                            const Icon(Icons.engineering_outlined, size: 18, color: Color(0xff2196F3)),
+                            const SizedBox(width: 6),
+                            Text(loc.t('gjd_labor_cost'),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        _addButton(loc.t('cqp_add_labor_button'), _addLaborItem),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -573,7 +618,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                         children: [
                           TextField(
                             controller: labor.nameCtrl,
-                            decoration: _fieldDecoration('ชื่องาน'),
+                            decoration: _fieldDecoration(loc.t('cqp_labor_name_hint')),
                           ),
                           const SizedBox(height: 10),
                           Row(
@@ -582,7 +627,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               Expanded(
                                 flex: 3,
                                 child: _labeledField(
-                                  label: 'เวลา',
+                                  label: loc.t('cqp_time_label'),
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -607,7 +652,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                               Expanded(
                                 flex: 3,
                                 child: _labeledField(
-                                  label: 'ค่าแรง',
+                                  label: loc.t('gjd_labor_cost'),
                                   child: TextField(
                                     controller: labor.priceCtrl,
                                     keyboardType:
@@ -625,11 +670,17 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       );
                     }),
 
-                    _totalPill('รวมค่าแรง', _laborCost),
+                    _totalPill(loc.t('cqp_labor_subtotal_label'), _laborCost),
 
                     const SizedBox(height: 20),
-                    const Text('ระยะเวลาซ่อมโดยประมาณ',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        const Icon(Icons.date_range_outlined, size: 18, color: Color(0xff2196F3)),
+                        const SizedBox(width: 6),
+                        Text(loc.t('cqp_estimated_duration_title'),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -639,9 +690,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                             onTap: () => _pickDate(isStart: true),
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('ถึง', style: TextStyle(color: Colors.grey)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(loc.t('cqp_to_label'), style: const TextStyle(color: Colors.grey)),
                         ),
                         Expanded(
                           child: _dateButton(
@@ -653,14 +704,20 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     ),
 
                     const SizedBox(height: 20),
-                    const Text('หมายเหตุ (ถ้ามี)',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        const Icon(Icons.notes_outlined, size: 18, color: Color(0xff2196F3)),
+                        const SizedBox(width: 6),
+                        Text(loc.t('cqp_notes_optional_title'),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _notesController,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        hintText: 'เช่น ต้องสั่งอะไหล่จากศูนย์ อาจใช้เวลาเพิ่ม',
+                        hintText: loc.t('cqp_notes_hint'),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -687,17 +744,23 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('สรุปยอดรวม',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15)),
+                          Row(
+                            children: [
+                              const Icon(Icons.receipt_long_outlined, size: 17, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Text(loc.t('cqp_summary_title'),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15)),
+                            ],
+                          ),
                           const SizedBox(height: 10),
-                          _summaryRow('ค่าอะไหล่', _partsCost),
-                          _summaryRow('ค่าแรง', _laborCost),
-                          _summaryRow('ภาษีมูลค่าเพิ่ม 7%', _vatAmount),
+                          _summaryRow(loc.t('cqp_parts_cost_label'), _partsCost),
+                          _summaryRow(loc.t('gjd_labor_cost'), _laborCost),
+                          _summaryRow(loc.t('common_vat_7'), _vatAmount),
                           const Divider(color: Colors.white38, height: 20),
-                          _summaryRow('ยอดรวมสุทธิ', _totalPrice, big: true),
+                          _summaryRow(loc.t('cqp_net_total_label'), _totalPrice, big: true),
                         ],
                       ),
                     ),
@@ -728,8 +791,8 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     : Icon(_isEditMode ? Icons.save : Icons.send, color: Colors.white),
                 label: Text(
                   _isSubmitting
-                      ? (_isEditMode ? 'กำลังบันทึก...' : 'กำลังส่ง...')
-                      : (_isEditMode ? 'บันทึกการแก้ไข' : 'ส่งใบเสนอราคา'),
+                      ? (_isEditMode ? loc.t('cqp_saving') : loc.t('cqp_sending'))
+                      : (_isEditMode ? loc.t('cqp_save_edit_button') : loc.t('cqp_send_quotation_button')),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -828,7 +891,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           value: value,
           isDense: true,
           items: options
-              .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13))))
+              .map((u) => DropdownMenuItem(value: u, child: Text(_unitDisplayLabel(u), style: const TextStyle(fontSize: 13))))
               .toList(),
           onChanged: onChanged,
         ),
@@ -840,7 +903,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text('รวม', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(AppLocale.instance.t('cqp_subtotal_label'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
         Text('฿${value.toStringAsFixed(0)}',
             style: const TextStyle(
                 fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xff2196F3))),

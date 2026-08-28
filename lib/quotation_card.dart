@@ -8,6 +8,7 @@
 
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 const List<String> kQuoteRejectionReasons = [
   'ราคาสูงเกินไป',
@@ -16,6 +17,20 @@ const List<String> kQuoteRejectionReasons = [
   'เปลี่ยนใจ ไม่ต้องการซ่อมแล้ว',
   'ไม่แน่ใจในรายการอะไหล่ที่เสนอมา',
 ];
+
+// ✅ ค่า kQuoteRejectionReasons ยังคงเป็นภาษาไทยเสมอ (ส่งตรงไปเป็น reason ให้ API) —
+// ใช้ตัวนี้แค่ตอนแสดงผลใน Text widget เท่านั้น
+String _quoteRejectionReasonDisplayLabel(String reason) {
+  const map = {
+    'ราคาสูงเกินไป': 'qc_reason_price_high',
+    'ระยะเวลาซ่อมนานเกินไป': 'qc_reason_duration_long',
+    'อยากเปรียบเทียบราคากับอู่อื่นก่อน': 'qc_reason_compare_price',
+    'เปลี่ยนใจ ไม่ต้องการซ่อมแล้ว': 'qc_reason_changed_mind',
+    'ไม่แน่ใจในรายการอะไหล่ที่เสนอมา': 'qc_reason_unsure_parts',
+  };
+  final key = map[reason];
+  return key != null ? AppLocale.instance.t(key) : reason;
+}
 
 /// การ์ดแสดงใบเสนอราคา พร้อมปุ่มยืนยัน/ปฏิเสธ (ใช้ในหน้าประวัติคำขอซ่อมของลูกค้า)
 class QuotationCard extends StatefulWidget {
@@ -43,6 +58,17 @@ class _QuotationCardState extends State<QuotationCard> {
   void initState() {
     super.initState();
     _fetchQuotation();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchQuotation() async {
@@ -99,8 +125,8 @@ class _QuotationCardState extends State<QuotationCard> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('ปฏิเสธใบเสนอราคา',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(AppLocale.instance.t('qc_reject_sheet_title'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ...kQuoteRejectionReasons.map((r) {
                 final selected = selectedReason == r;
@@ -125,7 +151,7 @@ class _QuotationCardState extends State<QuotationCard> {
                           Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
                               size: 18, color: selected ? Colors.red : Colors.grey),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(r, style: const TextStyle(fontSize: 13))),
+                          Expanded(child: Text(_quoteRejectionReasonDisplayLabel(r), style: const TextStyle(fontSize: 13))),
                         ],
                       ),
                     ),
@@ -137,7 +163,7 @@ class _QuotationCardState extends State<QuotationCard> {
                 controller: customController,
                 onChanged: (_) => setSheetState(() => selectedReason = null),
                 decoration: InputDecoration(
-                  hintText: 'หรือพิมพ์เหตุผลเอง',
+                  hintText: AppLocale.instance.t('qc_custom_reason_hint'),
                   filled: true,
                   fillColor: const Color(0xffF5F5F5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -159,7 +185,7 @@ class _QuotationCardState extends State<QuotationCard> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('ยืนยันการปฏิเสธ', style: TextStyle(color: Colors.white)),
+                  child: Text(AppLocale.instance.t('qc_confirm_reject_button'), style: const TextStyle(color: Colors.white)),
                 ),
               ),
             ],
@@ -187,6 +213,7 @@ class _QuotationCardState extends State<QuotationCard> {
     }
     if (_quotation == null) return const SizedBox.shrink();
 
+    final loc = AppLocale.instance;
     final items = (_quotation!['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
     final status = _quotation!['status']?.toString() ?? 'pending';
     final laborCost = double.tryParse(_quotation!['labor_cost']?.toString() ?? '0') ?? 0;
@@ -239,7 +266,7 @@ class _QuotationCardState extends State<QuotationCard> {
                 child: const Icon(Icons.receipt_long, size: 16, color: Color(0xff2196F3)),
               ),
               const SizedBox(width: 8),
-              const Text('ใบเสนอราคา', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(loc.t('rrd_quotation_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               const Spacer(),
               if (status != 'pending') _statusBadge(status),
             ],
@@ -249,22 +276,22 @@ class _QuotationCardState extends State<QuotationCard> {
 
           // ---------- รายการอะไหล่ ----------
           if (items.isNotEmpty) ...[
-            const Text('รายการอะไหล่', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+            Text(loc.t('qc_parts_list_title'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
             const SizedBox(height: 6),
             ...items.map((it) => _lineItemCard(
                   title: '${it['name']}',
-                  subtitle: 'จำนวน ${it['quantity']}${(it['unit'] ?? '').toString().isNotEmpty ? ' ${it['unit']}' : ''}',
+                  subtitle: loc.t('qc_qty_prefix').replaceAll('%s', '${it['quantity']}${(it['unit'] ?? '').toString().isNotEmpty ? ' ${it['unit']}' : ''}'),
                   price: itemSubtotal(it),
                 )),
-            _subtotalRow('รวมค่าอะไหล่', partsCost),
+            _subtotalRow(loc.t('qc_parts_subtotal_label'), partsCost),
             const SizedBox(height: 10),
           ],
 
           // ---------- ค่าแรง ----------
           if (laborCost > 0) ...[
-            const Text('ค่าแรง', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+            Text(loc.t('gjd_labor_cost'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
             const SizedBox(height: 6),
-            _lineItemCard(title: 'ค่าแรงรวม', subtitle: null, price: laborCost),
+            _lineItemCard(title: loc.t('qc_labor_total_label'), subtitle: null, price: laborCost),
             const SizedBox(height: 10),
           ],
 
@@ -284,11 +311,11 @@ class _QuotationCardState extends State<QuotationCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (vatAmount > 0) ...[
-                  _summaryRow('ราคาก่อนภาษี', totalPrice - vatAmount),
-                  _summaryRow('ภาษีมูลค่าเพิ่ม 7%', vatAmount),
+                  _summaryRow(loc.t('qc_price_before_vat'), totalPrice - vatAmount),
+                  _summaryRow(loc.t('common_vat_7'), vatAmount),
                   const Divider(color: Colors.white38, height: 16),
                 ],
-                _summaryRow('รวมทั้งหมด', totalPrice, big: true),
+                _summaryRow(loc.t('common_grand_total'), totalPrice, big: true),
               ],
             ),
           ),
@@ -301,7 +328,7 @@ class _QuotationCardState extends State<QuotationCard> {
                 const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('ระยะเวลาซ่อม: $startDate ถึง $endDate',
+                  child: Text(loc.t('qc_repair_duration_prefix').replaceAll('%start', '$startDate').replaceAll('%end', '$endDate'),
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ),
               ],
@@ -324,7 +351,7 @@ class _QuotationCardState extends State<QuotationCard> {
                   const Icon(Icons.info_outline, size: 16, color: Color(0xffF9A825)),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('หมายเหตุ: $notes',
+                    child: Text(loc.t('qc_notes_prefix').replaceAll('%s', notes),
                         style: const TextStyle(fontSize: 12, color: Color(0xff8D6E00))),
                   ),
                 ],
@@ -348,7 +375,7 @@ class _QuotationCardState extends State<QuotationCard> {
                   const Icon(Icons.cancel_outlined, size: 16, color: Color(0xffE53935)),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('เหตุผลที่ปฏิเสธ: ${_quotation!['customer_rejection_reason']}',
+                    child: Text(loc.t('grd_rejection_reason_prefix').replaceAll('%s', '${_quotation!['customer_rejection_reason']}'),
                         style: const TextStyle(fontSize: 12, color: Color(0xffE53935))),
                   ),
                 ],
@@ -371,7 +398,7 @@ class _QuotationCardState extends State<QuotationCard> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     icon: const Icon(Icons.close, size: 16),
-                    label: const Text('ปฏิเสธ'),
+                    label: Text(loc.t('garage_reject')),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -390,7 +417,7 @@ class _QuotationCardState extends State<QuotationCard> {
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : const Icon(Icons.check, size: 16, color: Colors.white),
-                    label: Text(_isResponding ? '' : 'ยอมรับใบเสนอราคา',
+                    label: Text(_isResponding ? '' : loc.t('qc_accept_quotation_button'),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
                 ),
@@ -413,7 +440,7 @@ class _QuotationCardState extends State<QuotationCard> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        confirmed ? 'ยืนยันแล้ว' : 'ปฏิเสธแล้ว',
+        confirmed ? AppLocale.instance.t('qc_status_confirmed') : AppLocale.instance.t('qc_status_rejected'),
         style: TextStyle(
           fontSize: 11,
           color: confirmed ? Colors.green.shade800 : Colors.red.shade800,

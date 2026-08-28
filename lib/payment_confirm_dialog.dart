@@ -8,6 +8,8 @@
 
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 Future<bool?> showPaymentConfirmDialog(
   BuildContext context, {
@@ -52,9 +54,20 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
   final _reasonController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
   void dispose() {
     _reasonController.dispose();
+    AppLocale.instance.removeListener(_onLocaleChanged);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _confirm() async {
@@ -70,9 +83,9 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
       final commissionAmount = (result.data!['commissionAmount'] as num?)?.toDouble();
       final walletBalanceAfter = (result.data!['walletBalanceAfter'] as num?)?.toDouble();
       if (commissionAmount != null && commissionAmount > 0 && walletBalanceAfter != null) {
-        message =
-            'ยืนยันรับเงินสำเร็จ — หักค่าคอมมิชชั่น ฿${commissionAmount.toStringAsFixed(2)} '
-            '(wallet คงเหลือ ฿${walletBalanceAfter.toStringAsFixed(2)})';
+        message = AppLocale.instance.t('pcd_confirm_success_msg')
+            .replaceAll('%commission', commissionAmount.toStringAsFixed(2))
+            .replaceAll('%balance', walletBalanceAfter.toStringAsFixed(2));
       }
     }
 
@@ -85,7 +98,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
   Future<void> _reject() async {
     if (_reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาระบุเหตุผลที่ปฏิเสธ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('pcd_reject_reason_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -107,6 +120,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -121,27 +135,27 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
                 children: [
                   const Icon(Icons.payments_outlined, color: Color(0xff4CAF50)),
                   const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('ตรวจสอบการชำระเงิน', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(loc.t('arp_check_payment_button'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                 ],
               ),
               const SizedBox(height: 4),
-              Text('ยอดที่แจ้งโอน: ฿${widget.amount.toStringAsFixed(0)}',
+              Text(loc.t('gjd_transferred_amount_prefix').replaceAll('%s', widget.amount.toStringAsFixed(0)),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff2196F3))),
               const SizedBox(height: 14),
               if (widget.slipUrl != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(widget.slipUrl!, fit: BoxFit.contain),
+                  child: NetImage(widget.slipUrl!, fit: BoxFit.contain),
                 )
               else
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(color: const Color(0xffF5F5F5), borderRadius: BorderRadius.circular(12)),
-                  child: const Center(child: Text('ไม่พบรูปสลิป', style: TextStyle(color: Colors.grey))),
+                  child: Center(child: Text(loc.t('pcd_no_slip_image'), style: const TextStyle(color: Colors.grey))),
                 ),
               const SizedBox(height: 16),
 
@@ -151,7 +165,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
                   maxLines: 3,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: 'เหตุผลที่ปฏิเสธ เช่น ยอดไม่ตรง, สลิปไม่ชัด...',
+                    hintText: loc.t('pcd_reject_reason_hint'),
                     filled: true,
                     fillColor: const Color(0xffF5F5F5),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -167,7 +181,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('ยืนยันการปฏิเสธ', style: TextStyle(color: Colors.white)),
+                    child: Text(loc.t('qc_confirm_reject_button'), style: const TextStyle(color: Colors.white)),
                   ),
                 ),
               ] else
@@ -182,7 +196,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('ปฏิเสธ'),
+                        child: Text(loc.t('garage_reject')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -198,7 +212,7 @@ class _PaymentConfirmSheetState extends State<_PaymentConfirmSheet> {
                             ? const SizedBox(
                                 width: 18, height: 18,
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('ยืนยันรับเงินแล้ว', style: TextStyle(color: Colors.white)),
+                            : Text(loc.t('pcd_confirm_received_button'), style: const TextStyle(color: Colors.white)),
                       ),
                     ),
                   ],

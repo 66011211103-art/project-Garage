@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:socket_io_client/socket_io_client.dart' as socket_io;
 import 'app_config.dart';
+import 'app_locale.dart';
 
 /// ระบบแจ้งเตือนแบบ real-time โดยใช้ Socket.IO (แทน Firebase Cloud Messaging)
 ///
@@ -78,7 +79,7 @@ class SocketNotificationService {
       _socket!.on('notification', (data) async {
         if (data is! Map) return;
         final map = Map<String, dynamic>.from(data);
-        final title = map['title']?.toString() ?? 'แจ้งเตือน';
+        final title = map['title']?.toString() ?? AppLocale.instance.t('sns_notification_fallback_title');
         final body = map['body']?.toString() ?? '';
         final notifData = (map['data'] is Map)
             ? Map<String, dynamic>.from(map['data'])
@@ -104,10 +105,10 @@ class SocketNotificationService {
     required String body,
     required Map<String, dynamic> payload,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       'garage_app_channel',
-      'การแจ้งเตือนคำขอซ่อม',
-      channelDescription: 'แจ้งเตือนสถานะคำขอซ่อม/ใบเสนอราคา',
+      AppLocale.instance.t('sns_channel_name'),
+      channelDescription: AppLocale.instance.t('sns_channel_description'),
       importance: Importance.high,
       priority: Priority.high,
     );
@@ -121,7 +122,7 @@ class SocketNotificationService {
       DateTime.now().millisecondsSinceEpoch ~/ 1000, // id ไม่ซ้ำกันในแต่ละครั้ง
       title,
       body,
-      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
       payload: _encodePayload(payload),
     );
   }

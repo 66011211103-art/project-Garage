@@ -11,6 +11,7 @@
 
 import 'package:flutter/material.dart';
 import 'garage_review_page.dart';
+import 'app_locale.dart';
 
 class ReviewCard extends StatelessWidget {
   final int repairRequestId;
@@ -69,9 +70,13 @@ class ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isReviewed = initialRating != null;
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        final loc = AppLocale.instance;
+        final isReviewed = initialRating != null;
 
-    return Container(
+        return Container(
       margin: const EdgeInsets.only(top: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -98,7 +103,7 @@ class ReviewCard extends StatelessWidget {
                     child: const Icon(Icons.star_outline, size: 16, color: Color(0xffFF9800)),
                   ),
                   const SizedBox(width: 8),
-                  const Text('รีวิวอู่ซ่อม', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(loc.t('rc_header_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const Spacer(),
                   if (isReviewed)
                     Container(
@@ -107,8 +112,8 @@ class ReviewCard extends StatelessWidget {
                         color: Colors.green.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text('รีวิวแล้ว',
-                          style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600)),
+                      child: Text(loc.t('rc_reviewed_badge'),
+                          style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
                 ],
               ),
@@ -126,7 +131,7 @@ class ReviewCard extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Text('คุณให้คะแนนอู่นี้แล้ว',
+                      Text(loc.t('rc_you_rated_msg'),
                           style: TextStyle(color: Colors.amber.shade800, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       _starRow(initialRating!, size: 22),
@@ -148,17 +153,17 @@ class ReviewCard extends StatelessWidget {
                     if ((initialReply ?? '').trim().isNotEmpty) ...[
                       Icon(Icons.reply, size: 14, color: Colors.blue.shade600),
                       const SizedBox(width: 4),
-                      Text('อู่ตอบกลับแล้ว · ',
+                      Text(loc.t('rc_garage_replied'),
                           style: TextStyle(color: Colors.blue.shade600, fontSize: 12, fontWeight: FontWeight.w600)),
                     ],
-                    Text('ดูรายละเอียด', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    Text(loc.t('garage_view_details'), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                     Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade600),
                   ],
                 ),
               ] else ...[
                 // ---------- ยังไม่รีวิว — ชวนกดเข้าไปเขียน ----------
-                const Text('งานซ่อมเสร็จแล้ว — ให้คะแนนความพึงพอใจของคุณได้เลย',
-                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                Text(loc.t('rc_not_reviewed_msg'),
+                    style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -170,8 +175,8 @@ class ReviewCard extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     icon: const Icon(Icons.star, color: Colors.white, size: 18),
-                    label: const Text('ให้คะแนนอู่ซ่อม',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    label: Text(loc.t('rc_rate_button'),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -179,6 +184,8 @@ class ReviewCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

@@ -7,6 +7,8 @@ import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถ�
 import 'payment_confirm_dialog.dart'; // ✅ popup ตรวจสอบ/ยืนยัน/ปฏิเสธการชำระเงิน
 import 'chat_screen.dart'; // ✅ แชทกับลูกค้า
 import 'garage_request_detail_page.dart'; // ✅ หน้ารายละเอียดเต็มจอ (แทน bottom sheet เดิม)
+import 'app_locale.dart';
+import 'request_repair_page.dart' show problemCategoryDisplayLabel;
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -38,6 +40,17 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   void initState() {
     super.initState();
     _fetchRequests();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchRequests() async {
@@ -61,7 +74,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     if (!mounted) return;
     if (!result.success || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('gd_chat_open_failed')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -74,7 +87,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
           conversationId: result.data!['conversationId'],
           myId: widget.userData['id'],
           myType: 'repair',
-          otherPartyName: name.isEmpty ? 'ลูกค้า' : name,
+          otherPartyName: name.isEmpty ? AppLocale.instance.t('profile_type_customer') : name,
           otherPartyAvatar: r['customer_avatar']?.toString(),
         ),
       ),
@@ -143,13 +156,13 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   String _vehicleLabel(String? value) {
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return AppLocale.instance.t('tech_vehicle_sedan');
       case 'suv':
-        return 'SUV';
+        return AppLocale.instance.t('car_type_suv');
       case 'pickup':
-        return 'กระบะ';
+        return AppLocale.instance.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return AppLocale.instance.t('tech_vehicle_unspecified');
     }
   }
 
@@ -197,7 +210,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
           ? null
           : AppBar(
               backgroundColor: const Color(0xff2196F3),
-              title: const Text('รายการคำขอซ่อม', style: TextStyle(color: Colors.white)),
+              title: Text(AppLocale.instance.t('arp_page_title'), style: const TextStyle(color: Colors.white)),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
@@ -223,21 +236,21 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                     child: Row(
                       children: [
                         _filterPill(
-                          label: 'ทั้งหมด',
+                          label: AppLocale.instance.t('tech_filter_all'),
                           count: _activeRequests.length,
                           selected: _selectedTab == _RequestTab.all,
                           onTap: () => setState(() => _selectedTab = _RequestTab.all),
                         ),
                         const SizedBox(width: 8),
                         _filterPill(
-                          label: 'รอดำเนินการ',
+                          label: AppLocale.instance.t('myreq_status_pending'),
                           count: _pendingOnly.length,
                           selected: _selectedTab == _RequestTab.pending,
                           onTap: () => setState(() => _selectedTab = _RequestTab.pending),
                         ),
                         const SizedBox(width: 8),
                         _filterPill(
-                          label: 'รับแล้ว',
+                          label: AppLocale.instance.t('arp_filter_accepted'),
                           count: _acceptedOnly.length,
                           selected: _selectedTab == _RequestTab.accepted,
                           onTap: () => setState(() => _selectedTab = _RequestTab.accepted),
@@ -248,11 +261,11 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   Expanded(
                     child: _visibleRequests.isEmpty
                         ? ListView(
-                            children: const [
+                            children: [
                               Padding(
                                 padding: EdgeInsets.symmetric(vertical: 60),
                                 child: Center(
-                                  child: Text('ไม่มีคำขอในหมวดนี้', style: TextStyle(color: Colors.grey)),
+                                  child: Text(AppLocale.instance.t('arp_empty_state'), style: const TextStyle(color: Colors.grey)),
                                 ),
                               ),
                             ],
@@ -315,6 +328,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
   }
 
   Widget _requestCard(Map<String, dynamic> r) {
+    final loc = AppLocale.instance;
     final id = r['id'];
     final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
     final status = r['status']?.toString() ?? 'pending';
@@ -331,21 +345,21 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
     late Color badgeColor;
     if (isCompleted) {
       if (paymentStatus == 'pending_confirmation') {
-        badgeText = 'รอตรวจสอบการชำระเงิน';
+        badgeText = loc.t('arp_payment_pending_badge');
         badgeColor = const Color(0xffFF9800);
       } else if (paymentStatus == 'rejected') {
-        badgeText = 'ปฏิเสธสลิป รอลูกค้าส่งใหม่';
+        badgeText = loc.t('arp_slip_rejected_badge');
         badgeColor = const Color(0xffE53935);
       } else {
-        badgeText = 'ซ่อมเสร็จ รอลูกค้าชำระเงิน';
+        badgeText = loc.t('arp_completed_unpaid_badge');
         badgeColor = const Color(0xff4CAF50);
       }
     } else if (isInRepair) {
-      const labels = {
-        'assigned': 'มอบหมายช่างแล้ว',
-        'checking': 'ช่างกำลังเดินทาง',
-        'in_progress': 'กำลังซ่อม',
-        'waiting_parts': 'รอรับอะไหล่',
+      final labels = {
+        'assigned': loc.t('arp_status_assigned'),
+        'checking': loc.t('dash_status_checking'),
+        'in_progress': loc.t('dash_status_in_progress'),
+        'waiting_parts': loc.t('dash_status_waiting_parts'),
       };
       const colors = {
         'assigned': Color(0xff2196F3),
@@ -356,19 +370,19 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
       badgeText = labels[status] ?? status;
       badgeColor = colors[status] ?? Colors.grey;
     } else if (isConfirmed) {
-      badgeText = 'ลูกค้ายืนยันแล้ว';
+      badgeText = loc.t('arp_confirmed_badge');
       badgeColor = const Color(0xff4CAF50);
     } else if (isQuoted) {
-      badgeText = 'รอลูกค้ายืนยันใบเสนอราคา';
+      badgeText = loc.t('arp_awaiting_quote_confirm_badge');
       badgeColor = const Color(0xff9C27B0);
     } else if (isAccepted) {
-      badgeText = 'รับแล้ว';
+      badgeText = loc.t('arp_filter_accepted');
       badgeColor = const Color(0xff2196F3);
     } else if (_isRecentlyCreated(r['created_at']?.toString())) {
-      badgeText = 'ใหม่';
+      badgeText = loc.t('arp_new_badge');
       badgeColor = const Color(0xff4CAF50);
     } else {
-      badgeText = 'รอดำเนินการ';
+      badgeText = loc.t('myreq_status_pending');
       badgeColor = const Color(0xffFF9800);
     }
 
@@ -430,11 +444,11 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
             ],
           ),
           const SizedBox(height: 10),
-          _detailRow(Icons.person_outline, name.isEmpty ? 'ไม่ระบุชื่อ' : name),
+          _detailRow(Icons.person_outline, name.isEmpty ? loc.t('profile_name_fallback') : name),
           const SizedBox(height: 6),
           _detailRow(Icons.directions_car_outlined, _vehicleLabel(r['vehicle_type']?.toString())),
           const SizedBox(height: 6),
-          _detailRow(_problemIcon(r['problem_category']?.toString()), r['problem_category']?.toString() ?? '-'),
+          _detailRow(_problemIcon(r['problem_category']?.toString()), r['problem_category'] != null ? problemCategoryDisplayLabel(r['problem_category'].toString()) : '-'),
           const SizedBox(height: 6),
           _detailRow(Icons.access_time, _formatThaiDateTime(r['created_at']?.toString())),
           const SizedBox(height: 12),
@@ -445,7 +459,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                    label: const Text('ดูรายละเอียด'),
+                    label: Text(loc.t('garage_view_details')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.blue,
                       side: const BorderSide(color: Colors.blue),
@@ -458,7 +472,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   child: OutlinedButton.icon(
                     onPressed: _respondingIds.contains(id) ? null : () => _handleReject(id),
                     icon: const Icon(Icons.close, size: 16, color: Colors.red),
-                    label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
+                    label: Text(loc.t('garage_reject'), style: const TextStyle(color: Colors.red)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -474,7 +488,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: const Icon(Icons.check, color: Colors.white, size: 16),
-                    label: const Text('รับงาน', style: TextStyle(color: Colors.white)),
+                    label: Text(loc.t('arp_accept_button'), style: const TextStyle(color: Colors.white)),
                   ),
                 ),
               ],
@@ -486,7 +500,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                    label: const Text('ดูรายละเอียด'),
+                    label: Text(loc.t('garage_view_details')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.blue,
                       side: const BorderSide(color: Colors.blue),
@@ -503,7 +517,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                         MaterialPageRoute(
                           builder: (context) => CreateQuotationPage(
                             repairRequestId: id,
-                            customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+                            customerName: name.isEmpty ? loc.t('profile_name_fallback') : name,
                           ),
                         ),
                       );
@@ -514,7 +528,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-                    label: const Text('ใบเสนอราคา', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    label: Text(loc.t('rrd_quotation_title'), style: const TextStyle(color: Colors.white, fontSize: 13)),
                   ),
                 ),
               ],
@@ -525,7 +539,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               child: OutlinedButton.icon(
                 onPressed: () => _openDetail(r),
                 icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                label: const Text('ดูรายละเอียด / รอลูกค้ายืนยันใบเสนอราคา'),
+                label: Text(loc.t('arp_view_awaiting_quote')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.blue,
                   side: const BorderSide(color: Colors.blue),
@@ -542,7 +556,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _openDetail(r),
                     icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                    label: const Text('ดูรายละเอียด'),
+                    label: Text(loc.t('garage_view_details')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.blue,
                       side: const BorderSide(color: Colors.blue),
@@ -570,9 +584,9 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                               color: Colors.green.shade50,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Center(
-                              child: Text('มอบหมายงานให้ช่างแล้ว — แตะเพื่อดูสถานะ ✅',
-                                  style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
+                            child: Center(
+                              child: Text(loc.t('arp_assigned_tap_status'),
+                                  style: const TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
                             ),
                           ),
                         )
@@ -594,7 +608,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           icon: const Icon(Icons.engineering_outlined, color: Colors.white, size: 16),
-                          label: const Text('มอบหมายงานให้ช่าง', style: TextStyle(color: Colors.white)),
+                          label: Text(loc.t('arp_assign_tech_button'), style: const TextStyle(color: Colors.white)),
                         ),
                 ),
               ],
@@ -620,14 +634,14 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-                      label: const Text('ตรวจสอบการชำระเงิน', style: TextStyle(color: Colors.white)),
+                      label: Text(loc.t('arp_check_payment_button'), style: const TextStyle(color: Colors.white)),
                     )
                   : OutlinedButton.icon(
                       onPressed: () => _openDetail(r),
                       icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
                       label: Text(paymentStatus == 'rejected'
-                          ? 'ดูรายละเอียด (รอลูกค้าแนบสลิปใหม่)'
-                          : 'ดูรายละเอียด (รอลูกค้าชำระเงิน)'),
+                          ? loc.t('arp_view_slip_rejected')
+                          : loc.t('arp_view_awaiting_payment')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.blue,
                         side: const BorderSide(color: Colors.blue),
@@ -653,7 +667,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 icon: const Icon(Icons.timeline, color: Colors.white, size: 16),
-                label: const Text('ดูสถานะการซ่อม', style: TextStyle(color: Colors.white)),
+                label: Text(loc.t('arp_view_repair_status'), style: const TextStyle(color: Colors.white)),
               ),
             )
           else
@@ -662,7 +676,7 @@ class _AllRepairRequestsPageState extends State<AllRepairRequestsPage> {
               child: OutlinedButton.icon(
                 onPressed: () => _openDetail(r),
                 icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                label: const Text('ดูรายละเอียด'),
+                label: Text(loc.t('garage_view_details')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.blue,
                   side: const BorderSide(color: Colors.blue),

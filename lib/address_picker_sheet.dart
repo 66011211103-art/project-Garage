@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'location_service.dart'; // ✅ ใช้ getCurrentPosition + reverseGeocodeOSM ร่วมกับหน้าอื่น
+import 'app_locale.dart';
 
 /// ผลลัพธ์ที่อยู่ + พิกัด ที่ได้จากการค้นหา
 class PickedAddress {
@@ -111,7 +112,10 @@ Future<List<PickedAddress>> searchAddressOSM(String query) async {
       PickedAddress(
         address:
             label ??
-            'พิกัด ${rawCoords.$1.toStringAsFixed(6)}, ${rawCoords.$2.toStringAsFixed(6)}',
+            AppLocale.instance
+                .t('addr_picker_coords_fallback')
+                .replaceAll('%lat', rawCoords.$1.toStringAsFixed(6))
+                .replaceAll('%lng', rawCoords.$2.toStringAsFixed(6)),
         latitude: rawCoords.$1,
         longitude: rawCoords.$2,
       ),
@@ -129,7 +133,7 @@ Future<List<PickedAddress>> searchAddressOSM(String query) async {
     return results
         .map(
           (r) => PickedAddress(
-            address: '${r.address} — (ตำแหน่งโดยประมาณ)',
+            address: '${r.address} — ${AppLocale.instance.t('addr_picker_approx_suffix')}',
             latitude: r.latitude,
             longitude: r.longitude,
           ),
@@ -301,12 +305,18 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialQuery ?? '');
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _handleSend() async {
@@ -325,10 +335,7 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
       _isSearching = false;
       _results = results;
       if (results.isEmpty) {
-        _errorText =
-            'ไม่พบที่อยู่นี้ในฐานข้อมูลแผนที่ฟรี (OpenStreetMap) — ที่อยู่แบบ'
-            ' "บ้านเลขที่ + หมู่ที่" ในพื้นที่ชนบทมักไม่มีข้อมูลระดับบ้านในฐานข้อมูลนี้'
-            ' วิธีที่แม่นยำที่สุดคือปิดหน้าต่างนี้แล้วแตะค้างบนแผนที่ตรงตำแหน่งจริงเพื่อปักหมุดเอง';
+        _errorText = AppLocale.instance.t('addr_picker_not_found');
       }
     });
   }
@@ -354,7 +361,10 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
         PickedAddress(
           address:
               address ??
-              'พิกัด ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
+              AppLocale.instance
+              .t('addr_picker_coords_fallback')
+              .replaceAll('%lat', position.latitude.toStringAsFixed(6))
+              .replaceAll('%lng', position.longitude.toStringAsFixed(6)),
           latitude: position.latitude,
           longitude: position.longitude,
         ),
@@ -370,6 +380,7 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -384,9 +395,9 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
               children: [
                 const Icon(Icons.place_outlined, color: Color(0xff2196F3)),
                 const SizedBox(width: 8),
-                const Text(
-                  'ค้นหาที่อยู่',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  loc.t('addr_picker_title'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 IconButton(
@@ -412,8 +423,8 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                     : const Icon(Icons.my_location, size: 18),
                 label: Text(
                   _isLocating
-                      ? 'กำลังค้นหาตำแหน่งของคุณ...'
-                      : 'ใช้ตำแหน่งปัจจุบันของฉัน',
+                      ? loc.t('addr_picker_locating')
+                      : loc.t('addr_picker_use_current'),
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xff2196F3),
@@ -428,16 +439,16 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
 
             const SizedBox(height: 12),
             Row(
-              children: const [
-                Expanded(child: Divider()),
+              children: [
+                const Expanded(child: Divider()),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Text(
-                    'หรือพิมพ์/วางที่อยู่เอง',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    loc.t('addr_picker_or_type'),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
-                Expanded(child: Divider()),
+                const Expanded(child: Divider()),
               ],
             ),
             const SizedBox(height: 8),
@@ -450,7 +461,7 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                   ? Center(
                       child: Text(
                         _errorText ??
-                            'พิมพ์หรือวางที่อยู่ที่ต้องการค้นหาด้านล่าง',
+                            loc.t('addr_picker_placeholder'),
                         style: TextStyle(
                           color: _errorText != null ? Colors.red : Colors.grey,
                         ),
@@ -463,7 +474,7 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                       itemBuilder: (context, index) {
                         final r = _results[index];
                         final isApprox = r.address.contains(
-                          '(ตำแหน่งโดยประมาณ)',
+                          loc.t('addr_picker_approx_suffix'),
                         );
                         return InkWell(
                           onTap: () => Navigator.pop(context, r),
@@ -516,8 +527,7 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _handleSend(),
                     decoration: InputDecoration(
-                      hintText:
-                          'เช่น 123 ถ.สุขุมวิท กรุงเทพฯ หรือวางพิกัด 16.24,103.25',
+                      hintText: loc.t('addr_picker_input_hint'),
                       filled: true,
                       fillColor: const Color(0xFFF5F6FA),
                       contentPadding: const EdgeInsets.symmetric(

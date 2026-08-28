@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
+import 'manage_technicians_page.dart' show specialtyDisplayLabel;
 
 /// หน้ามอบหมายงานให้ช่าง — ตรงตามดีไซน์ "Assign Mechanic Screen"
 class AssignTechnicianPage extends StatefulWidget {
@@ -24,12 +26,18 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
   void initState() {
     super.initState();
     _fetchTechnicians();
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _noteController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchTechnicians() async {
@@ -47,15 +55,16 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
   }
 
   String _vehicleLabel(String? value) {
+    final loc = AppLocale.instance;
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return loc.t('tech_vehicle_sedan');
       case 'suv':
         return 'SUV';
       case 'pickup':
-        return 'กระบะ';
+        return loc.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return loc.t('garage_address_fallback');
     }
   }
 
@@ -80,7 +89,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
   Future<void> _handleConfirm() async {
     if (_selectedTechnicianId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกช่างก่อน'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('atp_select_tech_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -105,13 +114,14 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final customerName = '${widget.job['first_name'] ?? ''} ${widget.job['last_name'] ?? ''}'.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('มอบหมายงานช่าง', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('atp_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -132,28 +142,28 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.assignment_outlined, size: 18, color: Color(0xff2196F3)),
-                          SizedBox(width: 8),
-                          Text('สรุปงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const Icon(Icons.assignment_outlined, size: 18, color: Color(0xff2196F3)),
+                          const SizedBox(width: 8),
+                          Text(loc.t('atp_summary_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _summaryRow('ลูกค้า', customerName.isEmpty ? 'ไม่ระบุชื่อ' : customerName),
+                      _summaryRow(loc.t('profile_type_customer'), customerName.isEmpty ? loc.t('profile_name_fallback') : customerName),
                       const SizedBox(height: 8),
-                      _summaryRow('ประเภทงาน', widget.job['problem_category']?.toString() ?? '-'),
+                      _summaryRow(loc.t('atp_summary_job_type'), widget.job['problem_category']?.toString() ?? '-'),
                       const SizedBox(height: 8),
-                      _summaryRow('เลขที่งาน', '#REQ${widget.job['id'].toString().padLeft(6, '0')}'),
+                      _summaryRow(loc.t('atp_summary_job_number'), '#REQ${widget.job['id'].toString().padLeft(6, '0')}'),
                       const SizedBox(height: 8),
-                      _summaryRow('ประเภทรถ', _vehicleLabel(widget.job['vehicle_type']?.toString())),
+                      _summaryRow(loc.t('car_type_label'), _vehicleLabel(widget.job['vehicle_type']?.toString())),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 20),
-                const Text('เลือกช่างผู้รับผิดชอบ',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(loc.t('atp_choose_tech_title'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 12),
 
                 if (_isLoading)
@@ -165,14 +175,14 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                    child: const Column(
+                    child: Column(
                       children: [
-                        Icon(Icons.engineering_outlined, size: 40, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('ยังไม่มีช่างในสังกัด', style: TextStyle(color: Colors.grey)),
-                        SizedBox(height: 4),
-                        Text('ไปเพิ่มช่างที่หน้า "จัดการช่าง" ก่อน',
-                            style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        const Icon(Icons.engineering_outlined, size: 40, color: Colors.grey),
+                        const SizedBox(height: 8),
+                        Text(loc.t('atp_no_techs_title'), style: const TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        Text(loc.t('atp_no_techs_subtitle'),
+                            style: const TextStyle(color: Colors.grey, fontSize: 12)),
                       ],
                     ),
                   )
@@ -180,11 +190,11 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                   ..._technicians.map((tech) => _technicianOption(tech)),
 
                 const SizedBox(height: 20),
-                const Text('รายละเอียดการมอบหมาย',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(loc.t('atp_details_title'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 12),
 
-                const Text('วันที่มอบหมาย', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                Text(loc.t('atp_date_label'), style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 6),
                 InkWell(
                   onTap: _pickDate,
@@ -209,13 +219,13 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                 ),
 
                 const SizedBox(height: 16),
-                const Text('หมายเหตุ (ถ้ามี)', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                Text(loc.t('atp_note_label'), style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _noteController,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    hintText: 'เพิ่มหมายเหตุสำหรับช่าง...',
+                    hintText: loc.t('atp_note_hint'),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -250,7 +260,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.check_circle_outline, color: Colors.white),
               label: Text(
-                _isSubmitting ? 'กำลังมอบหมาย...' : 'ยืนยันการมอบหมายงาน',
+                _isSubmitting ? loc.t('atp_assigning') : loc.t('atp_confirm_button'),
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -270,6 +280,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
   }
 
   Widget _technicianOption(Map<String, dynamic> tech) {
+    final loc = AppLocale.instance;
     final id = tech['id'] as int;
     final selected = _selectedTechnicianId == id;
     final activeJobs = tech['active_job_count'] ?? 0;
@@ -322,7 +333,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                         child: Wrap(
                           spacing: 6,
                           children: specialties
-                              .map((s) => Text(s.trim(),
+                              .map((s) => Text(specialtyDisplayLabel(s.trim()),
                                   style: const TextStyle(fontSize: 11, color: Color(0xff2196F3))))
                               .toList(),
                         ),
@@ -341,7 +352,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                   children: [
                     Icon(Icons.circle, size: 8, color: isAvailable ? Colors.green : Colors.red),
                     const SizedBox(width: 4),
-                    Text(isAvailable ? 'ว่าง' : 'ไม่ว่าง',
+                    Text(isAvailable ? loc.t('atp_available') : loc.t('atp_unavailable'),
                         style: TextStyle(
                             fontSize: 11, color: isAvailable ? Colors.green.shade800 : Colors.red.shade800)),
                   ],
@@ -350,7 +361,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text('รับงานอยู่: $activeJobs งาน', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(loc.t('atp_active_jobs_prefix').replaceAll('%s', '$activeJobs'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -364,7 +375,7 @@ class _AssignTechnicianPageState extends State<AssignTechnicianPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: Icon(selected ? Icons.check : Icons.person_add_alt, size: 16),
-              label: Text(selected ? 'เลือกแล้ว' : 'เลือกช่าง'),
+              label: Text(selected ? loc.t('atp_selected') : loc.t('atp_select_tech_button')),
             ),
           ),
         ],

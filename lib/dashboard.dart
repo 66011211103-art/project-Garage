@@ -9,6 +9,9 @@ import 'my_repair_requests_page.dart'; // ✅ หน้าประวัติ�
 import 'repair_tracking_page.dart'; // ✅ หน้าติดตามสถานะการซ่อม (ปุ่ม "ติดตาม" ในการ์ดกำลังซ่อม)
 import 'garage_detail_page.dart'; // ✅ กดจากการ์ด "อู่แนะนำ" แล้วเปิดหน้ารายละเอียดอู่
 import 'api_service.dart'; // ✅ สำหรับนับ/มาร์คแจ้งเตือนที่ยังไม่อ่าน
+import 'network_image_helper.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
+import 'category_icons.dart'; // ✅ ไอคอนหมวดงานซ่อมแบบสมจริง
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -35,6 +38,18 @@ class _HomePageState extends State<HomePage> {
     _fetchUnseenCount();
     _fetchActiveJob();
     _fetchRecommendedGarages();
+    // ✅ รีบิลด์หน้าแรกอัตโนมัติเมื่อผู้ใช้เปลี่ยนภาษาจากหน้าตั้งค่า
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   // ✅ อู่แนะนำหน้าแรก — เรียงตามคะแนนรีวิวเฉลี่ยสูงสุดก่อน (4.9, 4.8, 4.7, ...)
@@ -201,12 +216,12 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         onTap: _handleNavTap,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "หน้าหลัก"),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: "ค้นหา"),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: "ประวัติ"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: "แชท"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: "โปรไฟล์"),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home), label: AppLocale.instance.t('nav_home')),
+          BottomNavigationBarItem(icon: const Icon(Icons.search), label: AppLocale.instance.t('nav_search')),
+          BottomNavigationBarItem(icon: const Icon(Icons.history), label: AppLocale.instance.t('nav_history')),
+          BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline), label: AppLocale.instance.t('nav_chat')),
+          BottomNavigationBarItem(icon: const Icon(Icons.person_outline), label: AppLocale.instance.t('profile_title')),
         ],
       ),
     );
@@ -225,17 +240,18 @@ void _openSearch(BuildContext context, Map<String, dynamic> userData, String ser
 // ✅ ข้อความหัวการ์ด "กำลังซ่อม" หน้าแรก — เปลี่ยนตามสถานะจริงที่ช่างอัปเดตล่าสุด
 // (เดิม const Text("กำลังซ่อม") ฝังตายตัว ไม่เคยอ่านสถานะจริงเลย)
 String _activeJobStatusLabel(String? status) {
+  final loc = AppLocale.instance;
   switch (status) {
     case 'assigned':
-      return 'รับงานแล้ว';
+      return loc.t('dash_status_assigned');
     case 'checking':
-      return 'ช่างกำลังเดินทาง';
+      return loc.t('dash_status_checking');
     case 'in_progress':
-      return 'กำลังซ่อม';
+      return loc.t('dash_status_in_progress');
     case 'waiting_parts':
-      return 'รอรับอะไหล่';
+      return loc.t('dash_status_waiting_parts');
     default:
-      return 'กำลังซ่อม';
+      return loc.t('dash_status_in_progress');
   }
 }
 
@@ -277,11 +293,12 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     // ดึงชื่อจาก userData (ชื่อเต็มสำหรับลูกค้า, ชื่อร้านสำหรับอู่)
     final firstName = userData['first_name'] ?? '';
     final lastName = userData['last_name'] ?? '';
     final fullName = userData['shop_name'] ??
-        (('$firstName $lastName').trim().isEmpty ? 'ผู้ใช้' : '$firstName $lastName'.trim());
+        (('$firstName $lastName').trim().isEmpty ? loc.t('dash_user_fallback') : '$firstName $lastName'.trim());
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -305,9 +322,9 @@ class HomeContent extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              "สวัสดี",
-                              style: TextStyle(color: Colors.white70, fontSize: 20),
+                            Text(
+                              loc.t('dash_greeting'),
+                              style: const TextStyle(color: Colors.white70, fontSize: 20),
                             ),
                             const SizedBox(height: 5),
                             Text(
@@ -378,7 +395,7 @@ class HomeContent extends StatelessWidget {
                       );
                     },
                     decoration: InputDecoration(
-                      hintText: "ค้นหาอู่ซ่อมรถ...",
+                      hintText: loc.t('dash_search_hint'),
                       prefixIcon: const Icon(Icons.search),
                       filled: true,
                       fillColor: Colors.white,
@@ -399,9 +416,9 @@ class HomeContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  const Text(
-                    "ประเภทงานซ่อม",
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  Text(
+                    loc.t('dash_categories_heading'),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 20),
@@ -410,23 +427,27 @@ class HomeContent extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       CategoryItem(
-                        icon: Icons.directions_car_filled_outlined,
-                        title: "เครื่องยนต์",
+                        customIcon: buildEngineIcon(),
+                        color: const Color(0xff2196F3),
+                        title: loc.t('cat_engine'),
                         onTap: () => _openSearch(context, userData, "เครื่องยนต์"),
                       ),
                       CategoryItem(
-                        icon: Icons.circle,
-                        title: "ยาง",
+                        customIcon: buildTireIcon(),
+                        color: const Color(0xff546E7A),
+                        title: loc.t('cat_tires'),
                         onTap: () => _openSearch(context, userData, "ยาง"),
                       ),
                       CategoryItem(
-                        icon: Icons.battery_charging_full,
-                        title: "แบตเตอรี่",
+                        customIcon: buildBatteryIcon(),
+                        color: const Color(0xff43A047),
+                        title: loc.t('cat_battery'),
                         onTap: () => _openSearch(context, userData, "แบตเตอรี่"),
                       ),
                       CategoryItem(
-                        icon: Icons.format_paint,
-                        title: "ซ่อมสี",
+                        customIcon: buildPaintIcon(),
+                        color: const Color(0xffFB8C00),
+                        title: loc.t('cat_paint'),
                         onTap: () => _openSearch(context, userData, "ซ่อมสี"),
                       ),
                     ],
@@ -470,7 +491,7 @@ class HomeContent extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  "${activeJob!['shop_name'] ?? 'ไม่ระบุอู่'}\n${activeJob!['problem_category'] ?? ''}",
+                                  "${activeJob!['shop_name'] ?? loc.t('dash_garage_fallback')}\n${activeJob!['problem_category'] ?? ''}",
                                   style: const TextStyle(color: Colors.white, fontSize: 18),
                                 ),
                               ],
@@ -482,11 +503,11 @@ class HomeContent extends StatelessWidget {
                               foregroundColor: Colors.white,
                             ),
                             onPressed: onTrackTap,
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Text("ติดตาม"),
-                                SizedBox(width: 5),
-                                Icon(Icons.arrow_forward_ios, size: 15),
+                                Text(loc.t('dash_track_button')),
+                                const SizedBox(width: 5),
+                                const Icon(Icons.arrow_forward_ios, size: 15),
                               ],
                             ),
                           ),
@@ -500,20 +521,20 @@ class HomeContent extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('อู่แนะนำ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(loc.t('dash_recommended_heading'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         GestureDetector(
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (context) => SearchPage(userData: userData)),
                           ),
-                          child: const Text('ดูทั้งหมด', style: TextStyle(color: Color(0xff2196F3), fontSize: 14)),
+                          child: Text(loc.t('dash_see_all'), style: const TextStyle(color: Color(0xff2196F3), fontSize: 14)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     ...recommendedGarages.map((garage) {
                       final avatar = garage['avatar']?.toString();
-                      final name = garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+                      final name = garage['shop_name']?.toString() ?? loc.t('profile_shop_fallback');
                       final rating = (garage['rating'] as num?)?.toDouble() ?? 0;
                       final reviewCount = (garage['review_count'] as num?)?.toInt() ?? 0;
                       final distanceKm = _distanceKmTo(garage);
@@ -540,7 +561,7 @@ class HomeContent extends StatelessWidget {
                                 ClipRRect(
                                   borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
                                   child: (avatar != null && avatar.isNotEmpty)
-                                      ? Image.network(avatar, height: 130, width: double.infinity, fit: BoxFit.cover)
+                                      ? NetImage(avatar, height: 130, width: double.infinity, fit: BoxFit.cover)
                                       : Container(
                                           height: 130,
                                           width: double.infinity,
@@ -572,7 +593,7 @@ class HomeContent extends StatelessWidget {
                                           if (distanceKm != null) ...[
                                             Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
                                             const SizedBox(width: 2),
-                                            Text('${distanceKm.toStringAsFixed(1)} กม.',
+                                            Text('${distanceKm.toStringAsFixed(1)} ${loc.t('dash_km_unit')}',
                                                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                                           ],
                                         ],
@@ -599,31 +620,49 @@ class HomeContent extends StatelessWidget {
 }
 
 class CategoryItem extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? customIcon; // ✅ ใช้กราฟิกกำหนดเองแทน Icon ธรรมดา เช่น ไอคอนยางที่ประกอบเอง
+  final Color color;
   final String title;
   final VoidCallback? onTap;
 
-  const CategoryItem({super.key, required this.icon, required this.title, this.onTap});
+  const CategoryItem({
+    super.key,
+    this.icon,
+    this.customIcon,
+    required this.title,
+    this.color = const Color(0xff2196F3),
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Column(
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(35),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: customIcon ?? Icon(icon, color: color, size: 30),
+              ),
             ),
-            child: Icon(icon, color: Colors.blue),
-          ),
-          const SizedBox(height: 8),
-          Text(title),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xff424242)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -657,7 +696,7 @@ class GarageCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(15),
-              child: Image.network(image, height: 180, width: double.infinity, fit: BoxFit.cover),
+              child: NetImage(image, height: 180, width: double.infinity, fit: BoxFit.cover),
             ),
             const SizedBox(height: 15),
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),

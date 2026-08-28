@@ -16,6 +16,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'app_locale.dart';
 
 /// คำนวณ CRC16-CCITT (XModem variant) ตามที่สเปก EMV QR กำหนด
 int _crc16(String input) {
@@ -97,30 +98,34 @@ class PromptPayQrCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final payload = buildPromptPayPayload(promptPayId: promptPayId, amount: amount);
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        final loc = AppLocale.instance;
+        final payload = buildPromptPayPayload(promptPayId: promptPayId, amount: amount);
 
-    if (payload == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(14)),
-        child: const Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.error_outline, color: Color(0xffE65100), size: 20),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'เลขพร้อมเพย์ของอู่ไม่ถูกต้อง (ต้องเป็นเบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก) กรุณาติดต่ออู่โดยตรง',
-                style: TextStyle(color: Color(0xffE65100), fontSize: 13),
-              ),
+        if (payload == null) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline, color: Color(0xffE65100), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.t('ppq_invalid_id_msg'),
+                    style: const TextStyle(color: Color(0xffE65100), fontSize: 13),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          );
+        }
 
-    return Container(
+        return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -133,8 +138,8 @@ class PromptPayQrCode extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(color: const Color(0xff1E4598), borderRadius: BorderRadius.circular(6)),
-            child: const Text('พร้อมเพย์ PromptPay',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            child: Text(loc.t('ppq_promptpay_badge'),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
           ),
           const SizedBox(height: 18),
           QrImageView(
@@ -151,10 +156,12 @@ class PromptPayQrCode extends StatelessWidget {
             Text(accountName!, style: const TextStyle(color: Colors.grey, fontSize: 13)),
           ],
           const SizedBox(height: 10),
-          const Text('เปิดแอปธนาคาร (สแกน QR / พร้อมเพย์) แล้วสแกนโค้ดนี้เพื่อชำระเงินได้เลย',
-              textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(loc.t('ppq_instructions'),
+              textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
+    );
+      },
     );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'app_config.dart';
+import 'app_locale.dart';
 
 class ApiResult {
   final bool success;
@@ -44,18 +45,18 @@ class ApiService {
               'userType': userType,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ',
+        message: body['message'] ?? AppLocale.instance.t('api_unknown_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -72,18 +73,56 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ',
+        message: body['message'] ?? AppLocale.instance.t('api_unknown_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
+      );
+    }
+  }
+
+  // ===== SUBMIT COMPLAINT =====
+  // ✅ เพิ่มใหม่: แจ้งข้อร้องเรียน (แยกจากรีวิว) — เดิม endpoint ฝั่ง backend เตรียมไว้รอ
+  // มานานแล้ว (ดูคอมเมนต์ server.js) แต่ฝั่งแอปไม่เคยมีปุ่ม/ฟอร์มเรียกใช้เลย ตอนนี้เชื่อมแล้ว
+  // แอดมินจะเห็นข้อร้องเรียนที่ส่งเข้ามาทันทีในหน้า "รีวิว & ข้อร้องเรียน" ของระบบแอดมิน
+  static Future<ApiResult> submitComplaint({
+    required int reporterId,
+    int? garageId,
+    required String subject,
+    String? detail,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/complaints'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'reporterId': reporterId,
+              'garageId': garageId,
+              'subject': subject,
+              'detail': detail,
+            }),
+          )
+          .timeout(const Duration(seconds: 45));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? AppLocale.instance.t('api_unknown_error'),
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(
+        success: false,
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -129,18 +168,18 @@ class ApiService {
               if (longitude != null) 'longitude': longitude,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -157,18 +196,18 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'userId': userId, 'newEmail': newEmail}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -185,18 +224,18 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'userId': userId, 'otp': otp}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -219,7 +258,7 @@ class ApiService {
         '$baseUrl/garages',
       ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -229,7 +268,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -259,11 +298,11 @@ class ApiService {
 
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'อัปโหลดไม่สำเร็จ');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_upload_failed'));
     }
   }
 
@@ -279,7 +318,7 @@ class ApiService {
               '$baseUrl/user/profile?userId=$userId&userType=$userType',
             ),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -288,7 +327,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_fetch_failed'));
     }
   }
 
@@ -338,13 +377,13 @@ class ApiService {
 
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่',
+        message: AppLocale.instance.t('api_repair_request_failed'),
       );
     }
   }
@@ -363,7 +402,7 @@ class ApiService {
           if (technicianId != null) 'technicianId': technicianId.toString(),
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -373,7 +412,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -396,7 +435,7 @@ class ApiService {
               if (reason != null) 'reason': reason,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -406,7 +445,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -435,7 +474,7 @@ class ApiService {
               if (specialties != null) 'specialties': specialties,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -445,7 +484,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -456,7 +495,7 @@ class ApiService {
       final uri = Uri.parse(
         '$baseUrl/technicians',
       ).replace(queryParameters: {'garageId': garageId.toString()});
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -466,7 +505,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -483,7 +522,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'status': status}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -493,7 +532,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -516,7 +555,7 @@ class ApiService {
               if (assignmentNote != null) 'assignmentNote': assignmentNote,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -526,7 +565,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -543,7 +582,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'status': status}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -553,7 +592,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -593,11 +632,11 @@ class ApiService {
       final body = jsonDecode(await response.stream.bytesToString());
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_save_failed_retry'));
     }
   }
 
@@ -607,7 +646,7 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/repair-logs').replace(
         queryParameters: {'repairRequestId': repairRequestId.toString()},
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -617,7 +656,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -629,7 +668,7 @@ class ApiService {
       final uri = Uri.parse(
         '$baseUrl/repair-requests/unseen-count',
       ).replace(queryParameters: {'customerId': customerId.toString()});
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -639,7 +678,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -653,7 +692,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'customerId': customerId}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -663,7 +702,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -694,7 +733,7 @@ class ApiService {
               'notes': notes,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -702,7 +741,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'สร้างใบเสนอราคาไม่สำเร็จ');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_create_quotation_failed'));
     }
   }
 
@@ -731,7 +770,7 @@ class ApiService {
               'notes': notes,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -739,7 +778,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'แก้ไขใบเสนอราคาไม่สำเร็จ');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_edit_quotation_failed'));
     }
   }
 
@@ -749,7 +788,7 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/quotations').replace(
         queryParameters: {'repairRequestId': repairRequestId.toString()},
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -759,7 +798,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -782,7 +821,7 @@ class ApiService {
               if (reason != null) 'reason': reason,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -792,7 +831,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -801,7 +840,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/cars?userId=$userId'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -810,7 +849,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถดึงข้อมูลรถได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_fetch_vehicle_failed'));
     }
   }
 
@@ -839,7 +878,7 @@ class ApiService {
               'carType': carType,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -850,7 +889,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -879,7 +918,7 @@ class ApiService {
               'carType': carType,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -890,7 +929,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -900,7 +939,7 @@ class ApiService {
     try {
       final response = await http
           .delete(Uri.parse('$baseUrl/cars/$carId'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -911,7 +950,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -925,18 +964,18 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'email': email}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -958,18 +997,18 @@ class ApiService {
               'newPassword': newPassword,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1020,13 +1059,73 @@ class ApiService {
               as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่',
+        message: AppLocale.instance.t('api_review_submit_failed'),
+      );
+    }
+  }
+
+  // ===== ✅ ใหม่ — แก้ไขรีวิวที่ส่งไปแล้ว (เฉพาะเจ้าของรีวิวเท่านั้น ยืนยันสิทธิ์ด้วย customerId) =====
+  // keepPhotoUrls: รูปเดิมที่ยังอยากเก็บไว้ (URL เต็มจาก server ก็ได้ backend จะตัดเอาแค่ชื่อไฟล์เอง)
+  // newPhotos/newPhotoNames: รูปใหม่ที่เพิ่งเลือกเพิ่ม — รวมกับ keepPhotoUrls แล้วต้องไม่เกิน 5 รูป
+  static Future<ApiResult> updateReview({
+    required int reviewId,
+    required int customerId,
+    required int rating,
+    int? qualityRating,
+    int? priceRating,
+    int? serviceRating,
+    String? comment,
+    List<String> keepPhotoUrls = const [],
+    List<Uint8List> newPhotos = const [],
+    List<String> newPhotoNames = const [],
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$baseUrl/reviews/$reviewId'),
+      );
+      request.fields['customerId'] = customerId.toString();
+      request.fields['rating'] = rating.toString();
+      if (qualityRating != null)
+        request.fields['qualityRating'] = qualityRating.toString();
+      if (priceRating != null)
+        request.fields['priceRating'] = priceRating.toString();
+      if (serviceRating != null)
+        request.fields['serviceRating'] = serviceRating.toString();
+      if (comment != null) request.fields['comment'] = comment;
+      request.fields['keepPhotos'] = jsonEncode(keepPhotoUrls);
+
+      for (var i = 0; i < newPhotos.length; i++) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'photos',
+            newPhotos[i],
+            filename: i < newPhotoNames.length ? newPhotoNames[i] : 'review_$i.jpg',
+          ),
+        );
+      }
+
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final body =
+          jsonDecode(await response.stream.bytesToString())
+              as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
+        data: body['data'],
+      );
+    } catch (e) {
+      return ApiResult(
+        success: false,
+        message: AppLocale.instance.t('api_review_edit_failed'),
       );
     }
   }
@@ -1044,7 +1143,7 @@ class ApiService {
             'repairRequestId': repairRequestId.toString(),
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1054,7 +1153,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1072,18 +1171,18 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'garageId': garageId, 'reply': reply}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1120,13 +1219,13 @@ class ApiService {
               as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'แจ้งชำระเงินไม่สำเร็จ กรุณาลองใหม่',
+        message: AppLocale.instance.t('api_payment_notify_failed'),
       );
     }
   }
@@ -1146,7 +1245,7 @@ class ApiService {
           if (garageId != null) 'garageId': garageId.toString(),
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1156,7 +1255,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1173,17 +1272,17 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'garageId': garageId}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'], // ✅ มี commissionAmount/walletBalanceAfter ติดมาด้วยตั้งแต่เพิ่มระบบ wallet
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1200,16 +1299,16 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'garageId': garageId, 'reason': reason}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1234,16 +1333,16 @@ class ApiService {
               'promptpayId': promptpayId,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1256,7 +1355,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/wallet/$garageId'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1264,7 +1363,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_connection_failed'));
     }
   }
 
@@ -1275,7 +1374,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/wallet/$garageId/unpaid-commissions'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1283,7 +1382,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_connection_failed'));
     }
   }
 
@@ -1310,11 +1409,11 @@ class ApiService {
       final body = jsonDecode(await response.stream.bytesToString());
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_connection_failed'));
     }
   }
 
@@ -1323,7 +1422,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/wallet/topups?garageId=$garageId'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1331,7 +1430,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_connection_failed'));
     }
   }
 
@@ -1340,7 +1439,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/platform/bank-account'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1348,7 +1447,7 @@ class ApiService {
         data: body['data'],
       );
     } catch (e) {
-      return ApiResult(success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      return ApiResult(success: false, message: AppLocale.instance.t('api_connection_failed'));
     }
   }
 
@@ -1364,17 +1463,17 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'customerId': customerId, 'garageId': garageId}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1391,7 +1490,7 @@ class ApiService {
           if (garageId != null) 'garageId': garageId.toString(),
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1401,7 +1500,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1418,7 +1517,7 @@ class ApiService {
           'viewerType': viewerType,
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 45));
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
@@ -1428,7 +1527,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้',
+        message: AppLocale.instance.t('api_connection_failed'),
       );
     }
   }
@@ -1469,13 +1568,13 @@ class ApiService {
               as Map<String, dynamic>;
       return ApiResult(
         success: body['success'] == true,
-        message: body['message'] ?? 'เกิดข้อผิดพลาด',
+        message: body['message'] ?? AppLocale.instance.t('api_generic_error'),
         data: body['data'],
       );
     } catch (e) {
       return ApiResult(
         success: false,
-        message: 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่',
+        message: AppLocale.instance.t('api_send_message_failed'),
       );
     }
   }

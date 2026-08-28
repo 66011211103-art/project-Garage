@@ -18,6 +18,9 @@ import 'repair_tracking_page.dart';
 import 'payment_confirm_dialog.dart';
 import 'chat_screen.dart';
 import ' myCarPage.dart' show vehicleTypeLabel;
+import 'network_image_helper.dart';
+import 'app_locale.dart';
+import 'request_repair_page.dart' show problemCategoryDisplayLabel;
 
 class GarageRequestDetailPage extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -44,6 +47,17 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
     super.initState();
     _request = widget.request;
     _fetchQuotation();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchQuotation() async {
@@ -76,13 +90,13 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
   String _vehicleLabel(String? value) {
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return AppLocale.instance.t('tech_vehicle_sedan');
       case 'suv':
-        return 'SUV';
+        return AppLocale.instance.t('car_type_suv');
       case 'pickup':
-        return 'กระบะ';
+        return AppLocale.instance.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return AppLocale.instance.t('tech_vehicle_unspecified');
     }
   }
 
@@ -116,26 +130,28 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
+    final timeSuffix = AppLocale.instance.isThai ? ' น.' : '';
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}$timeSuffix';
   }
 
   ({String label, Color color}) get _statusInfo {
+    final loc = AppLocale.instance;
     final paymentStatus = _request['payment_status']?.toString();
     if (_isCompleted) {
       if (paymentStatus == 'pending_confirmation') {
-        return (label: 'รอตรวจสอบการชำระเงิน', color: const Color(0xffFF9800));
+        return (label: loc.t('arp_payment_pending_badge'), color: const Color(0xffFF9800));
       } else if (paymentStatus == 'rejected') {
-        return (label: 'ปฏิเสธสลิป รอลูกค้าส่งใหม่', color: const Color(0xffE53935));
+        return (label: loc.t('arp_slip_rejected_badge'), color: const Color(0xffE53935));
       }
-      return (label: 'ซ่อมเสร็จ รอลูกค้าชำระเงิน', color: const Color(0xff4CAF50));
+      return (label: loc.t('arp_completed_unpaid_badge'), color: const Color(0xff4CAF50));
     }
     if (_isInRepair) {
-      const labels = {
-        'assigned': 'มอบหมายช่างแล้ว',
-        'checking': 'ช่างกำลังเดินทาง',
-        'in_progress': 'กำลังซ่อม',
-        'waiting_parts': 'รอรับอะไหล่',
+      final labels = {
+        'assigned': loc.t('arp_status_assigned'),
+        'checking': loc.t('dash_status_checking'),
+        'in_progress': loc.t('dash_status_in_progress'),
+        'waiting_parts': loc.t('dash_status_waiting_parts'),
       };
       const colors = {
         'assigned': Color(0xff2196F3),
@@ -145,11 +161,11 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
       };
       return (label: labels[_status] ?? _status, color: colors[_status] ?? Colors.grey);
     }
-    if (_isConfirmed) return (label: 'ลูกค้ายืนยันแล้ว', color: const Color(0xff4CAF50));
-    if (_isQuoted) return (label: 'รอลูกค้ายืนยันใบเสนอราคา', color: const Color(0xff9C27B0));
-    if (_isAccepted) return (label: 'รับแล้ว', color: const Color(0xff2196F3));
-    if (_isRejected) return (label: 'ปฏิเสธคำขอแล้ว', color: const Color(0xffE53935));
-    return (label: 'รอดำเนินการ', color: const Color(0xffFF9800));
+    if (_isConfirmed) return (label: loc.t('arp_confirmed_badge'), color: const Color(0xff4CAF50));
+    if (_isQuoted) return (label: loc.t('arp_awaiting_quote_confirm_badge'), color: const Color(0xff9C27B0));
+    if (_isAccepted) return (label: loc.t('arp_filter_accepted'), color: const Color(0xff2196F3));
+    if (_isRejected) return (label: loc.t('grd_rejected_badge'), color: const Color(0xffE53935));
+    return (label: loc.t('myreq_status_pending'), color: const Color(0xffFF9800));
   }
 
   Future<void> _openChat() async {
@@ -160,7 +176,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
     if (!mounted) return;
     if (!result.success || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('gd_chat_open_failed')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -172,7 +188,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
           conversationId: result.data!['conversationId'],
           myId: widget.userData['id'],
           myType: 'repair',
-          otherPartyName: name.isEmpty ? 'ลูกค้า' : name,
+          otherPartyName: name.isEmpty ? AppLocale.instance.t('profile_type_customer') : name,
           otherPartyAvatar: _request['customer_avatar']?.toString(),
         ),
       ),
@@ -215,7 +231,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
       MaterialPageRoute(
         builder: (context) => CreateQuotationPage(
           repairRequestId: _request['id'],
-          customerName: name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+          customerName: name.isEmpty ? AppLocale.instance.t('profile_name_fallback') : name,
           existingQuotation: _quotation, // ✅ null = สร้างใหม่, มีค่า = แก้ไข
           carInfo: _carInfo, // ✅ ข้อมูลรถของลูกค้า (ถ้าคำขอนี้ผูกกับรถใน "รถของฉัน")
           garageServices: (widget.userData['services'] is List)
@@ -262,6 +278,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final name = '${_request['first_name'] ?? ''} ${_request['last_name'] ?? ''}'.trim();
     final photos = (_request['photos'] is List) ? List<dynamic>.from(_request['photos']) : [];
     final statusInfo = _statusInfo;
@@ -286,7 +303,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
             IconButton(
               icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
               onPressed: _openChat,
-              tooltip: 'แชทกับลูกค้า',
+              tooltip: loc.t('grd_chat_tooltip'),
             ),
           ],
           elevation: 0,
@@ -321,27 +338,28 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _infoRow(Icons.person_outline, 'ลูกค้า', name.isEmpty ? 'ไม่ระบุชื่อ' : name),
+                    _infoRow(Icons.person_outline, loc.t('profile_type_customer'), name.isEmpty ? loc.t('profile_name_fallback') : name),
                     const Divider(height: 20),
-                    _infoRow(Icons.directions_car_outlined, 'ประเภทรถ', _vehicleTypeDisplay),
+                    _infoRow(Icons.directions_car_outlined, loc.t('car_type_label'), _vehicleTypeDisplay),
                     if (_hasCarInfo) ...[
                       const Divider(height: 20),
-                      _infoRow(Icons.badge_outlined, 'ยี่ห้อ/รุ่น',
+                      _infoRow(Icons.badge_outlined, loc.t('grd_brand_model_label'),
                           '${_request['car_brand'] ?? ''} ${_request['car_model'] ?? ''}'.trim().isEmpty
-                              ? 'ไม่ระบุ'
+                              ? loc.t('garage_address_fallback')
                               : '${_request['car_brand'] ?? ''} ${_request['car_model'] ?? ''}'.trim()),
                       if ((_request['car_plate']?.toString() ?? '').isNotEmpty) ...[
                         const Divider(height: 20),
-                        _infoRow(Icons.pin_outlined, 'ทะเบียนรถ', _request['car_plate'].toString()),
+                        _infoRow(Icons.pin_outlined, loc.t('car_plate_label'), _request['car_plate'].toString()),
                       ],
                     ],
                     const Divider(height: 20),
-                    _infoRow(Icons.build_outlined, 'ประเภทปัญหา', _request['problem_category']?.toString() ?? '-'),
+                    _infoRow(Icons.build_outlined, loc.t('req_problem_section_title'),
+                        _request['problem_category'] != null ? problemCategoryDisplayLabel(_request['problem_category'].toString()) : '-'),
                     const Divider(height: 20),
-                    _infoRow(Icons.event_outlined, 'วันที่แจ้งซ่อม', _formatDateTime(_request['created_at']?.toString())),
+                    _infoRow(Icons.event_outlined, loc.t('crd_label_request_date'), _formatDateTime(_request['created_at']?.toString())),
                     if (_request['technician_name'] != null) ...[
                       const Divider(height: 20),
-                      _infoRow(Icons.engineering_outlined, 'ช่างที่รับผิดชอบ', _request['technician_name'].toString()),
+                      _infoRow(Icons.engineering_outlined, loc.t('gjd_label_technician'), _request['technician_name'].toString()),
                     ],
                   ],
                 ),
@@ -354,13 +372,13 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('รายละเอียดที่ลูกค้าแจ้ง',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                    Text(loc.t('grd_reported_details_title'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                     const SizedBox(height: 8),
                     Text(
                       _request['description']?.toString().isNotEmpty == true
                           ? _request['description'].toString()
-                          : 'ไม่มีรายละเอียดเพิ่มเติม',
+                          : loc.t('crd_no_description'),
                       style: const TextStyle(fontSize: 14, height: 1.5),
                     ),
                   ],
@@ -378,7 +396,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _request['address']?.toString().isNotEmpty == true ? _request['address'].toString() : 'ไม่ระบุที่อยู่',
+                        _request['address']?.toString().isNotEmpty == true ? _request['address'].toString() : loc.t('crd_no_address'),
                         style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                       ),
                     ),
@@ -393,8 +411,8 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('รูปภาพประกอบ',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      Text(loc.t('crd_photos_title'),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                       const SizedBox(height: 10),
                       SizedBox(
                         height: 96,
@@ -406,7 +424,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                             borderRadius: BorderRadius.circular(10),
                             child: GestureDetector(
                               onTap: () => _viewPhoto(photos[i].toString()),
-                              child: Image.network(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
+                              child: NetImage(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
                             ),
                           ),
                         ),
@@ -426,7 +444,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                       const Icon(Icons.cancel_outlined, size: 18, color: Color(0xffE53935)),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('เหตุผลที่ปฏิเสธ: ${_request['rejection_reason']}',
+                        child: Text(loc.t('grd_rejection_reason_prefix').replaceAll('%s', '${_request['rejection_reason']}'),
                             style: const TextStyle(color: Color(0xffE53935), fontSize: 13)),
                       ),
                     ],
@@ -442,8 +460,8 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
-                          child: Text('ใบเสนอราคา', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                        Expanded(
+                          child: Text(loc.t('rrd_quotation_title'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                         ),
                         if (_canEditQuotation)
                           TextButton.icon(
@@ -453,7 +471,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                               foregroundColor: const Color(0xff2196F3),
                             ),
                             icon: const Icon(Icons.edit_outlined, size: 15),
-                            label: const Text('แก้ไขใบเสนอราคา', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            label: Text(loc.t('grd_edit_quotation_button'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                           ),
                       ],
                     ),
@@ -461,7 +479,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                     if (_isLoadingQuotation)
                       const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
                     else if (_quotation == null) ...[
-                      const Text('ยังไม่มีใบเสนอราคา', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text(loc.t('grd_no_quotation'), style: const TextStyle(color: Colors.grey, fontSize: 13)),
                       if (_isAccepted) ...[
                         const SizedBox(height: 10),
                         SizedBox(
@@ -473,7 +491,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-                            label: const Text('สร้างใบเสนอราคา', style: TextStyle(color: Colors.white)),
+                            label: Text(loc.t('grd_create_quotation_button'), style: const TextStyle(color: Colors.white)),
                           ),
                         ),
                       ],
@@ -497,7 +515,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                           padding: const EdgeInsets.symmetric(vertical: 3),
                           child: Row(
                             children: [
-                              const Expanded(child: Text('ค่าแรง', style: TextStyle(fontSize: 13))),
+                              Expanded(child: Text(loc.t('gjd_labor_cost'), style: const TextStyle(fontSize: 13))),
                               Text('฿${double.tryParse(_quotation!['labor_cost']?.toString() ?? '0')?.toStringAsFixed(0)}',
                                   style: const TextStyle(fontSize: 13)),
                             ],
@@ -527,7 +545,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                               padding: const EdgeInsets.symmetric(vertical: 3),
                               child: Row(
                                 children: [
-                                  const Expanded(child: Text('ภาษีมูลค่าเพิ่ม 7%', style: TextStyle(fontSize: 13))),
+                                  Expanded(child: Text(loc.t('common_vat_7'), style: const TextStyle(fontSize: 13))),
                                   Text('฿${vatAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13)),
                                 ],
                               ),
@@ -535,7 +553,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                             const Divider(height: 16),
                             Row(
                               children: [
-                                const Expanded(child: Text('รวมทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                                Expanded(child: Text(loc.t('common_grand_total'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
                                 Text('฿${totalPrice.toStringAsFixed(0)}',
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff4CAF50))),
                               ],
@@ -555,18 +573,18 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('สลิปการชำระเงิน', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      Text(loc.t('gjd_payment_slip_title'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                       const SizedBox(height: 10),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: GestureDetector(
                           onTap: () => _viewPhoto(_request['payment_slip'].toString()),
-                          child: Image.network(_request['payment_slip'].toString(), fit: BoxFit.contain),
+                          child: NetImage(_request['payment_slip'].toString(), fit: BoxFit.contain),
                         ),
                       ),
                       if (amount > 0) ...[
                         const SizedBox(height: 8),
-                        Text('ยอดที่แจ้งโอน: ฿${amount.toStringAsFixed(0)}',
+                        Text(loc.t('gjd_transferred_amount_prefix').replaceAll('%s', amount.toStringAsFixed(0)),
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       ],
                     ],
@@ -594,7 +612,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: InteractiveViewer(child: Image.network(url)),
+              child: InteractiveViewer(child: NetImage(url)),
             ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
@@ -609,6 +627,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
 
   /// แถบปุ่มการทำงานด้านล่าง — เปลี่ยนไปตามสถานะ เหมือนพฤติกรรมเดิมในลิสต์
   Widget? _bottomActionBar() {
+    final loc = AppLocale.instance;
     final id = _request['id'];
     final paymentStatus = _request['payment_status']?.toString();
 
@@ -627,7 +646,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
           child: OutlinedButton.icon(
             onPressed: _isResponding ? null : _handleReject,
             icon: const Icon(Icons.close, size: 16, color: Colors.red),
-            label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
+            label: Text(loc.t('garage_reject'), style: const TextStyle(color: Colors.red)),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Colors.red),
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -645,7 +664,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.check, color: Colors.white, size: 16),
-            label: const Text('รับงาน', style: TextStyle(color: Colors.white)),
+            label: Text(loc.t('arp_accept_button'), style: const TextStyle(color: Colors.white)),
           ),
         ),
       ]);
@@ -668,7 +687,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.task_alt, color: Colors.white, size: 16),
-              label: const Text('มอบหมายงานให้ช่างแล้ว — ดูสถานะ', style: TextStyle(color: Colors.white)),
+              label: Text(loc.t('grd_assigned_view_status'), style: const TextStyle(color: Colors.white)),
             ),
           ),
         ]);
@@ -683,7 +702,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.engineering_outlined, color: Colors.white, size: 16),
-            label: const Text('มอบหมายงานให้ช่าง', style: TextStyle(color: Colors.white)),
+            label: Text(loc.t('arp_assign_tech_button'), style: const TextStyle(color: Colors.white)),
           ),
         ),
       ]);
@@ -700,7 +719,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.timeline, color: Colors.white, size: 16),
-            label: const Text('ดูสถานะการซ่อม', style: TextStyle(color: Colors.white)),
+            label: Text(loc.t('arp_view_repair_status'), style: const TextStyle(color: Colors.white)),
           ),
         ),
       ]);
@@ -717,7 +736,7 @@ class _GarageRequestDetailPageState extends State<GarageRequestDetailPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.receipt_long, color: Colors.white, size: 16),
-            label: const Text('ตรวจสอบการชำระเงิน', style: TextStyle(color: Colors.white)),
+            label: Text(loc.t('arp_check_payment_button'), style: const TextStyle(color: Colors.white)),
           ),
         ),
       ]);

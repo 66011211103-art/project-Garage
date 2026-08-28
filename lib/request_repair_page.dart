@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
 import 'address_picker_sheet.dart'; // ✅ ใช้ chatbox ค้นหาที่อยู่แบบเดียวกับหน้าอื่น
 import ' myCarPage.dart'; // ✅ ใช้ kVehicleTypes/vehicleTypeLabel/CarFormSheet ร่วมกัน — "ประเภทรถ"
+import 'app_locale.dart';
 // ผูกกับรถแต่ละคันใน "รถของฉัน" แล้ว ไม่ต้องถามซ้ำเป็นปุ่มลอยๆ ในหน้านี้อีกต่อไป
 
 const List<String> kProblemCategories = [
@@ -16,6 +17,27 @@ const List<String> kProblemCategories = [
 ];
 
 const int kMaxRepairPhotos = 5;
+
+// ✅ ค่า kProblemCategories/_problemCategory ยังคงเป็นภาษาไทยเสมอ (ส่งตรงไป API เป็น
+// problemCategory) — ฟังก์ชันนี้ใช้แค่แปลงเป็นข้อความที่ "แสดงผล" บน ChoiceChip เท่านั้น
+String problemCategoryDisplayLabel(String category) {
+  switch (category) {
+    case 'เครื่องยนต์':
+      return AppLocale.instance.t('cat_engine');
+    case 'ยาง':
+      return AppLocale.instance.t('cat_tires');
+    case 'แบตเตอรี่':
+      return AppLocale.instance.t('cat_battery');
+    case 'เบรก':
+      return AppLocale.instance.t('svc_brakes');
+    case 'ซ่อมสี':
+      return AppLocale.instance.t('cat_paint');
+    case 'อื่นๆ':
+      return AppLocale.instance.t('car_type_other');
+    default:
+      return category;
+  }
+}
 
 /// หน้าส่งคำขอซ่อมรถ ไปยังอู่ที่เลือกไว้จากหน้ารายละเอียดอู่
 class RequestRepairPage extends StatefulWidget {
@@ -58,12 +80,18 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
     _latitude = double.tryParse(widget.userData['latitude']?.toString() ?? '');
     _longitude = double.tryParse(widget.userData['longitude']?.toString() ?? '');
     _loadCars();
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   // ✅ โหลดรถของลูกค้าคนนี้ แล้วเลือกคันแรกให้อัตโนมัติถ้ายังไม่เคยเลือกไว้
@@ -98,7 +126,12 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
-        return Padding(
+        final loc = AppLocale.instance;
+        // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น
+        // warning เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+        return Material(
+          color: Colors.white,
+          child: Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
@@ -109,13 +142,13 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('เลือกรถที่ต้องการซ่อม',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(loc.t('req_choose_car_title'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               if (_cars.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Text('ยังไม่มีรถที่บันทึกไว้ กด "เพิ่มรถใหม่" ด้านล่างเพื่อเริ่มต้น',
+                  child: Text(loc.t('req_no_cars_hint'),
                       style: TextStyle(color: Colors.grey.shade600)),
                 )
               else
@@ -129,10 +162,10 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.directions_car,
                             color: selected ? const Color(0xff2196F3) : Colors.grey.shade500),
-                        title: Text(car['car_model'] ?? 'ไม่ระบุรุ่น',
+                        title: Text(car['car_model'] ?? loc.t('car_model_unspecified'),
                             style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Text(
-                            '${car['car_plate'] ?? 'ไม่ระบุทะเบียน'} · ${vehicleTypeLabel(car['car_type']?.toString())}'),
+                            '${car['car_plate'] ?? loc.t('car_plate_unspecified')} · ${vehicleTypeLabel(car['car_type']?.toString())}'),
                         trailing: selected
                             ? const Icon(Icons.check_circle, color: Color(0xff2196F3))
                             : null,
@@ -157,7 +190,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                   }
                 },
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('เพิ่มรถใหม่'),
+                label: Text(loc.t('req_add_car_new')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xff2196F3),
                   side: const BorderSide(color: Color(0xff2196F3)),
@@ -167,6 +200,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                 ),
               ),
             ],
+          ),
           ),
         );
       },
@@ -201,7 +235,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
 
     if (picked.length > remaining) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เลือกได้สูงสุด $kMaxRepairPhotos รูป เพิ่มให้แล้ว $remaining รูป')),
+        SnackBar(content: Text(AppLocale.instance.t('req_photos_limit_msg').replaceAll('%max', '$kMaxRepairPhotos').replaceAll('%added', '$remaining'))),
       );
     }
   }
@@ -237,13 +271,13 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
   Future<void> _handleSubmit() async {
     if (_selectedCar == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกรถที่ต้องการซ่อม'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('req_select_car_required')), backgroundColor: Colors.red),
       );
       return;
     }
     if (_descriptionController.text.trim().isEmpty && !_symptomUnknown) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายละเอียดปัญหา หรือติ๊กว่า "ไม่ทราบอาการ"'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('req_description_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -251,7 +285,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
     // และไม่กดเลือกตำแหน่งเอง คำขอจะส่งไปแบบไม่มีที่อยู่/พิกัดเลย อู่หาตัวลูกค้าไม่เจอ
     if (_address.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกตำแหน่งที่ต้องการให้ไปซ่อม'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('req_address_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -291,11 +325,12 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ส่งคำขอซ่อมรถ', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('req_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -311,14 +346,14 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('รถที่ต้องการซ่อม',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(loc.t('req_car_section_title'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     _buildCarSelector(),
 
                     const SizedBox(height: 20),
-                    const Text('ประเภทปัญหา',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(loc.t('req_problem_section_title'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
@@ -326,7 +361,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                       children: kProblemCategories.map((c) {
                         final selected = _problemCategory == c;
                         return ChoiceChip(
-                          label: Text(c),
+                          label: Text(problemCategoryDisplayLabel(c)),
                           selected: selected,
                           onSelected: (_) => setState(() => _problemCategory = c),
                           selectedColor: const Color(0xffE3F2FD),
@@ -345,8 +380,8 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                     ),
 
                     const SizedBox(height: 20),
-                    const Text('รายละเอียดปัญหา',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(loc.t('req_description_section_title'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     TextField(
                       controller: _descriptionController,
@@ -354,8 +389,8 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                       enabled: !_symptomUnknown,
                       decoration: InputDecoration(
                         hintText: _symptomUnknown
-                            ? 'ไม่บังคับ — พิมพ์สิ่งที่สังเกตเห็นได้ก็ได้ เช่น มีเสียงดัง มีไฟโชว์ที่หน้าปัด...'
-                            : 'อธิบายปัญหาที่พบ เช่น รถติดยาก เครื่องดับบ่อย มีเสียงผิดปกติ...',
+                            ? loc.t('req_description_hint_unknown')
+                            : loc.t('req_description_hint_normal'),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -380,9 +415,9 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                               onChanged: (v) => setState(() => _symptomUnknown = v ?? false),
                               activeColor: const Color(0xff2196F3),
                             ),
-                            const Expanded(
-                              child: Text('ไม่ทราบอาการ / ไม่รู้ว่ารถเสียตรงไหน',
-                                  style: TextStyle(fontSize: 14)),
+                            Expanded(
+                              child: Text(loc.t('req_symptom_unknown_label'),
+                                  style: const TextStyle(fontSize: 14)),
                             ),
                           ],
                         ),
@@ -392,7 +427,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                       Padding(
                         padding: const EdgeInsets.only(left: 4, top: 2),
                         child: Text(
-                          'ไม่เป็นไร — ส่งคำขอได้เลย แนะนำให้ถ่ายรูป/แนบรูปเพิ่มเติมด้านล่าง อู่จะช่วยตรวจสอบอาการเบื้องต้นให้',
+                          loc.t('req_symptom_unknown_note'),
                           style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
                         ),
                       ),
@@ -400,8 +435,8 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                     const SizedBox(height: 20),
                     Row(
                       children: [
-                        const Text('อัปโหลดรูปภาพรถ',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(loc.t('req_upload_photos_title'),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 6),
                         Text('(${_photos.length}/$kMaxRepairPhotos)',
                             style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
@@ -466,7 +501,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                                   children: [
                                     Icon(Icons.camera_alt_outlined, color: Colors.grey.shade400),
                                     const SizedBox(height: 6),
-                                    Text('เพิ่มรูปภาพ',
+                                    Text(loc.t('req_add_photo_label'),
                                         style:
                                             TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                                   ],
@@ -478,8 +513,8 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                     ),
 
                     const SizedBox(height: 20),
-                    const Text('ตำแหน่งปัจจุบัน',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(loc.t('req_current_location_title'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     InkWell(
                       onTap: _pickAddress,
@@ -499,11 +534,11 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('ตำแหน่งของคุณ',
-                                      style: TextStyle(fontWeight: FontWeight.w600)),
+                                  Text(loc.t('req_your_location_label'),
+                                      style: const TextStyle(fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _address.isEmpty ? 'แตะเพื่อเลือกตำแหน่ง' : _address,
+                                    _address.isEmpty ? loc.t('req_tap_to_select_location') : _address,
                                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -525,14 +560,14 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                         color: const Color(0xffE3F2FD),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Color(0xff2196F3), size: 20),
-                          SizedBox(width: 10),
+                          const Icon(Icons.info_outline, color: Color(0xff2196F3), size: 20),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'อู่ซ่อมรถจะติดต่อกลับภายใน 15 นาที',
-                              style: TextStyle(color: Color(0xff1976D2), fontSize: 13),
+                              loc.t('req_garage_contact_note'),
+                              style: const TextStyle(color: Color(0xff1976D2), fontSize: 13),
                             ),
                           ),
                         ],
@@ -566,7 +601,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
                       )
                     : const Icon(Icons.send, color: Colors.white),
                 label: Text(
-                  _isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอซ่อม',
+                  _isSubmitting ? loc.t('req_sending') : loc.t('gd_send_repair_request'),
                   style: const TextStyle(
                       color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
@@ -581,6 +616,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
   // ✅ การ์ดเลือกรถที่ต้องการซ่อม — แทนที่ปุ่มเลือก "ประเภทรถ" แบบเดิม ด้วยการเลือกรถจริง
   // จาก "รถของฉัน" (ประเภทรถผูกไว้กับแต่ละคันแล้วตอนเพิ่มรถ ไม่ต้องถามซ้ำตรงนี้)
   Widget _buildCarSelector() {
+    final loc = AppLocale.instance;
     if (_isLoadingCars) {
       return Container(
         width: double.infinity,
@@ -617,10 +653,10 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
             children: [
               const Icon(Icons.add_circle_outline, color: Color(0xff2196F3), size: 28),
               const SizedBox(height: 8),
-              const Text('เพิ่มรถของฉัน',
-                  style: TextStyle(color: Color(0xff2196F3), fontWeight: FontWeight.w600)),
+              Text(loc.t('car_add_button'),
+                  style: const TextStyle(color: Color(0xff2196F3), fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
-              Text('เลือกหรือเพิ่มรถที่ต้องการส่งซ่อม',
+              Text(loc.t('req_select_car_hint'),
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
             ],
           ),
@@ -657,9 +693,9 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(car['car_model'] ?? 'ไม่ระบุรุ่น',
+                Text(car['car_model'] ?? loc.t('car_model_unspecified'),
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(car['car_plate'] ?? 'ไม่ระบุทะเบียน',
+                Text(car['car_plate'] ?? loc.t('car_plate_unspecified'),
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                 if (subtitleParts.isNotEmpty)
                   Text(subtitleParts,
@@ -669,7 +705,7 @@ class _RequestRepairPageState extends State<RequestRepairPage> {
           ),
           TextButton(
             onPressed: _openCarPicker,
-            child: const Text('เปลี่ยนรถ'),
+            child: Text(loc.t('req_change_car_button')),
           ),
         ],
       ),

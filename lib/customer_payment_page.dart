@@ -17,6 +17,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
 import 'promptpay_qr.dart'; // ✅ ตัวสร้าง QR พร้อมเพย์จริง (EMV QR Code)
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class CustomerPaymentPage extends StatefulWidget {
   final int repairRequestId;
@@ -59,6 +61,17 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   void initState() {
     super.initState();
     _fetchData();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchData() async {
@@ -123,7 +136,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
     if (_selectedMethod != 'bank_transfer' && _selectedMethod != 'qr') return; // กันไว้ (บัตรเครดิตยังปิดอยู่)
     if (_slipBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาแนบสลิปการโอนเงิน'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('gw_slip_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -150,11 +163,12 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ชำระเงิน', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('pc_pay_button'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -166,6 +180,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Widget _buildBody() {
+    final loc = AppLocale.instance;
     final paymentStatus = _payment?['status']?.toString();
 
     if (paymentStatus == 'confirmed') return _confirmedView();
@@ -189,8 +204,8 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('อู่ปฏิเสธสลิปที่แนบมา',
-                          style: TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(loc.t('pc_rejected_msg'),
+                          style: const TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text(_payment?['rejection_reason']?.toString() ?? '-',
                           style: const TextStyle(color: Color(0xffE53935), fontSize: 13)),
@@ -205,45 +220,45 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
 
         _amountCard(),
         const SizedBox(height: 20),
-        const Text('เลือกวิธีการชำระเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        Text(loc.t('cpp_select_method_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
         const SizedBox(height: 10),
         _methodOption(
           value: 'bank_transfer',
           icon: Icons.account_balance,
-          title: 'โอนเงินผ่านธนาคาร',
-          subtitle: 'โอนผ่านแอปธนาคาร',
+          title: loc.t('php_method_bank_transfer'),
+          subtitle: loc.t('cpp_bank_transfer_subtitle'),
         ),
         const SizedBox(height: 10),
         _methodOption(
           value: 'qr',
           icon: Icons.qr_code,
-          title: 'QR Payment',
-          subtitle: 'สแกน QR Code เพื่อชำระเงิน',
+          title: loc.t('php_method_qr'),
+          subtitle: loc.t('cpp_qr_subtitle'),
         ),
         const SizedBox(height: 10),
         _methodOption(
           value: 'credit_card',
           icon: Icons.credit_card,
-          title: 'บัตรเครดิต / เดบิต',
-          subtitle: 'ชำระด้วยบัตรเครดิต',
+          title: loc.t('cpp_credit_card_label'),
+          subtitle: loc.t('cpp_credit_card_subtitle'),
         ),
 
         if (_selectedMethod == 'bank_transfer') ...[
           const SizedBox(height: 20),
-          const Text('รายละเอียดการโอนเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(loc.t('cpp_transfer_details_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _bankDetailsCard(),
           const SizedBox(height: 20),
-          const Text('อัปโหลดสลิปการโอนเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(loc.t('cpp_upload_slip_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _slipUploadBox(),
         ] else if (_selectedMethod == 'qr') ...[
           const SizedBox(height: 20),
-          const Text('สแกน QR เพื่อชำระเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(loc.t('cpp_scan_qr_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _qrPaymentCard(),
           const SizedBox(height: 20),
-          const Text('อัปโหลดสลิปการโอนเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(loc.t('cpp_upload_slip_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _slipUploadBox(),
         ] else ...[
@@ -252,13 +267,13 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.hourglass_top, color: Colors.grey, size: 20),
-                SizedBox(width: 10),
+                const Icon(Icons.hourglass_top, color: Colors.grey, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text('ฟีเจอร์นี้จะเปิดให้บริการเร็วๆ นี้ ขณะนี้รองรับ "โอนเงินผ่านธนาคาร" และ "QR Payment"',
-                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  child: Text(loc.t('cpp_coming_soon_msg'),
+                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
                 ),
               ],
             ),
@@ -270,13 +285,13 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(12)),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
-              SizedBox(width: 8),
+              const Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text('กรุณาชำระเงินภายใน 24 ชั่วโมง หลังจากงานซ่อมเสร็จเรียบร้อย',
-                    style: TextStyle(color: Color(0xff2196F3), fontSize: 12)),
+                child: Text(loc.t('cpp_payment_deadline_note'),
+                    style: const TextStyle(color: Color(0xff2196F3), fontSize: 12)),
               ),
             ],
           ),
@@ -298,7 +313,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                     width: 18, height: 18,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                 : const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
-            label: Text(_isSubmitting ? 'กำลังส่ง...' : 'ยืนยันการชำระเงิน',
+            label: Text(_isSubmitting ? loc.t('cqp_sending') : loc.t('cpp_confirm_payment_button'),
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),
@@ -308,6 +323,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Widget _amountCard() {
+    final loc = AppLocale.instance;
     final items = (_quotation?['items'] is List) ? List<dynamic>.from(_quotation!['items']) : [];
     final laborCost = double.tryParse(_quotation?['labor_cost']?.toString() ?? '0') ?? 0;
 
@@ -320,7 +336,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
       ),
       child: Column(
         children: [
-          const Text('ยอดชำระทั้งหมด', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          Text(loc.t('cpp_total_amount_label'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 6),
           Text('฿${_totalAmount.toStringAsFixed(0)}',
               style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold)),
@@ -334,7 +350,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('ดูรายละเอียดค่าใช้จ่าย', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(loc.t('cpp_view_cost_details'), style: const TextStyle(color: Colors.white, fontSize: 12)),
                   Icon(_showCostDetails ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                       color: Colors.white, size: 16),
                 ],
@@ -353,11 +369,11 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                   ...items.map((it) => _costRow(
                       '${it['name']} x${it['quantity'] ?? 1}',
                       _itemSubtotal(it))),
-                  if (laborCost > 0) _costRow('ค่าแรง', laborCost),
-                  _costRow('ภาษีมูลค่าเพิ่ม 7%',
+                  if (laborCost > 0) _costRow(loc.t('gjd_labor_cost'), laborCost),
+                  _costRow(loc.t('common_vat_7'),
                       (items.fold<double>(0, (sum, it) => sum + _itemSubtotal(it)) + laborCost) * 0.07),
                   const Divider(height: 16),
-                  _costRow('รวมทั้งหมด', _totalAmount, bold: true),
+                  _costRow(loc.t('common_grand_total'), _totalAmount, bold: true),
                 ],
               ),
             ),
@@ -455,6 +471,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Widget _bankDetailsCard() {
+    final loc = AppLocale.instance;
     final hasBankDetails = (widget.bankAccountNumber ?? '').isNotEmpty;
 
     if (!hasBankDetails) {
@@ -462,8 +479,8 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(14)),
-        child: const Text('อู่ยังไม่ได้ตั้งค่าบัญชีธนาคารสำหรับรับชำระเงิน กรุณาติดต่ออู่โดยตรง',
-            style: TextStyle(color: Color(0xffE65100), fontSize: 13)),
+        child: Text(loc.t('cpp_no_bank_details'),
+            style: const TextStyle(color: Color(0xffE65100), fontSize: 13)),
       );
     }
 
@@ -501,7 +518,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
             ],
           ),
           const SizedBox(height: 22),
-          Text('เลขที่บัญชี', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
+          Text(loc.t('bsp_account_number_label'), style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -517,7 +534,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                   await Clipboard.setData(ClipboardData(text: widget.bankAccountNumber ?? ''));
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('คัดลอกเลขบัญชีแล้ว'), duration: Duration(seconds: 1)),
+                    SnackBar(content: Text(loc.t('cpp_copied_account_number')), duration: const Duration(seconds: 1)),
                   );
                 },
                 borderRadius: BorderRadius.circular(20),
@@ -530,7 +547,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
             ],
           ),
           const SizedBox(height: 16),
-          Text('ชื่อบัญชี', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
+          Text(loc.t('bsp_account_name_label'), style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
           const SizedBox(height: 2),
           Text(widget.bankAccountName ?? widget.shopName,
               style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
@@ -548,8 +565,8 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(14)),
-        child: const Text('อู่ยังไม่ได้ตั้งค่า PromptPay สำหรับรับชำระเงิน กรุณาเลือก "โอนเงินผ่านธนาคาร" แทน',
-            style: TextStyle(color: Color(0xffE65100), fontSize: 13)),
+        child: Text(AppLocale.instance.t('cpp_no_promptpay'),
+            style: const TextStyle(color: Color(0xffE65100), fontSize: 13)),
       );
     }
 
@@ -562,6 +579,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
 
 
   Widget _slipUploadBox() {
+    final loc = AppLocale.instance;
     return InkWell(
       onTap: _pickSlip,
       borderRadius: BorderRadius.circular(14),
@@ -578,9 +596,9 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                 children: [
                   Icon(Icons.image_outlined, size: 36, color: Colors.grey.shade400),
                   const SizedBox(height: 8),
-                  const Text('แตะเพื่ออัปโหลดสลิป', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text(loc.t('cpp_tap_to_upload_slip'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   const SizedBox(height: 4),
-                  Text('รองรับไฟล์ JPG, PNG', style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                  Text(loc.t('cpp_supported_files'), style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
                 ],
               )
             : Column(
@@ -593,7 +611,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
                   TextButton.icon(
                     onPressed: _pickSlip,
                     icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('เปลี่ยนรูป'),
+                    label: Text(loc.t('cpp_change_image_button')),
                   ),
                 ],
               ),
@@ -602,6 +620,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Widget _pendingView() {
+    final loc = AppLocale.instance;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -615,15 +634,15 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
             children: [
               const Icon(Icons.hourglass_top, size: 48, color: Color(0xffFF9800)),
               const SizedBox(height: 12),
-              const Text('รอการตรวจสอบจากอู่', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(loc.t('cpp_pending_review_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 6),
-              Text('อู่ ${widget.shopName} กำลังตรวจสอบสลิปการโอนเงินของคุณ',
+              Text(loc.t('cpp_pending_review_body').replaceAll('%s', widget.shopName),
                   textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 13)),
               if (_payment?['slip_photo'] != null) ...[
                 const SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(_payment!['slip_photo'].toString(), height: 160, fit: BoxFit.contain),
+                  child: NetImage(_payment!['slip_photo'].toString(), height: 160, fit: BoxFit.contain),
                 ),
               ],
             ],
@@ -634,6 +653,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Widget _confirmedView() {
+    final loc = AppLocale.instance;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -647,10 +667,10 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
             children: [
               const Icon(Icons.check_circle, size: 48, color: Color(0xff4CAF50)),
               const SizedBox(height: 12),
-              const Text('ชำระเงินเรียบร้อยแล้ว', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(loc.t('cpp_payment_success_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 6),
-              const Text('ตอนนี้คุณให้คะแนนอู่ได้แล้วที่หน้าประวัติคำขอซ่อม',
-                  textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 13)),
+              Text(loc.t('cpp_payment_success_body'),
+                  textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 13)),
             ],
           ),
         ),

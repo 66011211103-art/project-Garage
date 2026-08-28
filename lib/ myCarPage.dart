@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 /// ตัวเลือก "ประเภทรถ" ผูกกับรถแต่ละคัน (แทนที่การถามซ้ำทุกครั้งตอนส่งคำขอซ่อม)
 /// public ไว้เพราะ request_repair_page.dart เอาไปใช้ตอนเปิดฟอร์มเพิ่มรถแบบ inline ด้วย
 class VehicleTypeOption {
   final String value;
-  final String label;
+  final String labelKey;
   final IconData icon;
-  const VehicleTypeOption(this.value, this.label, this.icon);
+  const VehicleTypeOption(this.value, this.labelKey, this.icon);
+  String get label => AppLocale.instance.t(labelKey);
 }
 
 const List<VehicleTypeOption> kVehicleTypes = [
-  VehicleTypeOption('sedan', 'รถเก๋ง', Icons.directions_car),
-  VehicleTypeOption('suv', 'SUV', Icons.airport_shuttle),
-  VehicleTypeOption('pickup', 'กระบะ', Icons.local_shipping),
-  VehicleTypeOption('van', 'รถตู้', Icons.airport_shuttle),
-  VehicleTypeOption('motorcycle', 'มอเตอร์ไซค์', Icons.two_wheeler),
-  VehicleTypeOption('other', 'อื่นๆ', Icons.directions_car_filled),
+  VehicleTypeOption('sedan', 'tech_vehicle_sedan', Icons.directions_car),
+  VehicleTypeOption('suv', 'car_type_suv', Icons.airport_shuttle),
+  VehicleTypeOption('pickup', 'tech_vehicle_pickup', Icons.local_shipping),
+  VehicleTypeOption('van', 'car_type_van', Icons.airport_shuttle),
+  VehicleTypeOption('motorcycle', 'car_type_motorcycle', Icons.two_wheeler),
+  VehicleTypeOption('other', 'car_type_other', Icons.directions_car_filled),
 ];
 
 String vehicleTypeLabel(String? value) {
-  if (value == null || value.isEmpty) return 'ไม่ระบุประเภท';
+  if (value == null || value.isEmpty) return AppLocale.instance.t('car_type_unspecified');
   return kVehicleTypes
       .firstWhere((v) => v.value == value, orElse: () => kVehicleTypes.last)
       .label;
@@ -43,6 +45,17 @@ class _MyCarPageState extends State<MyCarPage> {
   void initState() {
     super.initState();
     _loadCars();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   // ✅ โหลดรายการรถทั้งหมดของผู้ใช้คนนี้
@@ -59,7 +72,7 @@ class _MyCarPageState extends State<MyCarPage> {
     } else {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'โหลดข้อมูลรถไม่สำเร็จ')),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('car_load_failed'))),
       );
     }
   }
@@ -89,16 +102,16 @@ class _MyCarPageState extends State<MyCarPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ลบรถคันนี้?'),
-        content: const Text('คุณต้องการลบข้อมูลรถคันนี้ใช่หรือไม่'),
+        title: Text(AppLocale.instance.t('car_delete_confirm_title')),
+        content: Text(AppLocale.instance.t('car_delete_confirm_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
+            child: Text(AppLocale.instance.t('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+            child: Text(AppLocale.instance.t('common_delete'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -111,7 +124,7 @@ class _MyCarPageState extends State<MyCarPage> {
         _loadCars();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'ลบรถไม่สำเร็จ')),
+          SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('car_delete_failed'))),
         );
       }
     }
@@ -119,17 +132,13 @@ class _MyCarPageState extends State<MyCarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
-        title: const Text('รถของฉัน'),
+        title: Text(loc.t('profile_my_cars')),
         backgroundColor: const Color(0xff2196F3),
         foregroundColor: Colors.white,
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xff2196F3),
-        onPressed: () => _openCarForm(),
-        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -153,12 +162,12 @@ class _MyCarPageState extends State<MyCarPage> {
         children: [
           const Icon(Icons.directions_car_outlined, size: 64, color: Colors.grey),
           const SizedBox(height: 12),
-          const Text('ยังไม่มีรถที่บันทึกไว้', style: TextStyle(color: Colors.grey)),
+          Text(AppLocale.instance.t('car_empty_state'), style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () => _openCarForm(),
             icon: const Icon(Icons.add),
-            label: const Text('เพิ่มรถของฉัน'),
+            label: Text(AppLocale.instance.t('car_add_button')),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xff2196F3),
               foregroundColor: Colors.white,
@@ -193,12 +202,12 @@ class _MyCarPageState extends State<MyCarPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  car['car_model'] ?? 'ไม่ระบุรุ่น',
+                  car['car_model'] ?? AppLocale.instance.t('car_model_unspecified'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  car['car_plate'] ?? 'ไม่ระบุทะเบียน',
+                  car['car_plate'] ?? AppLocale.instance.t('car_plate_unspecified'),
                   style: const TextStyle(color: Colors.grey),
                 ),
                 Padding(
@@ -240,9 +249,9 @@ class _MyCarPageState extends State<MyCarPage> {
                 _deleteCar(car['id']);
               }
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'edit', child: Text('แก้ไข')),
-              PopupMenuItem(value: 'delete', child: Text('ลบ')),
+            itemBuilder: (context) => [
+              PopupMenuItem(value: 'edit', child: Text(AppLocale.instance.t('common_edit'))),
+              PopupMenuItem(value: 'delete', child: Text(AppLocale.instance.t('common_delete'))),
             ],
           ),
         ],
@@ -279,6 +288,7 @@ class _CarFormSheetState extends State<CarFormSheet> {
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     final car = widget.existingCar;
     _modelCtrl = TextEditingController(text: car?['car_model'] ?? '');
     _plateCtrl = TextEditingController(text: car?['car_plate'] ?? '');
@@ -298,12 +308,17 @@ class _CarFormSheetState extends State<CarFormSheet> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _modelCtrl.dispose();
     _plateCtrl.dispose();
     _brandCtrl.dispose();
     _colorCtrl.dispose();
     _yearCtrl.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _save() async {
@@ -348,114 +363,297 @@ class _CarFormSheetState extends State<CarFormSheet> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'บันทึกข้อมูลไม่สำเร็จ')),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('common_save_failed'))),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
-        top: 20,
+        top: 12,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       child: SingleChildScrollView(
         child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _isEditing ? 'แก้ไขข้อมูลรถ' : 'เพิ่มรถของฉัน',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text('ประเภทรถ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: kVehicleTypes.map((v) {
-                final selected = _carType == v.value;
-                return ChoiceChip(
-                  label: Text(v.label),
-                  avatar: Icon(v.icon, size: 16, color: selected ? const Color(0xff2196F3) : Colors.grey.shade600),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _carType = v.value),
-                  selectedColor: const Color(0xffE3F2FD),
-                  backgroundColor: const Color(0xffF5F5F5),
-                  labelStyle: TextStyle(
-                    color: selected ? const Color(0xff2196F3) : Colors.black87,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                  side: BorderSide(color: selected ? const Color(0xff2196F3) : Colors.grey.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _modelCtrl,
-              decoration: const InputDecoration(labelText: 'รุ่นรถ', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณากรอกรุ่นรถ' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _plateCtrl,
-              decoration: const InputDecoration(labelText: 'ทะเบียนรถ', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณากรอกทะเบียนรถ' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _brandCtrl,
-              decoration: const InputDecoration(labelText: 'ยี่ห้อ (ถ้ามี)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _colorCtrl,
-                    decoration: const InputDecoration(labelText: 'สี', border: OutlineInputBorder()),
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _yearCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'ปี', border: OutlineInputBorder()),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isEditing ? loc.t('car_edit_title') : loc.t('car_add_button'),
+                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          loc.t('car_form_subtitle'),
+                          style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                      child: Icon(Icons.close, size: 18, color: Colors.grey.shade700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Text(loc.t('car_type_label'),
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              _vehicleTypeGrid(),
+              const SizedBox(height: 20),
+              _fieldLabel(loc.t('car_model_label'), required: true),
+              const SizedBox(height: 8),
+              _carTextField(
+                controller: _modelCtrl,
+                hint: loc.t('car_model_hint'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? loc.t('car_model_required') : null,
+              ),
+              const SizedBox(height: 16),
+              _fieldLabel(loc.t('car_plate_label'), required: true),
+              const SizedBox(height: 8),
+              _carTextField(
+                controller: _plateCtrl,
+                hint: loc.t('car_plate_hint'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? loc.t('car_plate_required') : null,
+              ),
+              const SizedBox(height: 16),
+              _fieldLabel(loc.t('car_brand_label')),
+              const SizedBox(height: 8),
+              _carTextField(controller: _brandCtrl, hint: loc.t('car_brand_hint')),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _fieldLabel(loc.t('car_color_label')),
+                        const SizedBox(height: 8),
+                        _carTextField(controller: _colorCtrl, hint: loc.t('car_color_hint')),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _fieldLabel(loc.t('car_year_label')),
+                        const SizedBox(height: 8),
+                        _carTextField(
+                          controller: _yearCtrl,
+                          hint: loc.t('car_year_hint'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [Color(0xff42A5F5), Color(0xff1976D2)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xff2196F3).withOpacity(0.35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _isSaving ? null : _save,
+                      child: Center(
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _isEditing ? loc.t('car_save_edit_button') : loc.t('car_add_short_button'),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String text, {bool required = false}) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Colors.black87),
+        children: [
+          TextSpan(text: text),
+          if (required)
+            const TextSpan(text: ' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _carTextField({
+    required TextEditingController controller,
+    required String hint,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey.shade400),
+        filled: true,
+        fillColor: const Color(0xFFF5F6FA),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red, width: 1.2),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red, width: 1.6),
+        ),
+      ),
+    );
+  }
+
+  Widget _vehicleTypeGrid() {
+    final rows = <Widget>[];
+    for (int i = 0; i < kVehicleTypes.length; i += 3) {
+      final rowItems = kVehicleTypes.skip(i).take(3).toList();
+      rows.add(Row(
+        children: [
+          for (int j = 0; j < rowItems.length; j++) ...[
+            Expanded(child: _vehicleTypeCard(rowItems[j])),
+            if (j != rowItems.length - 1) const SizedBox(width: 10),
+          ],
+        ],
+      ));
+      if (i + 3 < kVehicleTypes.length) rows.add(const SizedBox(height: 10));
+    }
+    return Column(children: rows);
+  }
+
+  Widget _vehicleTypeCard(VehicleTypeOption v) {
+    final selected = _carType == v.value;
+    return GestureDetector(
+      onTap: () => setState(() => _carType = v.value),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: selected ? const Color(0xffE3F2FD) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? const Color(0xff2196F3) : Colors.grey.shade200,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(v.icon, color: selected ? const Color(0xff2196F3) : Colors.grey.shade600, size: 24),
+                const SizedBox(height: 6),
+                Text(
+                  v.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? const Color(0xff2196F3) : Colors.black87,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff2196F3),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : Text(_isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มรถ'),
+          ),
+          if (selected)
+            Positioned(
+              top: -6,
+              right: -6,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(color: Color(0xff2196F3), shape: BoxShape.circle),
+                child: const Icon(Icons.check, color: Colors.white, size: 12),
               ),
             ),
-          ],
-        ),
-        ),
+        ],
       ),
     );
   }

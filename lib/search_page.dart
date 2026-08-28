@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'api_service.dart';
 import 'garage_detail_page.dart'; // ✅ หน้ารายละเอียดอู่
 import 'location_service.dart'; // ✅ ขอ permission + ดึงตำแหน่งปัจจุบันจริงจาก GPS
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 /// หมวดบริการที่ใช้กรอง ตรงกับที่อู่เลือกไว้ในหน้าแก้ไขข้อมูลอู่
 const List<String> kSearchServiceFilters = [
@@ -34,6 +35,25 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
+// ✅ ป้ายแสดงผลของหมวดบริการ — ค่าจริงที่ใช้กรอง/ส่งให้ backend ยังเป็นภาษาไทยเดิม
+// เสมอ (ต้องตรงกับ services ที่อู่ตั้งไว้ในระบบ) ฟังก์ชันนี้แค่แปล "ข้อความที่แสดง"
+// เท่านั้น ไม่กระทบค่าที่ใช้เปรียบเทียบ/ส่ง API เลย
+String _serviceDisplayLabel(String service) {
+  const keyMap = {
+    'ทั้งหมด': 'svc_all',
+    'เครื่องยนต์': 'cat_engine',
+    'ยาง': 'cat_tires',
+    'แบตเตอรี่': 'cat_battery',
+    'ซ่อมสี': 'cat_paint',
+    'เบรก': 'svc_brakes',
+    'ช่วงล่าง': 'svc_suspension',
+    'ตัวถัง': 'svc_body',
+    'ระบบไฟ': 'svc_electrical',
+  };
+  final key = keyMap[service];
+  return key != null ? AppLocale.instance.t(key) : service;
+}
+
 class _SearchPageState extends State<SearchPage> {
   final _searchController = TextEditingController();
 
@@ -59,6 +79,7 @@ class _SearchPageState extends State<SearchPage> {
     }
     _requestLocation();
     _fetchGarages();
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   Future<void> _requestLocation() async {
@@ -86,8 +107,13 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchGarages() async {
@@ -170,12 +196,13 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final results = _filteredResults;
+    final loc = AppLocale.instance;
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ค้นหาอู่ซ่อมรถ', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('search_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -189,7 +216,7 @@ class _SearchPageState extends State<SearchPage> {
               controller: _searchController,
               onSubmitted: (_) => _fetchGarages(),
               decoration: InputDecoration(
-                hintText: 'ค้นหาชื่ออู่ หรืออาการรถ เช่น "ยางรั่ว"',
+                hintText: loc.t('search_hint_detailed'),
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -214,13 +241,13 @@ class _SearchPageState extends State<SearchPage> {
                 margin: const EdgeInsets.only(bottom: 14),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(12)),
-                child: const Row(
+                child: Row(
                   children: [
-                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text('กำลังขอสิทธิ์เข้าถึงตำแหน่ง เพื่อหาอู่ที่ใกล้คุณที่สุด...',
-                          style: TextStyle(color: Color(0xff2196F3), fontSize: 12.5)),
+                      child: Text(loc.t('search_requesting_location'),
+                          style: const TextStyle(color: Color(0xff2196F3), fontSize: 12.5)),
                     ),
                   ],
                 ),
@@ -235,98 +262,140 @@ class _SearchPageState extends State<SearchPage> {
                     const Icon(Icons.location_off, size: 16, color: Color(0xffE65100)),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('$_locationError — ระยะทางที่แสดงอาจไม่ตรงกับตำแหน่งปัจจุบัน',
+                      child: Text('$_locationError${loc.t('search_location_error_suffix')}',
                           style: const TextStyle(color: Color(0xffE65100), fontSize: 12)),
                     ),
                     TextButton(
                       onPressed: _requestLocation,
                       style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                      child: const Text('ลองอีกครั้ง', style: TextStyle(fontSize: 12)),
+                      child: Text(loc.t('common_retry'), style: const TextStyle(fontSize: 12)),
                     ),
                   ],
                 ),
               ),
 
-            const Text('กรองผลการค้นหา',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.tune, size: 18, color: Color(0xff2196F3)),
+                      const SizedBox(width: 8),
+                      Text(loc.t('search_filter_heading'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-            const Text('ประเภทการซ่อม', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: kSearchServiceFilters.map((service) {
-                  final selected = _selectedService == service;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(service),
-                      selected: selected,
-                      onSelected: (_) => _onServiceTap(service),
-                      selectedColor: const Color(0xffE3F2FD),
-                      labelStyle: TextStyle(
-                        color: selected ? const Color(0xff2196F3) : Colors.black87,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      side: BorderSide(
-                        color: selected ? const Color(0xff2196F3) : Colors.grey.shade300,
-                      ),
-                      backgroundColor: Colors.white,
+                  Text(loc.t('search_filter_service'),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: kSearchServiceFilters.map((service) {
+                        final selected = _selectedService == service;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(_serviceDisplayLabel(service)),
+                            selected: selected,
+                            showCheckmark: false,
+                            onSelected: (_) => _onServiceTap(service),
+                            selectedColor: const Color(0xffE3F2FD),
+                            labelStyle: TextStyle(
+                              color: selected ? const Color(0xff2196F3) : Colors.black87,
+                              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                              fontSize: 13,
+                            ),
+                            shape: StadiumBorder(
+                              side: BorderSide(
+                                color: selected ? const Color(0xff2196F3) : Colors.grey.shade300,
+                              ),
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                        );
+                      }).toList(),
                     ),
-                  );
-                }).toList(),
+                  ),
+
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: Colors.grey.shade100),
+                  const SizedBox(height: 14),
+
+                  Text(loc.t('search_filter_distance'),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: kSearchDistanceFilters.map((distance) {
+                      final selected = _selectedDistance == distance;
+                      return ChoiceChip(
+                        label: Text(distance == null ? loc.t('svc_all') : '$distance ${loc.t('dash_km_unit')}'),
+                        selected: selected,
+                        showCheckmark: false,
+                        onSelected: (_) => setState(() => _selectedDistance = distance),
+                        selectedColor: const Color(0xffE3F2FD),
+                        labelStyle: TextStyle(
+                          color: selected ? const Color(0xff2196F3) : Colors.black87,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                        shape: StadiumBorder(
+                          side: BorderSide(
+                            color: selected ? const Color(0xff2196F3) : Colors.grey.shade300,
+                          ),
+                        ),
+                        backgroundColor: Colors.white,
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: Colors.grey.shade100),
+                  const SizedBox(height: 14),
+
+                  Text(loc.t('search_filter_rating'),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: kSearchRatingFilters.map((rating) {
+                      final selected = _selectedRating == rating;
+                      return ChoiceChip(
+                        label: Text(rating == null ? loc.t('svc_all') : '$rating+'),
+                        selected: selected,
+                        showCheckmark: false,
+                        onSelected: (_) => setState(() => _selectedRating = rating),
+                        selectedColor: const Color(0xffE3F2FD),
+                        labelStyle: TextStyle(
+                          color: selected ? const Color(0xff2196F3) : Colors.black87,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                        shape: StadiumBorder(
+                          side: BorderSide(color: selected ? const Color(0xff2196F3) : Colors.grey.shade300),
+                        ),
+                        backgroundColor: Colors.white,
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 16),
-            const Text('ระยะทาง', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            Row(
-              children: kSearchDistanceFilters.map((distance) {
-                final selected = _selectedDistance == distance;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(distance == null ? 'ทั้งหมด' : '$distance กม.'),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _selectedDistance = distance),
-                    selectedColor: const Color(0xffE3F2FD),
-                    labelStyle: TextStyle(
-                      color: selected ? const Color(0xff2196F3) : Colors.black87,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                    side: BorderSide(
-                      color: selected ? const Color(0xff2196F3) : Colors.grey.shade300,
-                    ),
-                    backgroundColor: Colors.white,
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 16),
-            const Text('คะแนนรีวิว', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            Row(
-              children: kSearchRatingFilters.map((rating) {
-                final selected = _selectedRating == rating;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(rating == null ? 'ทั้งหมด' : '$rating+'),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _selectedRating = rating),
-                    selectedColor: const Color(0xffE3F2FD),
-                    labelStyle: TextStyle(color: selected ? const Color(0xff2196F3) : Colors.black87),
-                    side: BorderSide(color: selected ? const Color(0xff2196F3) : Colors.grey.shade300),
-                    backgroundColor: Colors.white,
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             if (_isLoading)
               const Padding(
@@ -334,19 +403,30 @@ class _SearchPageState extends State<SearchPage> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else ...[
-              Text('พบ ${results.length} อู่ซ่อมรถ',
-                  style: const TextStyle(fontSize: 15, color: Colors.grey)),
-              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.storefront_outlined, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text(loc.t('search_found_count').replaceAll('%s', '${results.length}'),
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 14),
               if (results.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  padding: const EdgeInsets.symmetric(vertical: 30),
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 8),
-                        const Text('ไม่พบอู่ซ่อมรถที่ตรงกับเงื่อนไข',
-                            style: TextStyle(color: Colors.grey)),
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: const BoxDecoration(color: Color(0xffE3F2FD), shape: BoxShape.circle),
+                          child: Icon(Icons.search_off, size: 38, color: Colors.grey.shade500),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(loc.t('search_no_results'),
+                            style: const TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -382,13 +462,17 @@ class _SearchGarageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatar = garage['avatar']?.toString();
-    final name = garage['shop_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+    final loc = AppLocale.instance;
+    final name = garage['shop_name']?.toString() ?? loc.t('profile_shop_fallback');
     final rating = (garage['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = (garage['review_count'] as num?)?.toInt() ?? 0;
 
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 14, offset: const Offset(0, 4))],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -416,7 +500,7 @@ class _SearchGarageCard extends StatelessWidget {
                             children: [
                               Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey.shade400),
                               const SizedBox(height: 6),
-                              Text('โหลดรูปไม่สำเร็จ',
+                              Text(loc.t('search_image_load_failed'),
                                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
                             ],
                           ),
@@ -452,7 +536,7 @@ class _SearchGarageCard extends StatelessWidget {
                 if (reviewCount > 0) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: const Color(0xffFFF8E1),
                       borderRadius: BorderRadius.circular(20),
@@ -460,7 +544,7 @@ class _SearchGarageCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star, size: 14, color: Color(0xffFFC107)),
+                        const Icon(Icons.star_rounded, size: 15, color: Color(0xffFFC107)),
                         const SizedBox(width: 3),
                         Text(rating.toStringAsFixed(1),
                             style: const TextStyle(
@@ -474,25 +558,28 @@ class _SearchGarageCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                Icon(Icons.location_on, size: 16, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
-                  distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} กม.' : 'ไม่ทราบระยะทาง',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} ${loc.t('dash_km_unit')}' : loc.t('search_unknown_distance'),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                 ),
                 if (reviewCount > 0) ...[
-                  const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.circle, size: 3, color: Colors.grey.shade400),
+                  ),
                   Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey.shade500),
                   const SizedBox(width: 4),
-                  Text('$reviewCount รีวิว',
-                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                  Text(loc.t('search_reviews_count').replaceAll('%s', '$reviewCount'),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                 ],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -501,12 +588,15 @@ class _SearchGarageCard extends StatelessWidget {
                     ),
                   );
                 },
+                icon: const Icon(Icons.arrow_forward, size: 16, color: Colors.white),
+                label: Text(loc.t('garage_view_details'),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xff2196F3),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
-                child: const Text('ดูรายละเอียด', style: TextStyle(color: Colors.white)),
               ),
             ),
           ],

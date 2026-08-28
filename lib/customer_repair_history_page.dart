@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'repair_request_detail_page.dart';
+import 'app_locale.dart';
 
 class CustomerRepairHistoryPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -28,6 +29,17 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
   void initState() {
     super.initState();
     _fetchJobs();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchJobs() async {
@@ -67,11 +79,12 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
       grouped.putIfAbsent(key, () => []).add(job);
     }
 
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ประวัติการซ่อมรถ', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('crh_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -101,7 +114,7 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
                           children: [
                             Text('${_jobs.length}',
                                 style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-                            const Text('ครั้ง', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text(loc.t('crh_count_unit'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                           ],
                         ),
                         Column(
@@ -109,7 +122,7 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
                           children: [
                             Text('฿${_totalSpent.toStringAsFixed(0)}',
                                 style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-                            const Text('ค่าใช้จ่ายทั้งหมด', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text(loc.t('crh_total_spent_label'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                           ],
                         ),
                       ],
@@ -117,14 +130,14 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
                   ),
 
                   const SizedBox(height: 20),
-                  const Text('รายการทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  Text(loc.t('crh_all_items_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
                   const SizedBox(height: 12),
 
                   if (_jobs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 60),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 60),
                       child: Center(
-                        child: Text('ยังไม่มีประวัติการซ่อมที่เสร็จแล้ว', style: TextStyle(color: Colors.grey)),
+                        child: Text(loc.t('crh_empty_state'), style: const TextStyle(color: Colors.grey)),
                       ),
                     )
                   else
@@ -150,7 +163,8 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
   }
 
   Widget _jobCard(Map<String, dynamic> job) {
-    final shopName = job['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
+    final loc = AppLocale.instance;
+    final shopName = job['shop_name']?.toString() ?? loc.t('myreq_shop_name_fallback');
     final garageAvatar = job['garage_avatar']?.toString();
     final amount = double.tryParse(job['payment_amount']?.toString() ?? '0') ?? 0;
 
@@ -202,8 +216,8 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(color: const Color(0xffE8F5E9), borderRadius: BorderRadius.circular(20)),
-                child: const Text('ซ่อมเสร็จแล้ว',
-                    style: TextStyle(color: Color(0xff4CAF50), fontSize: 11, fontWeight: FontWeight.w600)),
+                child: Text(loc.t('tech_status_completed'),
+                    style: const TextStyle(color: Color(0xff4CAF50), fontSize: 11, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -218,7 +232,7 @@ class _CustomerRepairHistoryPageState extends State<CustomerRepairHistoryPage> {
                 );
               },
               icon: const Icon(Icons.arrow_forward, size: 15),
-              label: const Text('ดูรายละเอียด'),
+              label: Text(loc.t('garage_view_details')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xff2196F3),
                 side: const BorderSide(color: Color(0xff2196F3)),

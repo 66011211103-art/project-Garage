@@ -12,6 +12,8 @@
 import 'package:flutter/material.dart';
 import 'quotation_card.dart'; // ✅ การ์ดใบเสนอราคา (ยืนยัน/ปฏิเสธ)
 import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 const List<String> _detailThaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -30,19 +32,20 @@ class RepairRequestDetailPage extends StatelessWidget {
   String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'pending':
-        return 'รอดำเนินการ';
+        return loc.t('myreq_status_pending');
       case 'accepted':
-        return 'อู่รับงานแล้ว';
+        return loc.t('myreq_status_accepted');
       case 'quoted':
-        return 'มีใบเสนอราคาใหม่';
+        return loc.t('myreq_status_quoted');
       case 'confirmed':
-        return 'ยืนยันแล้ว กำลังซ่อม';
+        return loc.t('rrd_status_confirmed');
       case 'rejected':
-        return 'อู่ปฏิเสธ';
+        return loc.t('myreq_status_rejected');
       case 'done':
-        return 'เสร็จสิ้น';
+        return loc.t('myreq_status_done');
       default:
         return status;
     }
@@ -99,17 +102,21 @@ class RepairRequestDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = request['status']?.toString() ?? 'pending';
-    final shopName = request['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
-    final photos = (request['photos'] is List) ? List<dynamic>.from(request['photos']) : [];
-    final hasQuotation = status == 'quoted' || status == 'confirmed' || status == 'rejected';
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        final loc = AppLocale.instance;
+        final status = request['status']?.toString() ?? 'pending';
+        final shopName = request['shop_name']?.toString() ?? loc.t('myreq_shop_name_fallback');
+        final photos = (request['photos'] is List) ? List<dynamic>.from(request['photos']) : [];
+        final hasQuotation = status == 'quoted' || status == 'confirmed' || status == 'rejected';
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: const Color(0xffF5F6FA),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('รายละเอียดคำขอซ่อม',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(loc.t('rrd_page_title'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -172,13 +179,13 @@ class RepairRequestDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow(Icons.directions_car_outlined, 'ประเภทรถ',
+                _infoRow(Icons.directions_car_outlined, loc.t('car_type_label'),
                     _vehicleLabel(request['vehicle_type']?.toString())),
                 const Divider(height: 20),
-                _infoRow(Icons.build_outlined, 'ประเภทปัญหา',
+                _infoRow(Icons.build_outlined, loc.t('req_problem_section_title'),
                     request['problem_category']?.toString() ?? '-'),
                 const Divider(height: 20),
-                _infoRow(Icons.call_outlined, 'เบอร์อู่', request['garage_phone']?.toString() ?? '-'),
+                _infoRow(Icons.call_outlined, loc.t('crd_label_shop_phone'), request['garage_phone']?.toString() ?? '-'),
               ],
             ),
           ),
@@ -190,13 +197,13 @@ class RepairRequestDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('รายละเอียดที่แจ้ง',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                Text(loc.t('rrd_reported_details_title'),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                 const SizedBox(height: 8),
                 Text(
                   request['description']?.toString().isNotEmpty == true
                       ? request['description'].toString()
-                      : 'ไม่มีรายละเอียดเพิ่มเติม',
+                      : loc.t('crd_no_description'),
                   style: const TextStyle(fontSize: 14, height: 1.5),
                 ),
               ],
@@ -216,7 +223,7 @@ class RepairRequestDetailPage extends StatelessWidget {
                   child: Text(
                     request['address']?.toString().isNotEmpty == true
                         ? request['address'].toString()
-                        : 'ไม่ระบุที่อยู่',
+                        : loc.t('crd_no_address'),
                     style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                   ),
                 ),
@@ -231,8 +238,8 @@ class RepairRequestDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('รูปภาพประกอบ',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                  Text(loc.t('crd_photos_title'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 96,
@@ -242,7 +249,7 @@ class RepairRequestDetailPage extends StatelessWidget {
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
                       itemBuilder: (context, i) => ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.network(photos[i].toString(),
+                        child: NetImage(photos[i].toString(),
                             width: 96, height: 96, fit: BoxFit.cover),
                       ),
                     ),
@@ -266,8 +273,8 @@ class RepairRequestDetailPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('เหตุผลที่อู่ปฏิเสธ',
-                            style: TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(loc.t('rrd_rejection_reason_title'),
+                            style: const TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 4),
                         Text(request['rejection_reason'].toString(),
                             style: const TextStyle(color: Color(0xffE53935), fontSize: 13)),
@@ -282,9 +289,9 @@ class RepairRequestDetailPage extends StatelessWidget {
           // ---------- ใบเสนอราคา (ถ้ามี) ----------
           if (hasQuotation) ...[
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: Text('ใบเสนอราคา', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(loc.t('rrd_quotation_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ),
             QuotationCard(
               repairRequestId: request['id'],
@@ -296,6 +303,8 @@ class RepairRequestDetailPage extends StatelessWidget {
           const SizedBox(height: 20),
         ],
       ),
+    );
+      },
     );
   }
 

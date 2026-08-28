@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'reset_password_page.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -15,7 +16,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _emailController.dispose();
     super.dispose();
   }
@@ -54,13 +66,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF2F4F7),
         elevation: 0,
         foregroundColor: Colors.black,
-        title: const Text('ลืมรหัสผ่าน'),
+        title: Text(loc.t('forgot_pw_title')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -69,12 +82,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               const SizedBox(height: 20),
               const Icon(Icons.lock_reset, size: 70, color: Colors.blue),
               const SizedBox(height: 16),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 30),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Text(
-                  'กรอกอีเมลที่ใช้สมัครสมาชิก\nเราจะส่งรหัส OTP ไปให้ทางอีเมล',
+                  loc.t('forgot_pw_instructions'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ),
               const SizedBox(height: 30),
@@ -97,7 +110,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('อีเมล'),
+                      Text(loc.t('auth_email_label')),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _emailController,
@@ -114,10 +127,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'กรุณากรอกอีเมล';
+                            return loc.t('auth_email_required');
                           }
                           if (!value.contains('@')) {
-                            return 'อีเมลไม่ถูกต้อง';
+                            return loc.t('auth_email_invalid');
                           }
                           return null;
                         },
@@ -143,9 +156,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                     strokeWidth: 2.5,
                                   ),
                                 )
-                              : const Text(
-                                  'ส่งรหัส OTP',
-                                  style: TextStyle(
+                              : Text(
+                                  loc.t('forgot_pw_send_otp'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     color: Colors.white,
                                   ),

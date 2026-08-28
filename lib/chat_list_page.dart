@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'chat_screen.dart';
+import 'app_locale.dart';
 
 class ChatListPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -31,12 +32,18 @@ class _ChatListPageState extends State<ChatListPage> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    AppLocale.instance.removeListener(_onLocaleChanged);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   List<Map<String, dynamic>> get _filteredConversations {
@@ -64,14 +71,15 @@ class _ChatListPageState extends State<ChatListPage> {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inDays >= 1) return '${diff.inDays} วันที่แล้ว';
-    if (diff.inHours >= 1) return '${diff.inHours} ชม.ที่แล้ว';
-    if (diff.inMinutes >= 1) return '${diff.inMinutes} นาทีที่แล้ว';
-    return 'เมื่อสักครู่';
+    if (diff.inDays >= 1) return AppLocale.instance.t('garage_time_days_ago').replaceAll('%s', '${diff.inDays}');
+    if (diff.inHours >= 1) return AppLocale.instance.t('cl_hours_ago').replaceAll('%s', '${diff.inHours}');
+    if (diff.inMinutes >= 1) return AppLocale.instance.t('garage_time_minutes_ago').replaceAll('%s', '${diff.inMinutes}');
+    return AppLocale.instance.t('garage_time_just_now');
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       body: SafeArea(
@@ -80,16 +88,16 @@ class _ChatListPageState extends State<ChatListPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text('แชท', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(loc.t('cl_page_title'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'ค้นหาแชท',
+                    hintText: loc.t('cl_search_hint'),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     filled: true,
                     fillColor: Colors.white,
@@ -106,18 +114,18 @@ class _ChatListPageState extends State<ChatListPage> {
                     ? const Center(child: CircularProgressIndicator())
                     : _conversations.isEmpty
                         ? ListView(
-                            children: const [
+                            children: [
                               Padding(
-                                padding: EdgeInsets.symmetric(vertical: 80),
+                                padding: const EdgeInsets.symmetric(vertical: 80),
                                 child: Center(
-                                  child: Text('ยังไม่มีบทสนทนา\nแชทกับอู่ได้จากหน้ารายละเอียดคำขอซ่อม',
-                                      textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                                  child: Text(loc.t('cl_empty_state'),
+                                      textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
                                 ),
                               ),
                             ],
                           )
                         : _filteredConversations.isEmpty
-                            ? const Center(child: Text('ไม่พบแชทที่ค้นหา', style: TextStyle(color: Colors.grey)))
+                            ? Center(child: Text(loc.t('cl_no_search_results'), style: const TextStyle(color: Colors.grey)))
                             : ListView.separated(
                                 itemCount: _filteredConversations.length,
                                 separatorBuilder: (_, __) => const Divider(height: 1, indent: 84),
@@ -137,7 +145,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                             conversationId: c['id'],
                                             myId: widget.userData['id'],
                                             myType: 'customer',
-                                            otherPartyName: c['shop_name']?.toString() ?? 'อู่ซ่อมรถ',
+                                            otherPartyName: c['shop_name']?.toString() ?? loc.t('profile_type_repair'),
                                             otherPartyAvatar: c['garage_avatar']?.toString(),
                                           ),
                                         ),
@@ -172,7 +180,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text(c['shop_name']?.toString() ?? 'อู่ซ่อมรถ',
+                                                Text(c['shop_name']?.toString() ?? loc.t('profile_type_repair'),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                     style: TextStyle(
@@ -181,7 +189,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                                     )),
                                                 const SizedBox(height: 2),
                                                 Text(
-                                                  lastMessage.isNotEmpty ? lastMessage : (hasImage ? '📷 รูปภาพ' : 'เริ่มการสนทนา'),
+                                                  lastMessage.isNotEmpty ? lastMessage : (hasImage ? loc.t('cl_photo_placeholder') : loc.t('cl_start_conversation')),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(

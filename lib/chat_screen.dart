@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
 import 'socket_notification_service.dart';
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class ChatScreen extends StatefulWidget {
   final int conversationId;
@@ -49,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _fetchMessages();
     // ✅ ฟังข้อความใหม่แบบ real-time จาก socket ตัวเดียวกับระบบแจ้งเตือน
     SocketNotificationService.socket?.on('chat_message', _onIncomingMessage);
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
@@ -56,7 +59,12 @@ class _ChatScreenState extends State<ChatScreen> {
     SocketNotificationService.socket?.off('chat_message', _onIncomingMessage);
     _messageController.dispose();
     _scrollController.dispose();
+    AppLocale.instance.removeListener(_onLocaleChanged);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onIncomingMessage(dynamic data) {
@@ -153,15 +161,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _dayLabel(DateTime dt) {
     final now = DateTime.now();
-    if (_isSameDay(dt, now)) return 'วันนี้';
+    if (_isSameDay(dt, now)) return AppLocale.instance.t('cs_today');
     final yesterday = now.subtract(const Duration(days: 1));
-    if (_isSameDay(dt, yesterday)) return 'เมื่อวาน';
+    if (_isSameDay(dt, yesterday)) return AppLocale.instance.t('cs_yesterday');
     final buddhistYear2Digit = (dt.year + 543) % 100;
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
@@ -205,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
-                    ? const Center(child: Text('ยังไม่มีข้อความ เริ่มทักทายกันได้เลย', style: TextStyle(color: Colors.grey)))
+                    ? Center(child: Text(loc.t('cs_empty_state'), style: const TextStyle(color: Colors.grey)))
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
@@ -247,7 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     if (m['image'] != null) ...[
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(14),
-                                        child: Image.network(m['image'].toString(),
+                                        child: NetImage(m['image'].toString(),
                                             width: 200, fit: BoxFit.cover),
                                       ),
                                       const SizedBox(height: 4),
@@ -288,7 +297,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Image.memory(_pendingImage!, width: 56, height: 56, fit: BoxFit.cover),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(child: Text('พร้อมส่งรูปภาพ', style: TextStyle(fontSize: 13, color: Colors.grey))),
+                  Expanded(child: Text(loc.t('cs_ready_to_send_image'), style: const TextStyle(fontSize: 13, color: Colors.grey))),
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () => setState(() {
@@ -315,7 +324,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: _messageController,
                       decoration: InputDecoration(
-                        hintText: 'พิมพ์ข้อความ...',
+                        hintText: loc.t('cs_message_hint'),
                         filled: true,
                         fillColor: const Color(0xffF5F5F5),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

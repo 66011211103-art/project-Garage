@@ -18,6 +18,8 @@ import 'review_card.dart';
 import 'repair_tracking_page.dart';
 import 'chat_screen.dart';
 import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class CustomerRequestDetailPage extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -40,6 +42,17 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
   void initState() {
     super.initState();
     _request = widget.request;
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   // ✅ ดึงคำขอซ่อมนี้ตัวล่าสุดใหม่ทั้งก้อน (สถานะอาจเปลี่ยนหลังลูกค้ายืนยัน
@@ -62,36 +75,37 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
   }
 
   String get _status => _request['status']?.toString() ?? 'pending';
-  String get _shopName => _request['shop_name']?.toString() ?? 'ไม่ระบุชื่ออู่';
+  String get _shopName => _request['shop_name']?.toString() ?? AppLocale.instance.t('myreq_shop_name_fallback');
 
   // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย (ของเดิมรองรับแค่
   // sedan/suv/pickup แล้ว fallback เป็น "ไม่ระบุ" ทั้งที่มีข้อมูลจริง)
   String _vehicleLabel(String? value) => vehicleTypeLabel(value);
 
   String _statusLabel(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'pending':
-        return 'รอดำเนินการ';
+        return loc.t('myreq_status_pending');
       case 'accepted':
-        return 'อู่รับงานแล้ว';
+        return loc.t('myreq_status_accepted');
       case 'quoted':
-        return 'มีใบเสนอราคาใหม่';
+        return loc.t('myreq_status_quoted');
       case 'confirmed':
-        return 'ยืนยันแล้ว รอมอบหมายช่าง';
+        return loc.t('myreq_status_confirmed');
       case 'assigned':
-        return 'มอบหมายช่างแล้ว';
+        return loc.t('myreq_status_assigned');
       case 'checking':
-        return 'ช่างกำลังเดินทาง';
+        return loc.t('dash_status_checking');
       case 'in_progress':
-        return 'กำลังซ่อม';
+        return loc.t('dash_status_in_progress');
       case 'waiting_parts':
-        return 'รอรับอะไหล่';
+        return loc.t('dash_status_waiting_parts');
       case 'completed':
-        return 'ซ่อมเสร็จแล้ว';
+        return loc.t('tech_status_completed');
       case 'rejected':
-        return 'อู่ปฏิเสธ';
+        return loc.t('myreq_status_rejected');
       case 'done':
-        return 'เสร็จสิ้น';
+        return loc.t('myreq_status_done');
       default:
         return status;
     }
@@ -163,8 +177,9 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
     ];
     final buddhistYear2Digit = (dt.year + 543) % 100;
+    final timeSuffix = AppLocale.instance.isThai ? ' น.' : '';
     return '${dt.day} ${months[dt.month - 1]} ${buddhistYear2Digit.toString().padLeft(2, '0')}, '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}$timeSuffix';
   }
 
   Future<void> _openChat() async {
@@ -175,7 +190,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
     if (!mounted) return;
     if (!result.success || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message.isNotEmpty ? result.message : 'เปิดแชทไม่สำเร็จ'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result.message.isNotEmpty ? result.message : AppLocale.instance.t('gd_chat_open_failed')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -195,6 +210,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final photos = (_request['photos'] is List) ? List<dynamic>.from(_request['photos']) : [];
 
     return PopScope(
@@ -215,7 +231,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
             IconButton(
               icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
               onPressed: _openChat,
-              tooltip: 'แชทกับอู่',
+              tooltip: loc.t('crd_chat_tooltip'),
             ),
           ],
           elevation: 0,
@@ -254,15 +270,15 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _infoRow(Icons.store_outlined, 'อู่ซ่อม', _shopName),
+                    _infoRow(Icons.store_outlined, loc.t('crd_label_shop'), _shopName),
                     const Divider(height: 20),
-                    _infoRow(Icons.phone_outlined, 'เบอร์อู่', _request['garage_phone']?.toString() ?? '-'),
+                    _infoRow(Icons.phone_outlined, loc.t('crd_label_shop_phone'), _request['garage_phone']?.toString() ?? '-'),
                     const Divider(height: 20),
-                    _infoRow(Icons.directions_car_outlined, 'ประเภทรถ', _vehicleLabel(_request['vehicle_type']?.toString())),
+                    _infoRow(Icons.directions_car_outlined, loc.t('car_type_label'), _vehicleLabel(_request['vehicle_type']?.toString())),
                     const Divider(height: 20),
-                    _infoRow(Icons.build_outlined, 'ประเภทปัญหา', _request['problem_category']?.toString() ?? '-'),
+                    _infoRow(Icons.build_outlined, loc.t('req_problem_section_title'), _request['problem_category']?.toString() ?? '-'),
                     const Divider(height: 20),
-                    _infoRow(Icons.event_outlined, 'วันที่แจ้งซ่อม', _formatDateTime(_request['created_at']?.toString())),
+                    _infoRow(Icons.event_outlined, loc.t('crd_label_request_date'), _formatDateTime(_request['created_at']?.toString())),
                   ],
                 ),
               ),
@@ -274,13 +290,13 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('รายละเอียดที่แจ้งไป',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                    Text(loc.t('crd_reported_details_title'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                     const SizedBox(height: 8),
                     Text(
                       _request['description']?.toString().isNotEmpty == true
                           ? _request['description'].toString()
-                          : 'ไม่มีรายละเอียดเพิ่มเติม',
+                          : loc.t('crd_no_description'),
                       style: const TextStyle(fontSize: 14, height: 1.5),
                     ),
                   ],
@@ -298,7 +314,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _request['address']?.toString().isNotEmpty == true ? _request['address'].toString() : 'ไม่ระบุที่อยู่',
+                        _request['address']?.toString().isNotEmpty == true ? _request['address'].toString() : loc.t('crd_no_address'),
                         style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                       ),
                     ),
@@ -313,8 +329,8 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('รูปภาพประกอบ',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      Text(loc.t('crd_photos_title'),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
                       const SizedBox(height: 10),
                       SizedBox(
                         height: 96,
@@ -326,7 +342,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                             borderRadius: BorderRadius.circular(10),
                             child: GestureDetector(
                               onTap: () => _viewPhoto(photos[i].toString()),
-                              child: Image.network(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
+                              child: NetImage(photos[i].toString(), width: 96, height: 96, fit: BoxFit.cover),
                             ),
                           ),
                         ),
@@ -346,7 +362,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                       const Icon(Icons.cancel_outlined, size: 18, color: Color(0xffE53935)),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('เหตุผลที่อู่ปฏิเสธ: ${_request['rejection_reason']}',
+                        child: Text(loc.t('crd_rejection_reason_prefix').replaceAll('%s', '${_request['rejection_reason']}'),
                             style: const TextStyle(color: Color(0xffE53935), fontSize: 13)),
                       ),
                     ],
@@ -373,7 +389,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
                       MaterialPageRoute(builder: (context) => RepairTrackingPage(job: _request, isCustomerView: true)),
                     ),
                     icon: const Icon(Icons.timeline, size: 16),
-                    label: const Text('ติดตามสถานะการซ่อม'),
+                    label: Text(loc.t('myreq_track_status_button')),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xff2196F3),
                       side: const BorderSide(color: Color(0xff2196F3)),
@@ -431,7 +447,7 @@ class _CustomerRequestDetailPageState extends State<CustomerRequestDetailPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: InteractiveViewer(child: Image.network(url)),
+              child: InteractiveViewer(child: NetImage(url)),
             ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),

@@ -14,6 +14,8 @@ import 'garage_chat_list_page.dart'; // ✅ แชทกับลูกค้า
 import 'garage_tracking_list_page.dart'; // ✅ อัปเดตสถานะ/ติดตามงานที่กำลังซ่อม
 import 'garage_wallet_page.dart'; // ✅ Wallet ของอู่ — ดูยอดคงเหลือ/เติมเงิน
 import ' myCarPage.dart' show vehicleTypeLabel; // ✅ ใช้ label กลางที่รองรับรถตู้/มอเตอร์ไซค์/อื่นๆ ด้วย
+import 'network_image_helper.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 class GarageDashboard extends StatefulWidget {
   final Map<String, dynamic> userData; // ✅ รับ userData
@@ -38,6 +40,18 @@ class _GarageDashboardState extends State<GarageDashboard> {
     _fetchRequests();
     _setupPushNotifications();
     _fetchWalletBalance();
+    // ✅ รีบิลด์แดชบอร์ดอู่อัตโนมัติเมื่อผู้ใช้เปลี่ยนภาษาจากหน้าตั้งค่า
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchWalletBalance() async {
@@ -116,6 +130,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
   // ===== ข้อความเวลาแบบ "x นาทีที่แล้ว" =====
   String _timeAgo(String? createdAt) {
+    final loc = AppLocale.instance;
     if (createdAt == null) return '';
     // ✅ .toLocal() ไม่จำเป็นสำหรับผลต่างเวลา (DateTime.difference คำนวณจาก
     // instant จริงอยู่แล้ว ไม่ว่าจะเป็น UTC หรือ local) แต่ใส่ไว้ให้สอดคล้องกับ
@@ -123,10 +138,10 @@ class _GarageDashboardState extends State<GarageDashboard> {
     final created = DateTime.tryParse(createdAt)?.toLocal();
     if (created == null) return '';
     final diff = DateTime.now().difference(created);
-    if (diff.inMinutes < 1) return 'เมื่อสักครู่';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} นาทีที่แล้ว';
-    if (diff.inHours < 24) return '${diff.inHours} ชั่วโมงที่แล้ว';
-    return '${diff.inDays} วันที่แล้ว';
+    if (diff.inMinutes < 1) return loc.t('garage_time_just_now');
+    if (diff.inMinutes < 60) return loc.t('garage_time_minutes_ago').replaceAll('%s', '${diff.inMinutes}');
+    if (diff.inHours < 24) return loc.t('garage_time_hours_ago').replaceAll('%s', '${diff.inHours}');
+    return loc.t('garage_time_days_ago').replaceAll('%s', '${diff.inDays}');
   }
 
   // ===== ระยะทางจากอู่ (ตำแหน่งอู่) ไปยังตำแหน่งที่ลูกค้าส่งคำขอมา =====
@@ -144,7 +159,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(deg2rad(myLat)) * math.cos(deg2rad(rLat)) * math.sin(dLon / 2) * math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return '${(radius * c).toStringAsFixed(1)} กม.';
+    return '${(radius * c).toStringAsFixed(1)} ${AppLocale.instance.t('dash_km_unit')}';
   }
 
   Widget _detailRow(IconData icon, String text) {
@@ -230,7 +245,8 @@ class _GarageDashboardState extends State<GarageDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final shopName = _userData['shop_name'] ?? 'อู่ซ่อมรถ';
+    final loc = AppLocale.instance;
+    final shopName = _userData['shop_name'] ?? loc.t('profile_type_repair');
 
     final List<Widget> pages = [
       _buildDashboard(shopName),
@@ -252,18 +268,19 @@ class _GarageDashboardState extends State<GarageDashboard> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         onTap: (i) => setState(() => currentIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.build_outlined), label: 'งาน'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'ประวัติ'),
-          BottomNavigationBarItem(icon: Icon(Icons.star_border), label: 'รีวิว'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'โปรไฟล์'),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home), label: loc.t('garage_nav_dashboard')),
+          BottomNavigationBarItem(icon: const Icon(Icons.build_outlined), label: loc.t('garage_nav_jobs')),
+          BottomNavigationBarItem(icon: const Icon(Icons.history), label: loc.t('nav_history')),
+          BottomNavigationBarItem(icon: const Icon(Icons.star_border), label: loc.t('garage_nav_reviews')),
+          BottomNavigationBarItem(icon: const Icon(Icons.person_outline), label: loc.t('profile_title')),
         ],
       ),
     );
   }
 
   Widget _buildDashboard(String shopName) {
+    final loc = AppLocale.instance;
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
@@ -340,16 +357,16 @@ class _GarageDashboardState extends State<GarageDashboard> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  _statCard(icon: Icons.calendar_today, value: '$_todayCount', label: 'งานวันนี้', color: const Color(0xff2196F3)),
-                  _statCard(icon: Icons.build, value: '$_inProgressCount', label: 'กำลังดำเนินการ', color: const Color(0xffFF9800)),
-                  _statCard(icon: Icons.check_circle, value: '$_doneCount', label: 'เสร็จแล้ว', color: const Color(0xff4CAF50)),
+                  _statCard(icon: Icons.calendar_today, value: '$_todayCount', label: loc.t('garage_stat_today_jobs'), color: const Color(0xff2196F3)),
+                  _statCard(icon: Icons.build, value: '$_inProgressCount', label: loc.t('garage_stat_in_progress'), color: const Color(0xffFF9800)),
+                  _statCard(icon: Icons.check_circle, value: '$_doneCount', label: loc.t('garage_stat_done'), color: const Color(0xff4CAF50)),
                   _statCard(
                     icon: Icons.attach_money,
                     value: '฿${_todayRevenue.toStringAsFixed(0)}',
-                    label: 'รายได้วันนี้',
+                    label: loc.t('garage_stat_today_revenue'),
                     color: const Color(0xff9C27B0),
                     subtitle: _todayCommission > 0
-                        ? 'สุทธิ ฿${(_todayRevenue - _todayCommission).toStringAsFixed(0)}'
+                        ? loc.t('garage_net_after_commission').replaceAll('%s', (_todayRevenue - _todayCommission).toStringAsFixed(0))
                         : null,
                   ),
                 ],
@@ -380,7 +397,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Wallet ติดลบ ฿${_walletBalance!.abs().toStringAsFixed(2)} — แตะเพื่อเติมเงิน ก่อนถูกระงับรับงานใหม่',
+                            loc.t('garage_wallet_negative_banner').replaceAll('%s', _walletBalance!.abs().toStringAsFixed(2)),
                             style: const TextStyle(color: Color(0xffC62828), fontSize: 12.5, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -397,7 +414,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('คำขอซ่อมล่าสุด', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(loc.t('garage_recent_requests_heading'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   TextButton(
                     onPressed: () async {
                       await Navigator.push(
@@ -408,7 +425,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                       );
                       _fetchRequests(); // กลับมาแล้วรีเฟรชเผื่อมีการรับ/ปฏิเสธงานในหน้านั้น
                     },
-                    child: const Text('ดูทั้งหมด', style: TextStyle(color: Colors.blue)),
+                    child: Text(loc.t('dash_see_all'), style: const TextStyle(color: Colors.blue)),
                   ),
                 ],
               ),
@@ -425,9 +442,9 @@ class _GarageDashboardState extends State<GarageDashboard> {
             ],
 
             // ===== เมนูด่วน =====
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text('เมนูด่วน', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Text(loc.t('garage_quick_menu_heading'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
 
             Padding(
@@ -441,7 +458,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 children: [
                   _quickMenu(
                     icon: Icons.engineering_outlined,
-                    label: 'จัดการช่าง',
+                    label: loc.t('garage_menu_manage_technicians'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -453,7 +470,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   ),
                   _quickMenu(
                     icon: Icons.chat_bubble_outline,
-                    label: 'แชทลูกค้า',
+                    label: loc.t('garage_menu_chat_customers'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -465,7 +482,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   ),
                   _quickMenu(
                     icon: Icons.refresh,
-                    label: 'อัปเดตสถานะ',
+                    label: loc.t('garage_menu_update_status'),
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -478,7 +495,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   ),
                   _quickMenu(
                     icon: Icons.payments_outlined,
-                    label: 'การชำระเงิน',
+                    label: loc.t('garage_menu_payments'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -493,7 +510,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   ),
                   _quickMenu(
                     icon: Icons.account_balance_outlined,
-                    label: 'บัญชีรับเงิน',
+                    label: loc.t('garage_menu_bank_account'),
                     onTap: () async {
                       final saved = await Navigator.push(
                         context,
@@ -511,7 +528,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   // เห็นยอด wallet ของตัวเองเลย ทั้งที่ระบบหักค่าคอมมิชชั่นอัตโนมัติทุกงาน)
                   _quickMenu(
                     icon: Icons.account_balance_wallet_outlined,
-                    label: 'Wallet',
+                    label: loc.t('garage_menu_wallet'),
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -534,6 +551,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
   }
 
   Widget _emptyRequestsState() {
+    final loc = AppLocale.instance;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.symmetric(vertical: 32),
@@ -541,18 +559,18 @@ class _GarageDashboardState extends State<GarageDashboard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
-          SizedBox(height: 12),
+          const Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
           Text(
-            'ยังไม่มีคำขอซ่อมเข้ามา',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+            loc.t('garage_empty_requests_title'),
+            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
-            'คำขอจากลูกค้าจะแสดงที่นี่',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+            loc.t('garage_empty_requests_sub'),
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
           ),
         ],
       ),
@@ -589,6 +607,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
   }
 
   Widget _requestCard(Map<String, dynamic> r, int index) {
+    final loc = AppLocale.instance;
     final id = r['id'];
     final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
 
@@ -620,13 +639,13 @@ class _GarageDashboardState extends State<GarageDashboard> {
                   color: const Color(0xff4CAF50).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text('ใหม่',
-                    style: TextStyle(color: Color(0xff4CAF50), fontSize: 12, fontWeight: FontWeight.w600)),
+                child: Text(loc.t('garage_badge_new'),
+                    style: const TextStyle(color: Color(0xff4CAF50), fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          _detailRow(Icons.person_outline, name.isEmpty ? 'ไม่ระบุชื่อ' : name),
+          _detailRow(Icons.person_outline, name.isEmpty ? loc.t('profile_name_fallback') : name),
           const SizedBox(height: 6),
           _detailRow(Icons.directions_car_outlined, _vehicleLabel(r['vehicle_type']?.toString())),
           const SizedBox(height: 6),
@@ -642,7 +661,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 child: OutlinedButton.icon(
                   onPressed: () => _showRequestDetail(r, index),
                   icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                  label: const Text('ดูรายละเอียด'),
+                  label: Text(loc.t('garage_view_details')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blue,
                     side: const BorderSide(color: Colors.blue),
@@ -655,7 +674,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                 child: OutlinedButton.icon(
                   onPressed: _respondingIds.contains(id) ? null : () => _handleReject(id),
                   icon: const Icon(Icons.close, size: 16, color: Colors.red),
-                  label: const Text('ปฏิเสธ', style: TextStyle(color: Colors.red)),
+                  label: Text(loc.t('garage_reject'), style: const TextStyle(color: Colors.red)),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.red),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -671,7 +690,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(Icons.check, color: Colors.white, size: 16),
-                  label: const Text('รับงาน', style: TextStyle(color: Colors.white)),
+                  label: Text(loc.t('garage_accept_job'), style: const TextStyle(color: Colors.white)),
                 ),
               ),
             ],
@@ -682,6 +701,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
   }
 
   void _showRequestDetail(Map<String, dynamic> r, int index) {
+    final loc = AppLocale.instance;
     final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
     final photos = (r['photos'] is List) ? List<dynamic>.from(r['photos']) : [];
 
@@ -696,18 +716,18 @@ class _GarageDashboardState extends State<GarageDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+              Text(name.isEmpty ? loc.t('profile_name_fallback') : name,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text('ประเภทรถ: ${_vehicleLabel(r['vehicle_type']?.toString())}',
+              Text('${loc.t('garage_vehicle_type_prefix')}: ${_vehicleLabel(r['vehicle_type']?.toString())}',
                   style: const TextStyle(color: Colors.grey)),
-              Text('ประเภทปัญหา: ${r['problem_category'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
+              Text('${loc.t('garage_problem_type_prefix')}: ${r['problem_category'] ?? '-'}', style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 12),
               Text(r['description']?.toString().isNotEmpty == true
                   ? r['description'].toString()
-                  : 'ไม่มีรายละเอียดเพิ่มเติม'),
+                  : loc.t('garage_no_description')),
               const SizedBox(height: 12),
-              Text('ที่อยู่: ${r['address'] ?? 'ไม่ระบุ'}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              Text('${loc.t('garage_address_prefix')}: ${r['address'] ?? loc.t('garage_address_fallback')}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
               if ((r['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -717,7 +737,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                     color: const Color(0xffFFEBEE),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text('เหตุผลที่ปฏิเสธ: ${r['rejection_reason']}',
+                  child: Text('${loc.t('garage_rejection_reason_prefix')}: ${r['rejection_reason']}',
                       style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ),
               ],
@@ -732,7 +752,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
                         padding: const EdgeInsets.only(right: 8),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.network(url.toString(), width: 90, height: 90, fit: BoxFit.cover),
+                          child: NetImage(url.toString(), width: 90, height: 90, fit: BoxFit.cover),
                         ),
                       );
                     }).toList(),

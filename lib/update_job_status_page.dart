@@ -13,6 +13,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 class _PartRow {
   final TextEditingController nameCtrl = TextEditingController();
@@ -67,15 +68,21 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
       default:
         _selectedStatus = 'in_progress';
     }
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _noteController.dispose();
     for (final p in _parts) {
       p.dispose();
     }
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickPhoto({required bool isBefore}) async {
@@ -152,7 +159,7 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
     final success = statusResult.success && logResult.success;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(success ? 'ส่งอัปเดตสำเร็จ' : (statusResult.message.isNotEmpty ? statusResult.message : logResult.message)),
+        content: Text(success ? AppLocale.instance.t('ujs_update_success') : (statusResult.message.isNotEmpty ? statusResult.message : logResult.message)),
         backgroundColor: success ? Colors.green : Colors.red,
       ),
     );
@@ -164,13 +171,14 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final customerName = '${widget.job['first_name'] ?? ''} ${widget.job['last_name'] ?? ''}'.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F6FA),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('อัปเดตสถานะงาน', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('ujs_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -194,10 +202,10 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('งาน #${widget.job['id']}',
+                            Text(loc.t('ujs_job_number_prefix').replaceAll('%s', '${widget.job['id']}'),
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             const SizedBox(height: 2),
-                            Text(customerName.isEmpty ? 'ไม่ระบุชื่อ' : customerName,
+                            Text(customerName.isEmpty ? loc.t('profile_name_fallback') : customerName,
                                 style: const TextStyle(color: Colors.grey, fontSize: 13)),
                           ],
                         ),
@@ -207,21 +215,21 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                 ),
 
                 const SizedBox(height: 16),
-                const Text('อัปเดตสถานะ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(loc.t('ujs_update_status_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                _statusOption('checking', 'ช่างกำลังเดินทาง', 'กำลังมุ่งหน้าไปยังจุดนัดหมาย',
+                _statusOption('checking', loc.t('dash_status_checking'), loc.t('ujs_status_checking_subtitle'),
                     Icons.directions_car_outlined, const Color(0xff9C27B0)),
-                _statusOption('in_progress', 'กำลังซ่อม', 'เริ่มดำเนินการซ่อมแล้ว',
+                _statusOption('in_progress', loc.t('dash_status_in_progress'), loc.t('ujs_status_in_progress_subtitle'),
                     Icons.build_circle_outlined, const Color(0xffFF9800)),
-                _statusOption('completed', 'ซ่อมเสร็จแล้ว', 'งานซ่อมเสร็จสมบูรณ์',
+                _statusOption('completed', loc.t('tech_status_completed'), loc.t('ujs_status_completed_subtitle'),
                     Icons.check_circle_outline, const Color(0xff4CAF50)),
 
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Text('บันทึกรายละเอียด', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text(loc.t('ujs_log_details_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 6),
-                    Text('(ไม่บังคับ)', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                    Text(loc.t('ujs_optional_label'), style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -229,7 +237,7 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                   controller: _noteController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText: 'กรอกรายละเอียดการซ่อม เช่น อันตอนที่ทำ ปัญหาที่พบเพิ่มเติม...',
+                    hintText: loc.t('ujs_details_hint'),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -240,13 +248,13 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                 ),
 
                 const SizedBox(height: 16),
-                const Text('รูปภาพก่อน/หลังซ่อม', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(loc.t('ujs_photos_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(child: _photoSlot('ก่อนซ่อม', _beforePhoto, () => _pickPhoto(isBefore: true))),
+                    Expanded(child: _photoSlot(loc.t('ujs_photo_before'), _beforePhoto, () => _pickPhoto(isBefore: true))),
                     const SizedBox(width: 10),
-                    Expanded(child: _photoSlot('หลังซ่อม', _afterPhoto, () => _pickPhoto(isBefore: false))),
+                    Expanded(child: _photoSlot(loc.t('ujs_photo_after'), _afterPhoto, () => _pickPhoto(isBefore: false))),
                   ],
                 ),
 
@@ -257,11 +265,11 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('อะไหล่ที่ใช้', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      Text(loc.t('ujs_parts_used_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                       TextButton.icon(
                         onPressed: _addPartRow,
                         icon: const Icon(Icons.add, size: 16),
-                        label: const Text('เพิ่มอะไหล่'),
+                        label: Text(loc.t('ujs_add_part_button')),
                       ),
                     ],
                   ),
@@ -278,8 +286,8 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                               Expanded(
                                 child: TextField(
                                   controller: p.nameCtrl,
-                                  decoration: const InputDecoration(
-                                      labelText: 'ชื่ออะไหล่', isDense: true, border: OutlineInputBorder()),
+                                  decoration: InputDecoration(
+                                      labelText: loc.t('ujs_part_name_label'), isDense: true, border: const OutlineInputBorder()),
                                 ),
                               ),
                               if (_parts.length > 1)
@@ -296,8 +304,8 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                                 child: TextField(
                                   controller: p.qtyCtrl,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                      labelText: 'จำนวน', isDense: true, border: OutlineInputBorder()),
+                                  decoration: InputDecoration(
+                                      labelText: loc.t('ujs_part_qty_label'), isDense: true, border: const OutlineInputBorder()),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -306,8 +314,8 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                                 child: TextField(
                                   controller: p.priceCtrl,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                      labelText: 'ราคา (บาท)', isDense: true, border: OutlineInputBorder()),
+                                  decoration: InputDecoration(
+                                      labelText: loc.t('ujs_part_price_label'), isDense: true, border: const OutlineInputBorder()),
                                 ),
                               ),
                             ],
@@ -340,7 +348,7 @@ class _UpdateJobStatusPageState extends State<UpdateJobStatusPage> {
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.send, color: Colors.white),
               label: Text(
-                _isSubmitting ? 'กำลังส่ง...' : 'ส่งอัปเดต',
+                _isSubmitting ? loc.t('ujs_sending') : loc.t('ujs_send_update_button'),
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),

@@ -9,6 +9,8 @@
 
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 class GarageReviewsPage extends StatefulWidget {
   final int garageId;
@@ -38,6 +40,17 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
   void initState() {
     super.initState();
     _fetchReviews();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchReviews() async {
@@ -57,7 +70,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
 
   int _countFor(int star) => (_ratingCounts['$star'] as num?)?.toInt() ?? 0;
 
-  String get _shopLabel => widget.shopName ?? 'อู่ของคุณ';
+  String get _shopLabel => widget.shopName ?? AppLocale.instance.t('grp_shop_fallback');
 
   String _formatDate(String? isoString) {
     // ✅ backend ส่งเวลาเป็น UTC ISO string — ไม่ .toLocal() ก่อน วันที่จะเพี้ยนได้
@@ -84,17 +97,18 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final body = RefreshIndicator(
         onRefresh: _fetchReviews,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _reviews.isEmpty
                 ? ListView(
-                    children: const [
+                    children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(vertical: 100),
+                        padding: const EdgeInsets.symmetric(vertical: 100),
                         child: Center(
-                          child: Text('อู่นี้ยังไม่มีรีวิว', style: TextStyle(color: Colors.grey)),
+                          child: Text(loc.t('grp_empty_state'), style: const TextStyle(color: Colors.grey)),
                         ),
                       ),
                     ],
@@ -116,7 +130,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                     style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
                                 _starRow(_averageRating.round()),
                                 const SizedBox(height: 4),
-                                Text('$_totalReviews รีวิว', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                Text(loc.t('grp_reviews_count').replaceAll('%s', '$_totalReviews'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                               ],
                             ),
                             const SizedBox(width: 24),
@@ -161,7 +175,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('รีวิวทั้งหมด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(loc.t('grp_all_reviews_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 10),
 
                       ..._reviews.map((r) {
@@ -192,7 +206,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(name.isEmpty ? 'ลูกค้า' : name,
+                                        Text(name.isEmpty ? loc.t('profile_type_customer') : name,
                                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                         Text(_formatDate(r['created_at']?.toString()),
                                             style: const TextStyle(color: Colors.grey, fontSize: 11)),
@@ -216,7 +230,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                     separatorBuilder: (_, __) => const SizedBox(width: 6),
                                     itemBuilder: (context, i) => ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(photos[i].toString(), width: 78, height: 78, fit: BoxFit.cover),
+                                      child: NetImage(photos[i].toString(), width: 78, height: 78, fit: BoxFit.cover),
                                     ),
                                   ),
                                 ),
@@ -237,7 +251,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                         children: [
                                           const Icon(Icons.reply, size: 14, color: Color(0xff2196F3)),
                                           const SizedBox(width: 4),
-                                          Text('การตอบกลับจาก$_shopLabel',
+                                          Text(loc.t('grp_reply_from_prefix').replaceAll('%s', _shopLabel),
                                               style: const TextStyle(
                                                   fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xff2196F3))),
                                         ],
@@ -264,7 +278,7 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: Text('รีวิว · $_shopLabel', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(loc.t('grp_page_title').replaceAll('%s', _shopLabel), style: const TextStyle(color: Colors.white, fontSize: 16)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

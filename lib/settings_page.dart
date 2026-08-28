@@ -7,6 +7,8 @@ import 'change_email_sheet.dart';
 import 'forgot_password_page.dart';
 import 'help_page.dart';
 import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
+import 'main.dart'; // ✅ เพิ่มใหม่: SessionStore + LoginPage สำหรับปุ่มออกจากระบบ
+import 'socket_notification_service.dart'; // ✅ เพิ่มใหม่: ตัดการเชื่อมต่อ socket ตอนออกจากระบบ
 
 class SettingsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -20,7 +22,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   static const _kNotificationsEnabled = 'notifications_enabled';
   static const _appVersion = '1.0.0';
-  static const _supportEmail = 'support@outeewaiwangjai.example.com';
+  static const _supportEmail = 'support@goodgarage.com';
 
   bool _notificationsEnabled = true;
   bool _emailChanged = false;
@@ -59,8 +61,8 @@ class _SettingsPageState extends State<SettingsPage> {
         widget.userData['email'] = newEmail;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เปลี่ยนอีเมลสำเร็จ'),
+        SnackBar(
+          content: Text(AppLocale.instance.t('epc_email_change_success')),
           backgroundColor: Colors.green,
         ),
       );
@@ -140,7 +142,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 scheme: 'mailto',
                 path: _supportEmail,
                 query:
-                    'subject=${Uri.encodeComponent('สอบถามการใช้งานแอปอู่ที่ไว้วางใจ')}',
+                    'subject=${Uri.encodeComponent(loc.t('settings_contact_subject'))}',
               );
               await launchUrl(uri);
             },
@@ -167,7 +169,11 @@ class _SettingsPageState extends State<SettingsPage> {
         return AnimatedBuilder(
           animation: loc,
           builder: (context, _) {
-            return SafeArea(
+            // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น
+            // warning เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+            return Material(
+              color: Colors.white,
+              child: SafeArea(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,6 +218,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: 8),
                 ],
+              ),
               ),
             );
           },
@@ -281,8 +288,17 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _handleLogout() {
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+  Future<void> _handleLogout() async {
+    // ✅ แก้บั๊ก: เดิมใช้ pushNamedAndRemoveUntil('/', ...) แต่แอปไม่เคยลงทะเบียน
+    // named route ไว้เลย (ดู main.dart) กดออกจากระบบแล้วเนวิเกตไม่ไปไหน/พังเงียบๆ
+    // เปลี่ยนมาเปิด LoginPage ตรงๆ พร้อมล้าง session ที่บันทึกไว้และตัดการเชื่อมต่อ socket เดิม
+    await SessionStore.clear();
+    SocketNotificationService.disconnect();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -328,16 +344,19 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
 
               _sectionHeader(loc.t('settings_section')),
-              SwitchListTile(
-                secondary: const Icon(
-                  Icons.notifications_outlined,
-                  color: Color(0xff2196F3),
+              Material(
+                color: Colors.white,
+                child: SwitchListTile(
+                  secondary: const Icon(
+                    Icons.notifications_outlined,
+                    color: Color(0xff2196F3),
+                  ),
+                  title: Text(loc.t('notifications')),
+                  subtitle: Text(loc.t('notifications_sub')),
+                  value: _notificationsEnabled,
+                  activeColor: const Color(0xff2196F3),
+                  onChanged: _toggleNotifications,
                 ),
-                title: Text(loc.t('notifications')),
-                subtitle: Text(loc.t('notifications_sub')),
-                value: _notificationsEnabled,
-                activeColor: const Color(0xff2196F3),
-                onChanged: _toggleNotifications,
               ),
               _tile(
                 icon: Icons.language_outlined,
@@ -352,7 +371,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: loc.t('help_center'),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const HelpPage()),
+                  MaterialPageRoute(
+                    // ✅ ส่ง userData ต่อไปด้วย ให้หน้าศูนย์ช่วยเหลือใช้แจ้งข้อร้องเรียนจริงได้
+                    builder: (context) => HelpPage(userData: widget.userData),
+                  ),
                 ),
               ),
               _tile(
@@ -405,7 +427,7 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'อู่ที่ไว้วางใจ v$_appVersion',
+                  '${loc.t('auth_app_name')} v$_appVersion',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
@@ -436,7 +458,11 @@ class _SettingsPageState extends State<SettingsPage> {
     Color? titleColor,
     required VoidCallback onTap,
   }) {
-    return Container(
+    // ✅ เดิมใช้ Container(color: ...) ห่อ ListTile ตรงๆ ทำให้ Container ทึบแสงบัง
+    // เอฟเฟกต์ ink splash ของ ListTile ไว้ (ListTile ต้องการ Material ancestor
+    // ที่ไม่มีอะไรทึบแสงคั่นกลาง) เปลี่ยนเป็น Material ถึงจะไม่มี error/warning
+    // "ListTile background color or ink splashes may be invisible" ขึ้นซ้ำๆ อีก
+    return Material(
       color: Colors.white,
       child: ListTile(
         leading: Icon(icon, color: titleColor ?? const Color(0xff2196F3)),
@@ -476,23 +502,27 @@ class _SavedAccountsSheetState extends State<_SavedAccountsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น warning
+    // เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+    return Material(
+      color: Colors.white,
+      child: Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'บัญชีที่จดจำไว้',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            AppLocale.instance.t('saved_accounts'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           if (_accounts.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
               child: Text(
-                'ยังไม่มีบัญชีที่จดจำไว้',
-                style: TextStyle(color: Colors.grey),
+                AppLocale.instance.t('saved_accounts_empty'),
+                style: const TextStyle(color: Colors.grey),
               ),
             )
           else
@@ -509,6 +539,7 @@ class _SavedAccountsSheetState extends State<_SavedAccountsSheet> {
             }),
           const SizedBox(height: 10),
         ],
+      ),
       ),
     );
   }

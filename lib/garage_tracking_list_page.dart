@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'repair_tracking_page.dart';
+import 'app_locale.dart';
 
 class GarageTrackingListPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -31,6 +32,17 @@ class _GarageTrackingListPageState extends State<GarageTrackingListPage> {
   void initState() {
     super.initState();
     _fetchJobs();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchJobs() async {
@@ -47,15 +59,16 @@ class _GarageTrackingListPageState extends State<GarageTrackingListPage> {
   }
 
   String _statusLabel(String? status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'assigned':
-        return 'มอบหมายช่างแล้ว';
+        return loc.t('myreq_status_assigned');
       case 'checking':
-        return 'ช่างกำลังเดินทาง';
+        return loc.t('dash_status_checking');
       case 'in_progress':
-        return 'กำลังซ่อม';
+        return loc.t('dash_status_in_progress');
       case 'waiting_parts':
-        return 'รอรับอะไหล่';
+        return loc.t('dash_status_waiting_parts');
       default:
         return status ?? '-';
     }
@@ -78,11 +91,12 @@ class _GarageTrackingListPageState extends State<GarageTrackingListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('อัปเดตสถานะลูกค้า', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('gtl_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -95,12 +109,12 @@ class _GarageTrackingListPageState extends State<GarageTrackingListPage> {
             ? const Center(child: CircularProgressIndicator())
             : _jobs.isEmpty
                 ? ListView(
-                    children: const [
+                    children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(vertical: 80),
+                        padding: const EdgeInsets.symmetric(vertical: 80),
                         child: Center(
-                          child: Text('ตอนนี้ยังไม่มีงานที่กำลังซ่อมอยู่',
-                              style: TextStyle(color: Colors.grey)),
+                          child: Text(loc.t('gtl_empty_state'),
+                              style: const TextStyle(color: Colors.grey)),
                         ),
                       ),
                     ],
@@ -147,14 +161,14 @@ class _GarageTrackingListPageState extends State<GarageTrackingListPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(name.isEmpty ? 'ไม่ระบุชื่อ' : name,
+                                    Text(name.isEmpty ? loc.t('profile_name_fallback') : name,
                                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                     const SizedBox(height: 2),
                                     Text(job['problem_category']?.toString() ?? '-',
                                         style: const TextStyle(color: Colors.grey, fontSize: 13)),
                                     if (technicianName != null) ...[
                                       const SizedBox(height: 2),
-                                      Text('ช่าง: $technicianName',
+                                      Text(loc.t('gtl_technician_prefix').replaceAll('%s', technicianName),
                                           style: const TextStyle(color: Colors.grey, fontSize: 12)),
                                     ],
                                   ],

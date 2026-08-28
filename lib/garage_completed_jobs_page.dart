@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'garage_job_detail_page.dart';
+import 'app_locale.dart';
 
 class GarageCompletedJobsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -31,6 +32,17 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
   void initState() {
     super.initState();
     _fetchJobs();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchJobs() async {
@@ -62,15 +74,16 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
   String _repairCode(dynamic id) => '#REQ${(id ?? 0).toString().padLeft(6, '0')}';
 
   String _paymentStatusLabel(String? status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'confirmed':
-        return 'ชำระเงินแล้ว';
+        return loc.t('gcj_payment_confirmed');
       case 'pending_confirmation':
-        return 'รอตรวจสอบสลิป';
+        return loc.t('gcj_payment_pending');
       case 'rejected':
-        return 'ปฏิเสธสลิปแล้ว';
+        return loc.t('gcj_payment_rejected');
       default:
-        return 'ยังไม่ชำระเงิน';
+        return loc.t('gcj_payment_unpaid');
     }
   }
 
@@ -104,6 +117,7 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final jobs = _filteredJobs;
 
     return Scaffold(
@@ -112,7 +126,7 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
           ? null
           : AppBar(
               backgroundColor: const Color(0xff2196F3),
-              title: const Text('ประวัติงานซ่อม', style: TextStyle(color: Colors.white)),
+              title: Text(loc.t('gcj_page_title'), style: const TextStyle(color: Colors.white)),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
@@ -128,10 +142,10 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Row(
                 children: [
-                  Expanded(child: _statCard(Icons.build_outlined, const Color(0xff2196F3), 'งานทั้งหมด', '${_jobs.length}')),
+                  Expanded(child: _statCard(Icons.build_outlined, const Color(0xff2196F3), loc.t('gcj_stat_total_jobs'), '${_jobs.length}')),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _statCard(Icons.attach_money, const Color(0xff4CAF50), 'รายได้', '฿${_formatCompact(_totalConfirmed)}'),
+                    child: _statCard(Icons.attach_money, const Color(0xff4CAF50), loc.t('gcj_stat_revenue'), '฿${_formatCompact(_totalConfirmed)}'),
                   ),
                 ],
               ),
@@ -143,11 +157,11 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  _filterChip('ทั้งหมด', 'all'),
+                  _filterChip(loc.t('svc_all'), 'all'),
                   const SizedBox(width: 8),
-                  _filterChip('เสร็จสิ้น', 'unpaid'),
+                  _filterChip(loc.t('gcj_filter_unpaid'), 'unpaid'),
                   const SizedBox(width: 8),
-                  _filterChip('ชำระแล้ว', 'paid'),
+                  _filterChip(loc.t('gcj_filter_paid'), 'paid'),
                 ],
               ),
             ),
@@ -161,7 +175,7 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
                   : jobs.isEmpty
                       ? Center(
                           child: Text(
-                            _jobs.isEmpty ? 'ยังไม่มีงานที่ซ่อมเสร็จ' : 'ไม่มีงานที่ตรงกับตัวกรองนี้',
+                            _jobs.isEmpty ? loc.t('gcj_empty_no_jobs') : loc.t('gcj_empty_no_match'),
                             style: const TextStyle(color: Colors.grey),
                           ),
                         )
@@ -233,6 +247,7 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
   }
 
   Widget _jobCard(Map<String, dynamic> job) {
+    final loc = AppLocale.instance;
     final name = '${job['first_name'] ?? ''} ${job['last_name'] ?? ''}'.trim();
     final paymentStatus = job['payment_status']?.toString();
     final amount = double.tryParse(job['payment_amount']?.toString() ?? '0') ?? 0;
@@ -265,11 +280,11 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
             ],
           ),
           const SizedBox(height: 10),
-          Text('ลูกค้า: ${name.isEmpty ? 'ไม่ระบุชื่อ' : name}', style: const TextStyle(fontSize: 13)),
+          Text(loc.t('gcj_customer_prefix').replaceAll('%s', name.isEmpty ? loc.t('profile_name_fallback') : name), style: const TextStyle(fontSize: 13)),
           const SizedBox(height: 4),
-          Text('ปัญหา: ${job['problem_category'] ?? '-'}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text(loc.t('gcj_problem_prefix').replaceAll('%s', '${job['problem_category'] ?? '-'}'), style: const TextStyle(fontSize: 13, color: Colors.grey)),
           const SizedBox(height: 4),
-          Text('ซ่อมเสร็จ: ${_formatDate(job['completed_at']?.toString())}',
+          Text(loc.t('gcj_completed_prefix').replaceAll('%s', _formatDate(job['completed_at']?.toString())),
               style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (amount > 0) ...[
             const SizedBox(height: 8),
@@ -291,7 +306,7 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
                 side: const BorderSide(color: Color(0xff2196F3)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('ดูรายละเอียด'),
+              child: Text(loc.t('garage_view_details')),
             ),
           ),
         ],

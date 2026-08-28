@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -28,6 +29,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     final u = widget.userData;
     _shopNameController = TextEditingController(text: u['shop_name'] ?? '');
     _firstNameController = TextEditingController(text: u['first_name'] ?? '');
@@ -38,12 +40,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _shopNameController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   String get _displayInitial {
@@ -58,17 +65,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
+      // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น
+      // warning เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+      builder: (context) => Material(
+        color: Colors.white,
+        child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('เลือกรูปโปรไฟล์',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(AppLocale.instance.t('pap_sheet_title'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.photo_library, color: Colors.blue),
-              title: const Text('เลือกจากคลังรูป'),
+              title: Text(AppLocale.instance.t('pap_pick_gallery')),
               onTap: () async {
                 Navigator.pop(context);
                 final picker = ImagePicker();
@@ -87,7 +98,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt, color: Colors.blue),
-              title: const Text('ถ่ายรูป'),
+              title: Text(AppLocale.instance.t('pap_take_photo')),
               onTap: () async {
                 Navigator.pop(context);
                 final picker = ImagePicker();
@@ -105,6 +116,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               },
             ),
           ],
+        ),
         ),
       ),
     );
@@ -127,7 +139,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('อัปโหลดรูปไม่สำเร็จ: ${avatarResult.message}'),
+            content: Text(AppLocale.instance.t('ep_avatar_upload_failed').replaceAll('%s', avatarResult.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -191,12 +203,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     final isRepair = widget.userData['userType'] == 'repair';
+    final loc = AppLocale.instance;
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แก้ไขโปรไฟล์', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('ep_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -257,9 +270,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'เปลี่ยนรูปโปรไฟล์',
-                        style: TextStyle(color: Color(0xff2196F3), fontSize: 14),
+                      Text(
+                        loc.t('pap_change_photo'),
+                        style: const TextStyle(color: Color(0xff2196F3), fontSize: 14),
                       ),
                     ],
                   ),
@@ -268,14 +281,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 const SizedBox(height: 24),
 
                 if (isRepair) ...[
-                  const Text('ชื่อร้านอู่ซ่อมรถ'),
+                  Text(loc.t('reg_shop_name_label')),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _shopNameController,
                     onChanged: (_) => setState(() {}),
-                    decoration: _inputDeco(hint: 'ชื่อร้าน', icon: Icons.store_outlined),
+                    decoration: _inputDeco(hint: loc.t('ep_shop_name_hint'), icon: Icons.store_outlined),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อร้าน' : null,
+                        v == null || v.trim().isEmpty ? loc.t('reg_shop_name_required') : null,
                   ),
                 ] else ...[
                   Row(
@@ -285,14 +298,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ชื่อ'),
+                            Text(loc.t('reg_first_name_label')),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _firstNameController,
                               onChanged: (_) => setState(() {}),
-                              decoration: _inputDeco(hint: 'ชื่อ', icon: Icons.person_outline),
+                              decoration: _inputDeco(hint: loc.t('reg_first_name_label'), icon: Icons.person_outline),
                               validator: (v) =>
-                                  v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อ' : null,
+                                  v == null || v.trim().isEmpty ? loc.t('reg_first_name_required') : null,
                             ),
                           ],
                         ),
@@ -302,13 +315,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('นามสกุล'),
+                            Text(loc.t('reg_last_name_label')),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _lastNameController,
-                              decoration: _inputDeco(hint: 'นามสกุล', icon: Icons.person_outline),
+                              decoration: _inputDeco(hint: loc.t('reg_last_name_label'), icon: Icons.person_outline),
                               validator: (v) =>
-                                  v == null || v.trim().isEmpty ? 'กรุณากรอกนามสกุล' : null,
+                                  v == null || v.trim().isEmpty ? loc.t('reg_last_name_required') : null,
                             ),
                           ],
                         ),
@@ -319,7 +332,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                const Text('เบอร์โทรศัพท์'),
+                Text(loc.t('reg_phone_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
@@ -330,7 +343,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                const Text('อีเมล'),
+                Text(loc.t('auth_email_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
@@ -358,8 +371,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             side: const BorderSide(color: Colors.grey),
                           ),
                         ),
-                        child: const Text('ยกเลิก',
-                            style: TextStyle(color: Colors.grey, fontSize: 16)),
+                        child: Text(loc.t('cancel'),
+                            style: const TextStyle(color: Colors.grey, fontSize: 16)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -381,9 +394,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2),
                               )
-                            : const Text(
-                                'บันทึกการเปลี่ยนแปลง',
-                                style: TextStyle(
+                            : Text(
+                                loc.t('ep_save_changes_button'),
+                                style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold),

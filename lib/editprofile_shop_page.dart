@@ -5,6 +5,7 @@ import 'profile_avatar_picker.dart'; // ใช้ pickProfileAvatar (bottom shee
 import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
 import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
 import 'change_email_sheet.dart'; // ✅ เปลี่ยนอีเมลผ่าน OTP
+import 'app_locale.dart';
 
 /// หมวดบริการมาตรฐาน — ใช้เป็นตัวเลือก "หมวด" ในฟอร์มเพิ่ม/แก้ไขบริการ และเป็นปุ่มเพิ่มด่วนด้านบน
 /// ส่วนชื่อเฉพาะของแต่ละบริการ (เช่น "เปลี่ยนน้ำมันเครื่อง") อู่ยังพิมพ์เองได้อิสระเสมอ
@@ -159,8 +160,8 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
     final min = s.priceMin.trim();
     final max = s.priceMax.trim();
     if (min.isEmpty && max.isEmpty) return '';
-    if (min.isNotEmpty && max.isNotEmpty && min != max) return '$min - $max บาท';
-    return '${min.isNotEmpty ? min : max} บาท';
+    if (min.isNotEmpty && max.isNotEmpty && min != max) return '$min - $max ${AppLocale.instance.t('gd_baht')}';
+    return '${min.isNotEmpty ? min : max} ${AppLocale.instance.t('gd_baht')}';
   }
 
   // ✅ เปิดฟอร์มเพิ่ม/แก้ไขบริการแบบ bottom sheet
@@ -214,7 +215,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            existing != null ? 'แก้ไขบริการ' : 'เพิ่มบริการใหม่',
+                            existing != null ? AppLocale.instance.t('esp_edit_service') : AppLocale.instance.t('esp_add_service'),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           IconButton(
@@ -224,7 +225,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text('เลือกหมวดบริการ',
+                      Text(AppLocale.instance.t('esp_select_category'),
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
@@ -245,18 +246,18 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         onChanged: (v) => setSheetState(() => category = v ?? category),
                       ),
                       const SizedBox(height: 14),
-                      const Text('ชื่อบริการ',
+                      Text(AppLocale.instance.t('esp_service_name_label'),
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: nameCtrl,
                         decoration: profileInputDeco(
-                            hint: 'เช่น เปลี่ยนน้ำมันเครื่อง', icon: Icons.build_outlined),
+                            hint: AppLocale.instance.t('esp_service_name_hint'), icon: Icons.build_outlined),
                         validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อบริการ' : null,
+                            v == null || v.trim().isEmpty ? AppLocale.instance.t('esp_service_name_required') : null,
                       ),
                       const SizedBox(height: 14),
-                      const Text('ราคาโดยประมาณ (บาท)',
+                      Text(AppLocale.instance.t('esp_estimated_price_label'),
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       Row(
@@ -266,7 +267,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                               controller: minCtrl,
                               keyboardType: TextInputType.number,
                               decoration: profileInputDeco(
-                                  hint: 'ราคาต่ำสุด', icon: Icons.sell_outlined),
+                                  hint: AppLocale.instance.t('esp_price_min_hint'), icon: Icons.sell_outlined),
                             ),
                           ),
                           const Padding(
@@ -278,31 +279,31 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                               controller: maxCtrl,
                               keyboardType: TextInputType.number,
                               decoration: profileInputDeco(
-                                  hint: 'ราคาสูงสุด', icon: Icons.sell_outlined),
+                                  hint: AppLocale.instance.t('esp_price_max_hint'), icon: Icons.sell_outlined),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'ใส่เฉพาะตัวเลข เช่น 800 กับ 1,500 (เว้นว่างได้ถ้ายังไม่ระบุราคา)',
+                        AppLocale.instance.t('esp_price_hint_numeric'),
                         style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 14),
-                      const Text('รายละเอียดเพิ่มเติม (ไม่บังคับ)',
+                      Text(AppLocale.instance.t('esp_additional_details_label'),
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: detailsCtrl,
                         maxLines: 2,
                         decoration: profileInputDeco(
-                            hint: 'เช่น รองรับรถเก๋งและรถกระบะ', icon: Icons.notes_outlined),
+                            hint: AppLocale.instance.t('esp_service_details_hint'), icon: Icons.notes_outlined),
                       ),
                       const SizedBox(height: 14),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('เปิดให้บริการ',
+                          Text(AppLocale.instance.t('esp_service_enabled_label'),
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                           Switch(
                             value: active,
@@ -320,7 +321,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                             Navigator.pop(sheetContext, true);
                           },
                           icon: const Icon(Icons.save_outlined, color: Colors.white),
-                          label: const Text('บันทึกบริการ',
+                          label: Text(AppLocale.instance.t('esp_save_service_button'),
                               style:
                                   TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
@@ -419,7 +420,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
       MaterialPageRoute(
         builder: (context) => AddressMapPage(
           title: _shopNameController.text.trim().isEmpty
-              ? 'อู่ซ่อมรถ'
+              ? AppLocale.instance.t('profile_type_repair')
               : _shopNameController.text.trim(),
           subtitle: _addressController.text.trim(),
           latitude: _latitude!,
@@ -439,7 +440,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         _emailChangedSuccessfully = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เปลี่ยนอีเมลสำเร็จ'), backgroundColor: Colors.green),
+        SnackBar(content: Text(AppLocale.instance.t('epc_email_change_success')), backgroundColor: Colors.green),
       );
     }
   }
@@ -458,13 +459,13 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(isWeekday ? 'เวลาทำการ จันทร์-ศุกร์' : 'เวลาทำการ เสาร์-อาทิตย์'),
+              title: Text(isWeekday ? AppLocale.instance.t('gie_hours_weekday_title') : AppLocale.instance.t('gie_hours_weekend_title')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('เวลาเปิด'),
+                    title: Text(AppLocale.instance.t('gie_open_time_label')),
                     trailing: TextButton(
                       child: Text(tempStart.format(context)),
                       onPressed: () async {
@@ -480,7 +481,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('เวลาปิด'),
+                    title: Text(AppLocale.instance.t('gie_close_time_label')),
                     trailing: TextButton(
                       child: Text(tempEnd.format(context)),
                       onPressed: () async {
@@ -499,14 +500,14 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('ยกเลิก'),
+                  child: Text(AppLocale.instance.t('cancel')),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     final formatted = '${_fmt(tempStart)}-${_fmt(tempEnd)}';
                     Navigator.pop(context, formatted);
                   },
-                  child: const Text('ตกลง'),
+                  child: Text(AppLocale.instance.t('gie_confirm_button')),
                 ),
               ],
             );
@@ -553,7 +554,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('อัปโหลดรูปไม่สำเร็จ: ${photoResult.message}'),
+            content: Text(AppLocale.instance.t('ep_avatar_upload_failed').replaceAll('%s', photoResult.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -610,7 +611,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แก้ไขข้อมูลอู่', style: TextStyle(color: Colors.white)),
+        title: Text(AppLocale.instance.t('profile_edit_shop'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(
@@ -632,35 +633,35 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // ===== รูปภาพ (ใช้ทั้งเป็นรูปโปรไฟล์และรูปอู่ — เหลือรูปเดียว) =====
-                      const Text('รูปภาพอู่',
+                      Text(AppLocale.instance.t('gie_photo_title'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 10),
                       _buildCoverImage(),
 
                       const SizedBox(height: 20),
-                      const Text('ชื่ออู่',
+                      Text(AppLocale.instance.t('gie_shop_name_label'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _shopNameController,
                         decoration:
-                            profileInputDeco(hint: 'ชื่ออู่ซ่อมรถ', icon: Icons.store_outlined),
+                            profileInputDeco(hint: AppLocale.instance.t('reg_shop_name_hint'), icon: Icons.store_outlined),
                         validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'กรุณากรอกชื่ออู่' : null,
+                            v == null || v.trim().isEmpty ? AppLocale.instance.t('gie_shop_name_required') : null,
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('ชื่อเจ้าของร้าน',
+                      Text(AppLocale.instance.t('esp_owner_name_label'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _ownerNameController,
                         decoration: profileInputDeco(
-                            hint: 'ชื่อ-นามสกุลเจ้าของร้าน', icon: Icons.person_outline),
+                            hint: AppLocale.instance.t('esp_owner_name_hint'), icon: Icons.person_outline),
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('เบอร์โทรศัพท์',
+                      Text(AppLocale.instance.t('reg_phone_label'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -671,14 +672,14 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('ที่อยู่',
+                      Text(AppLocale.instance.t('garage_address_prefix'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _addressController,
                         maxLines: 2,
                         decoration: profileInputDeco(
-                            hint: 'ที่อยู่อู่ซ่อมรถ', icon: Icons.location_on_outlined),
+                            hint: AppLocale.instance.t('gie_address_hint'), icon: Icons.location_on_outlined),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -687,7 +688,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                             child: OutlinedButton.icon(
                               onPressed: _handlePickAddress,
                               icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                              label: const Text('ค้นหาที่อยู่/พิกัด'),
+                              label: Text(AppLocale.instance.t('epc_find_address_button')),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xff2196F3),
                                 side: const BorderSide(color: Color(0xff2196F3)),
@@ -704,7 +705,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                                   ? _openAddressOnMap
                                   : null,
                               icon: const Icon(Icons.map_outlined, size: 18),
-                              label: const Text('ดูบนแผนที่'),
+                              label: Text(AppLocale.instance.t('epc_view_on_map_button')),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.grey.shade700,
                                 side: BorderSide(color: Colors.grey.shade400),
@@ -718,7 +719,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('อีเมล',
+                      Text(AppLocale.instance.t('auth_email_label'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -731,21 +732,21 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         ).copyWith(
                           suffixIcon: TextButton(
                             onPressed: _handleChangeEmail,
-                            child: const Text('เปลี่ยน'),
+                            child: Text(AppLocale.instance.t('epc_change_button')),
                           ),
                         ),
                       ),
 
                       // ===== ข้อมูลธุรกิจของอู่ (ไม่มีในฝั่งลูกค้า) =====
                       const SizedBox(height: 16),
-                      const Text('เวลาทำการ',
+                      Text(AppLocale.instance.t('gd_business_hours'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: _HoursCard(
-                              label: 'จ-ศ:',
+                              label: AppLocale.instance.t('gie_weekday_label'),
                               value: _weekdayHours,
                               onTap: () => _editHours(isWeekday: true),
                             ),
@@ -753,7 +754,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _HoursCard(
-                              label: 'ส-อา:',
+                              label: AppLocale.instance.t('gie_weekend_label'),
                               value: _weekendHours,
                               onTap: () => _editHours(isWeekday: false),
                             ),
@@ -762,11 +763,11 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Text('บริการที่ให้บริการ',
+                      Text(AppLocale.instance.t('gie_services_title'),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
                       Text(
-                        'เพิ่มบริการของอู่เอง พร้อมราคาโดยประมาณ — ลูกค้าจะเห็นเฉพาะบริการที่เปิดให้บริการเท่านั้น',
+                        AppLocale.instance.t('esp_services_desc'),
                         style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 10),
@@ -811,7 +812,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                               Icon(Icons.build_outlined, color: Colors.grey.shade400, size: 28),
                               const SizedBox(height: 8),
                               Text(
-                                'ยังไม่มีบริการ — กด "เพิ่มบริการใหม่" ด้านล่าง หรือแตะหมวดบริการด้านบน',
+                                AppLocale.instance.t('esp_no_services_hint'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                               ),
@@ -819,7 +820,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           ),
                         )
                       else ...[
-                        Text('บริการที่เพิ่มแล้ว (${_services.length})',
+                        Text('${AppLocale.instance.t('esp_added_services_count')} (${_services.length})',
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         ReorderableListView.builder(
@@ -876,7 +877,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                                                   color: Colors.grey.shade200,
                                                   borderRadius: BorderRadius.circular(8),
                                                 ),
-                                                child: Text('ปิดใช้งาน',
+                                                child: Text(AppLocale.instance.t('mtp_disabled_badge'),
                                                     style: TextStyle(
                                                         fontSize: 11,
                                                         color: Colors.grey.shade600)),
@@ -901,13 +902,13 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined,
                                         size: 20, color: Color(0xff2196F3)),
-                                    tooltip: 'แก้ไขบริการนี้',
+                                    tooltip: AppLocale.instance.t('esp_edit_service_tooltip'),
                                     onPressed: () => _openServiceForm(editIndex: index),
                                   ),
                                   IconButton(
                                     icon: Icon(Icons.delete_outline,
                                         size: 20, color: Colors.red.shade400),
-                                    tooltip: 'ลบบริการนี้',
+                                    tooltip: AppLocale.instance.t('esp_delete_service_tooltip'),
                                     onPressed: () => _removeService(index),
                                   ),
                                 ],
@@ -921,7 +922,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       OutlinedButton.icon(
                         onPressed: () => _openServiceForm(),
                         icon: const Icon(Icons.add, size: 18),
-                        label: const Text('เพิ่มบริการใหม่'),
+                        label: Text(AppLocale.instance.t('esp_add_service')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xff2196F3),
                           side: const BorderSide(color: Color(0xff2196F3)),
@@ -938,13 +939,13 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           color: const Color(0xffE3F2FD),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
                             Icon(Icons.info_outline, color: Color(0xff2196F3), size: 20),
                             SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'ข้อมูลที่แก้ไขจะแสดงในโปรไฟล์อู่ของคุณทันที',
+                                AppLocale.instance.t('gie_info_banner'),
                                 style: TextStyle(color: Color(0xff1976D2), fontSize: 13),
                               ),
                             ),
@@ -981,7 +982,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       )
                     : const Icon(Icons.save_outlined, color: Colors.white),
                 label: Text(
-                  _isLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
+                  _isLoading ? AppLocale.instance.t('arl_saving') : AppLocale.instance.t('gie_save_button'),
                   style: const TextStyle(
                       color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
@@ -1018,12 +1019,12 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       color: const Color(0xff2196F3).withOpacity(0.9),
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.camera_alt, color: Colors.white, size: 18),
                         SizedBox(width: 8),
-                        Text('เปลี่ยนรูปภาพ',
+                        Text(AppLocale.instance.t('gie_change_photo'),
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ],
                     ),

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'app_locale.dart';
 
 /// ผลลัพธ์จากการเลือกรูป (bytes รองรับทั้ง Web และมือถือ)
 class PickedAvatar {
@@ -17,17 +18,21 @@ Future<PickedAvatar?> pickProfileAvatar(BuildContext context) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) => Padding(
+    // ✅ แก้บัค: ห่อด้วย Material(color: Colors.white) กัน ListTile ขึ้น
+    // warning เรื่อง ink splash อาจมองไม่เห็น ตอนกดใน showModalBottomSheet
+    builder: (context) => Material(
+      color: Colors.white,
+      child: Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('เลือกรูปโปรไฟล์',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(AppLocale.instance.t('pap_sheet_title'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           ListTile(
             leading: const Icon(Icons.photo_library, color: Colors.blue),
-            title: const Text('เลือกจากคลังรูป'),
+            title: Text(AppLocale.instance.t('pap_pick_gallery')),
             onTap: () async {
               final picker = ImagePicker();
               final picked = await picker.pickImage(
@@ -49,7 +54,7 @@ Future<PickedAvatar?> pickProfileAvatar(BuildContext context) async {
           ),
           ListTile(
             leading: const Icon(Icons.camera_alt, color: Colors.blue),
-            title: const Text('ถ่ายรูป'),
+            title: Text(AppLocale.instance.t('pap_take_photo')),
             onTap: () async {
               final picker = ImagePicker();
               final picked = await picker.pickImage(
@@ -72,6 +77,7 @@ Future<PickedAvatar?> pickProfileAvatar(BuildContext context) async {
         ],
       ),
     ),
+    ),
   );
 }
 
@@ -93,7 +99,11 @@ class ProfileAvatarPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImage = imageProvider != null;
 
-    return Center(
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        final loc = AppLocale.instance;
+        return Center(
       child: Column(
         children: [
           GestureDetector(
@@ -132,12 +142,14 @@ class ProfileAvatarPicker extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'เปลี่ยนรูปโปรไฟล์',
-            style: TextStyle(color: Color(0xff2196F3), fontSize: 14),
+          Text(
+            loc.t('pap_change_photo'),
+            style: const TextStyle(color: Color(0xff2196F3), fontSize: 14),
           ),
         ],
       ),
+    );
+      },
     );
   }
 }

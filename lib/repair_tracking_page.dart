@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
 
 /// หน้าติดตามสถานะการซ่อม (Tracking Screen) — ใช้ร่วมกันทั้งฝั่งลูกค้าและอู่
 /// ลูกค้าเห็นปุ่ม "ติดต่อช่าง", อู่เห็นแบบอ่านอย่างเดียว (ไม่มีปุ่มโทร ให้ไปโทรจากที่อื่น)
@@ -17,10 +18,10 @@ class RepairTrackingPage extends StatefulWidget {
 // ✅ ลำดับขั้นตอนจริงตามสถานะที่ระบบมี — เปลี่ยนคำอธิบายขั้น "checking" ให้ตรงกับ
 // ดีไซน์ที่ขอ (แสดงเป็น "ช่างกำลังเดินทาง" แทน "กำลังตรวจสอบ" เฉพาะหน้านี้)
 const List<Map<String, String>> _steps = [
-  {'status': 'assigned', 'label': 'รับงานแล้ว'},
-  {'status': 'checking', 'label': 'ช่างกำลังเดินทาง'},
-  {'status': 'in_progress', 'label': 'กำลังซ่อม'},
-  {'status': 'completed', 'label': 'ซ่อมเสร็จ'},
+  {'status': 'assigned', 'labelKey': 'dash_status_assigned'},
+  {'status': 'checking', 'labelKey': 'dash_status_checking'},
+  {'status': 'in_progress', 'labelKey': 'dash_status_in_progress'},
+  {'status': 'completed', 'labelKey': 'track_step_completed'},
 ];
 
 class _RepairTrackingPageState extends State<RepairTrackingPage> {
@@ -33,6 +34,17 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
     super.initState();
     _fetchLogs();
     _fetchQuotation();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchLogs() async {
@@ -56,53 +68,56 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
   }
 
   String _vehicleLabel(String? value) {
+    final loc = AppLocale.instance;
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return loc.t('tech_vehicle_sedan');
       case 'suv':
         return 'SUV';
       case 'pickup':
-        return 'กระบะ';
+        return loc.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return loc.t('garage_address_fallback');
     }
   }
 
   String _statusLabel(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'pending':
-        return 'รอการตอบรับจากอู่';
+        return loc.t('track_status_pending');
       case 'accepted':
-        return 'อู่รับงานแล้ว รอมอบหมายช่าง';
+        return loc.t('track_status_accepted');
       case 'assigned':
-        return 'รับงานแล้ว';
+        return loc.t('dash_status_assigned');
       case 'checking':
-        return 'ช่างกำลังเดินทาง';
+        return loc.t('dash_status_checking');
       case 'in_progress':
-        return 'กำลังซ่อม';
+        return loc.t('dash_status_in_progress');
       case 'waiting_parts':
-        return 'รอรับอะไหล่';
+        return loc.t('dash_status_waiting_parts');
       case 'completed':
-        return 'ซ่อมเสร็จแล้ว';
+        return loc.t('tech_status_completed');
       case 'rejected':
-        return 'ถูกปฏิเสธ';
+        return loc.t('track_status_rejected');
       default:
         return status;
     }
   }
 
   String _statusDescription(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'checking':
-        return 'ช่างกำลังเดินทางมายังจุดนัดหมายของคุณ';
+        return loc.t('track_desc_checking');
       case 'in_progress':
-        return 'ช่างกำลังดำเนินการซ่อมรถของคุณ';
+        return loc.t('track_desc_in_progress');
       case 'waiting_parts':
-        return 'กำลังรออะไหล่ อาจใช้เวลาเพิ่มเติม';
+        return loc.t('track_desc_waiting_parts');
       case 'completed':
-        return 'ซ่อมเสร็จเรียบร้อยแล้ว';
+        return loc.t('track_desc_completed');
       default:
-        return 'รอการดำเนินการ';
+        return loc.t('track_desc_default');
     }
   }
 
@@ -110,15 +125,17 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
     // ✅ backend ส่งเวลาเป็น UTC ISO string — ต้อง .toLocal() ก่อนอ่าน .hour/.minute
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+    final timeSuffix = AppLocale.instance.isThai ? ' น.' : '';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}$timeSuffix';
   }
 
   String _formatDateTime(String? isoString) {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '-';
     final buddhistYear2Digit = (dt.year + 543) % 100;
+    final timeSuffix = AppLocale.instance.isThai ? ' น.' : '';
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}$timeSuffix';
   }
 
   // ✅ เวลาของแต่ละขั้นตอน — ใช้ข้อมูลจริงเท่าที่มี:
@@ -153,8 +170,8 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
     final end = DateTime.tryParse(endRaw ?? '');
     if (start == null || end == null) return null;
     final days = end.difference(start).inDays;
-    if (days <= 0) return 'ภายในวันเดียว';
-    return 'ประมาณ $days วัน';
+    if (days <= 0) return AppLocale.instance.t('track_duration_same_day');
+    return AppLocale.instance.t('track_duration_days').replaceAll('%s', '$days');
   }
 
   Future<void> _callTechnician(String? phone) async {
@@ -175,6 +192,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final status = widget.job['status']?.toString() ?? 'assigned';
     final technicianName = widget.job['technician_name']?.toString();
     final technicianPhone = widget.job['technician_phone']?.toString();
@@ -184,7 +202,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('ติดตามสถานะการซ่อม', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('myreq_track_status_button'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -218,7 +236,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('สถานะปัจจุบัน', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(loc.t('track_current_status_label'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         Text(_statusLabel(status),
                             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         Text(_statusDescription(status),
@@ -231,7 +249,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
             ),
 
             const SizedBox(height: 20),
-            const Text('ขั้นตอนการซ่อม', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(loc.t('track_steps_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
 
             // ===== Stepper =====
@@ -286,17 +304,17 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _steps[index]['label']!,
+                                  loc.t(_steps[index]['labelKey']!),
                                   style: TextStyle(
                                     fontWeight: done || active ? FontWeight.bold : FontWeight.normal,
                                     color: done || active ? Colors.black87 : Colors.grey,
                                   ),
                                 ),
                                 if (!done && !active)
-                                  const Text('รอดำเนินการ', style: TextStyle(color: Colors.grey, fontSize: 12))
+                                  Text(loc.t('myreq_status_pending'), style: const TextStyle(color: Colors.grey, fontSize: 12))
                                 else if (active && status == 'waiting_parts')
-                                  const Text('หยุดชั่วคราว: รอรับอะไหล่',
-                                      style: TextStyle(color: Color(0xff795548), fontSize: 12, fontWeight: FontWeight.w600))
+                                  Text(loc.t('track_paused_waiting_parts'),
+                                      style: const TextStyle(color: Color(0xff795548), fontSize: 12, fontWeight: FontWeight.w600))
                                 else if (_stepTimestamp(index) != null)
                                   Text(_stepTimestamp(index)!,
                                       style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -312,7 +330,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
             ),
 
             const SizedBox(height: 20),
-            const Text('รายละเอียดงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(loc.t('track_job_details_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -322,21 +340,21 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (technicianName != null)
-                    _detailRow(Icons.engineering_outlined, 'ช่างผู้รับผิดชอบ', technicianName),
-                  if (shopName != null) _detailRow(Icons.home_repair_service_outlined, 'อู่ซ่อมรถ', shopName),
-                  _detailRow(Icons.build_outlined, 'ประเภทปัญหา', widget.job['problem_category']?.toString() ?? '-'),
-                  _detailRow(Icons.directions_car_outlined, 'ประเภทรถ',
+                    _detailRow(Icons.engineering_outlined, loc.t('track_label_technician'), technicianName),
+                  if (shopName != null) _detailRow(Icons.home_repair_service_outlined, loc.t('profile_type_repair'), shopName),
+                  _detailRow(Icons.build_outlined, loc.t('req_problem_section_title'), widget.job['problem_category']?.toString() ?? '-'),
+                  _detailRow(Icons.directions_car_outlined, loc.t('car_type_label'),
                       _vehicleLabel(widget.job['vehicle_type']?.toString())),
-                  _detailRow(Icons.access_time, 'เวลาที่ส่งคำขอ',
+                  _detailRow(Icons.access_time, loc.t('track_label_request_time'),
                       _formatDateTime(widget.job['created_at']?.toString())),
                   if (_estimatedDurationText != null)
-                    _detailRow(Icons.hourglass_bottom, 'เวลาโดยประมาณ', _estimatedDurationText!),
+                    _detailRow(Icons.hourglass_bottom, loc.t('track_label_estimated_time'), _estimatedDurationText!),
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
-            const Text('ไทม์ไลน์ความคืบหน้า', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(loc.t('track_timeline_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             if (_isLoadingLogs)
               const Padding(
@@ -348,7 +366,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                child: const Text('ยังไม่มีบันทึกความคืบหน้าจากช่าง', style: TextStyle(color: Colors.grey)),
+                child: Text(loc.t('track_no_logs'), style: const TextStyle(color: Colors.grey)),
               )
             else
               ..._logs.map((log) => Container(
@@ -361,7 +379,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(log['technician_name']?.toString() ?? 'ช่าง',
+                            Text(log['technician_name']?.toString() ?? loc.t('track_technician_fallback'),
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                             Text(_formatTime(log['created_at']?.toString()),
                                 style: const TextStyle(color: Colors.grey, fontSize: 11)),
@@ -381,13 +399,13 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: const Color(0xffE8F5E9), borderRadius: BorderRadius.circular(12)),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.check_circle_outline, size: 18, color: Color(0xff4CAF50)),
-                    SizedBox(width: 8),
+                    const Icon(Icons.check_circle_outline, size: 18, color: Color(0xff4CAF50)),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text('ซ่อมเสร็จเรียบร้อยแล้ว ดูสรุปงาน/ให้คะแนนได้ที่หน้าประวัติคำขอซ่อม',
-                          style: TextStyle(color: Color(0xff4CAF50), fontSize: 12)),
+                      child: Text(loc.t('track_completed_banner'),
+                          style: const TextStyle(color: Color(0xff4CAF50), fontSize: 12)),
                     ),
                   ],
                 ),
@@ -398,13 +416,13 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: const Color(0xffE3F2FD), borderRadius: BorderRadius.circular(12)),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, size: 18, color: Color(0xff2196F3)),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text('ช่างจะแจ้งให้ทราบเมื่อซ่อมเสร็จ',
-                          style: TextStyle(color: Color(0xff2196F3), fontSize: 12)),
+                      child: Text(loc.t('track_pending_banner'),
+                          style: const TextStyle(color: Color(0xff2196F3), fontSize: 12)),
                     ),
                   ],
                 ),
@@ -423,7 +441,7 @@ class _RepairTrackingPageState extends State<RepairTrackingPage> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   icon: const Icon(Icons.call, color: Colors.white),
-                  label: const Text('ติดต่อช่าง', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  label: Text(loc.t('track_call_technician_button'), style: const TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],

@@ -9,6 +9,7 @@
 
 import 'package:flutter/material.dart';
 import 'customer_payment_page.dart';
+import 'app_locale.dart';
 
 class PaymentCard extends StatelessWidget {
   final int repairRequestId;
@@ -62,16 +63,20 @@ class PaymentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    late Widget content;
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        final loc = AppLocale.instance;
+        late Widget content;
 
     if (paymentStatus == 'pending_confirmation') {
       content = Row(
         children: [
           const Icon(Icons.hourglass_top, size: 18, color: Color(0xffFF9800)),
           const SizedBox(width: 8),
-          const Expanded(
-            child: Text('แจ้งชำระเงินแล้ว รออู่ตรวจสอบและยืนยัน',
-                style: TextStyle(fontSize: 13, color: Color(0xffFF9800), fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(loc.t('pc_pending_confirmation_msg'),
+                style: const TextStyle(fontSize: 13, color: Color(0xffFF9800), fontWeight: FontWeight.w600)),
           ),
         ],
       );
@@ -83,8 +88,8 @@ class PaymentCard extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline, size: 18, color: Color(0xffE53935)),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('อู่ปฏิเสธสลิปที่แนบมา', style: TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
+              Expanded(
+                child: Text(loc.t('pc_rejected_msg'), style: const TextStyle(color: Color(0xffE53935), fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ],
           ),
@@ -95,15 +100,15 @@ class PaymentCard extends StatelessWidget {
         ],
       );
     } else {
-      content = const Text('ซ่อมเสร็จแล้ว — ชำระเงินให้อู่เพื่อดำเนินการต่อ',
-          style: TextStyle(fontSize: 13, color: Colors.grey));
+      content = Text(loc.t('pc_unpaid_msg'),
+          style: const TextStyle(fontSize: 13, color: Colors.grey));
     }
 
     final buttonLabel = paymentStatus == 'rejected'
-        ? 'แนบสลิปใหม่'
+        ? loc.t('pc_reattach_slip_button')
         : paymentStatus == 'pending_confirmation'
-            ? 'ดูสถานะการชำระเงิน'
-            : 'ชำระเงิน';
+            ? loc.t('pc_view_payment_status_button')
+            : loc.t('pc_pay_button');
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -124,7 +129,7 @@ class PaymentCard extends StatelessWidget {
                 child: const Icon(Icons.payments_outlined, size: 16, color: Color(0xff4CAF50)),
               ),
               const SizedBox(width: 8),
-              const Text('การชำระเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(loc.t('garage_menu_payments'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ],
           ),
           const SizedBox(height: 10),
@@ -144,6 +149,8 @@ class PaymentCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }

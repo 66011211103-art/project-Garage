@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'app_locale.dart';
 
 /// หน้าจอแสดงตำแหน่งอู่บนแผนที่ (ใช้ OpenStreetMap ผ่าน flutter_map)
 ///
@@ -39,6 +40,22 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
     widget.latitude,
     widget.longitude,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +161,7 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
                       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
                       if (!launched && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เปิดแอปแผนที่ไม่สำเร็จ'), backgroundColor: Colors.red),
+                          SnackBar(content: Text(AppLocale.instance.t('gd_open_maps_failed')), backgroundColor: Colors.red),
                         );
                       }
                     },
@@ -155,7 +172,7 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
                       ),
                     ),
                     icon: const Icon(Icons.directions, size: 18),
-                    label: const Text('นำทาง'),
+                    label: Text(AppLocale.instance.t('common_navigate')),
                   ),
                 ],
               ),

@@ -7,9 +7,58 @@ import 'technician_dashboard.dart'; // ✅ หน้าหลักฝั่ง�
 import 'register.dart';
 import 'api_service.dart';
 import 'forgot_password_page.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษา ไทย/อังกฤษ
+
+/// ✅ เพิ่มใหม่: เก็บ/โหลด/ล้าง session ผู้ใช้ที่ล็อกอินไว้ ให้แอปจำสถานะล็อกอินข้ามการ
+/// เปิดปิดแอปได้จริง — เดิมแอปไม่เคยบันทึก session เลย (home: const LoginPage() ตายตัว)
+/// ทำให้ทุกครั้งที่ระบบปฏิบัติการ (โดยเฉพาะ Android) เคลียร์แอปออกจากหน่วยความจำ
+/// เบื้องหลัง (เกิดขึ้นบ่อยมากบนมือถือทั่วไป แค่สลับไปแอปอื่นหรือปิดหน้าจอทิ้งไว้สักพัก)
+/// พอกลับมาเปิดแอปใหม่ก็จะเจอหน้า login เปล่าๆ ทุกครั้ง ทั้งที่ผู้ใช้ไม่เคยกด logout เลย
+/// ผู้ใช้จึงรู้สึกว่า "แอปเด้ง/หลุดล็อกอินเอง" ทั้งที่จริงคือแอปไม่เคยจำ session ไว้ตั้งแต่แรก
+class SessionStore {
+  static const _key = 'session_user';
+
+  static Future<void> save(Map<String, dynamic> user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(user));
+    // ignore: avoid_print
+    print('[SessionStore] saved session for userType=${user['userType']} id=${user['id']}');
+  }
+
+  static Future<Map<String, dynamic>?> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    // ignore: avoid_print
+    print('[SessionStore] load(): raw=${raw == null ? 'null' : '(${raw.length} chars)'}');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final parsed = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      // ignore: avoid_print
+      print('[SessionStore] load(): parsed userType=${parsed['userType']} id=${parsed['id']}');
+      return parsed;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[SessionStore] load(): FAILED TO PARSE: $e');
+      return null;
+    }
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+    // ignore: avoid_print
+    print('[SessionStore] cleared session');
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ โหลดภาษาที่ผู้ใช้เคยเลือกไว้ก่อนเริ่ม runApp เสมอ ไม่งั้นต้องรอเข้าหน้าตั้งค่าก่อนถึงจะโหลด
+  await AppLocale.instance.load();
+
+  // ✅ เพิ่มใหม่: เช็ค session ที่เคยล็อกอินไว้ก่อนตัดสินใจว่าจะเปิดหน้าไหน (ดู SessionStore ด้านบน)
+  final savedUser = await SessionStore.load();
 
   // ✅ กันไม่ให้แอปโชว์ "หน้าจอแดง" (Flutter error screen) เวลามี widget พัง
   //     ไม่ว่าจะเกิดที่หน้าไหนก็ตาม — โชว์การ์ดข้อความสุภาพแทน
@@ -26,10 +75,10 @@ void main() async {
             children: [
               Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
               const SizedBox(height: 12),
-              const Text(
-                'เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่อีกครั้ง',
+              Text(
+                AppLocale.instance.t('error_generic'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
+                style: const TextStyle(color: Colors.black54),
               ),
             ],
           ),
@@ -38,17 +87,41 @@ void main() async {
     );
   };
 
-  runApp(const MyApp());
+  runApp(MyApp(savedUser: savedUser));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Map<String, dynamic>? savedUser;
+
+  const MyApp({super.key, this.savedUser});
+
+  // ✅ เพิ่มใหม่: เลือกหน้าแรกจาก session ที่บันทึกไว้ ให้ตรงกับ userType เดิม
+  // (ไม่มี session บันทึกไว้ -> ไปหน้า login ตามปกติ)
+  Widget _resolveHome() {
+    final user = savedUser;
+    if (user == null) return const LoginPage();
+    final userType = user['userType'] ?? 'customer';
+    if (userType == 'repair') {
+      return GarageDashboard(userData: user);
+    } else if (userType == 'technician') {
+      return TechnicianDashboard(userData: user);
+    }
+    return HomePage(userData: user);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const LoginPage(),
+    // ✅ ฟัง AppLocale ที่ราก MaterialApp เลย เวลากดเปลี่ยนภาษาจากหน้าตั้งค่า
+    // ทั้งต้นคือจะรีบิลด์ ขึ้นใหม่ทั้งต้นทีมทันที (ไม่ต้องรอหน้านั้นๆ ผูกตัวเอง)
+    // หน้าไหนจะเห็นภาษาเปลี่ยนจริง ขึ้นอยู่กับว่าหน้านั้นใช้ AppLocale.instance.t() หรือยัง
+    return AnimatedBuilder(
+      animation: AppLocale.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: _resolveHome(),
+        );
+      },
     );
   }
 }
@@ -72,8 +145,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
 
   // ✅ ควบคุม dropdown เอง แบบ inline ธรรมดา ไม่ใช้ Overlay/Autocomplete
+  // ✅ แก้ไข: เอา dropdown บัญชีที่จดจำไว้ออกจากช่องรหัสผ่าน ให้เหลือแสดงใต้ช่องอีเมล
+  // ที่เดียวตามที่ขอ (เดิมแตะช่องไหนก็ขึ้น dropdown ได้ทั้งคู่ ดูซ้ำซ้อน)
   bool _showEmailSuggestions = false;
-  bool _showPasswordSuggestions = false;
 
   // ✅ รายการบัญชีที่เคยบันทึกไว้ (สูงสุด 5 บัญชีล่าสุด)
   List<Map<String, String>> _savedAccounts = [];
@@ -82,6 +156,12 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _loadSavedAccounts();
+    // ✅ รีบิลด์หน้าล็อกอินอัตโนมัติเมื่อผู้ใช้เปลี่ยนภาษาจากหน้าตั้งค่า (เผื่อย้อนกลับมาหน้านี้)
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadSavedAccounts() async {
@@ -155,21 +235,18 @@ class _LoginPageState extends State<LoginPage> {
       _passwordController.text = account['password'] ?? '';
       _rememberMe = true;
       _showEmailSuggestions = false;
-      _showPasswordSuggestions = false;
     });
   }
 
   void _closeSuggestions() {
-    if (_showEmailSuggestions || _showPasswordSuggestions) {
-      setState(() {
-        _showEmailSuggestions = false;
-        _showPasswordSuggestions = false;
-      });
+    if (_showEmailSuggestions) {
+      setState(() => _showEmailSuggestions = false);
     }
   }
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -191,6 +268,8 @@ class _LoginPageState extends State<LoginPage> {
 
     if (result.success) {
       await _updateSavedAccounts();
+      // ✅ เพิ่มใหม่: บันทึก session ไว้ ให้เปิดแอปครั้งต่อไปไม่ต้องล็อกอินซ้ำ (ดู SessionStore ด้านบน)
+      await SessionStore.save(result.data!['user']);
 
       final userType = result.data?['user']?['userType'] ?? 'customer';
 
@@ -324,6 +403,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
       body: SafeArea(
@@ -337,27 +417,27 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 40),
 
                 Column(
-                  children: const [
-                    Image(
+                  children: [
+                    const Image(
                       image: AssetImage('images/logo.png'),
                       width: 220,
                       height: 212,
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
-                      'อู่ที่ไว้วางใจ',
+                      loc.t('auth_app_name'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.blue,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      'ค้นหาอู่ซ่อมรถใกล้คุณ',
+                      loc.t('auth_tagline'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
@@ -383,10 +463,10 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Center(
+                        Center(
                           child: Text(
-                            'เข้าสู่ระบบ',
-                            style: TextStyle(
+                            loc.t('auth_login_title'),
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
@@ -395,7 +475,7 @@ class _LoginPageState extends State<LoginPage> {
 
                         const SizedBox(height: 20),
 
-                        const Text('อีเมล'),
+                        Text(loc.t('auth_email_label')),
                         const SizedBox(height: 8),
 
                         // ✅ กันไม่ให้แตะในช่องอีเมล/รหัสผ่านไปโดน GestureDetector ปิด dropdown ของตัวเอง
@@ -415,7 +495,6 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 onTap: () {
                                   setState(() {
-                                    _showPasswordSuggestions = false;
                                     _showEmailSuggestions =
                                         _savedAccounts.isNotEmpty;
                                   });
@@ -433,7 +512,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
-                                    return 'กรุณากรอกอีเมล';
+                                    return loc.t('auth_email_required');
                                   }
                                   return null;
                                 },
@@ -457,7 +536,7 @@ class _LoginPageState extends State<LoginPage> {
 
                         const SizedBox(height: 16),
 
-                        const Text('รหัสผ่าน'),
+                        Text(loc.t('auth_password_label')),
                         const SizedBox(height: 8),
 
                         GestureDetector(
@@ -476,11 +555,9 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 onFieldSubmitted: (_) => _handleLogin(),
                                 onTap: () {
-                                  setState(() {
-                                    _showEmailSuggestions = false;
-                                    _showPasswordSuggestions =
-                                        _savedAccounts.isNotEmpty;
-                                  });
+                                  if (_showEmailSuggestions) {
+                                    setState(() => _showEmailSuggestions = false);
+                                  }
                                 },
                                 decoration: _fieldDecoration(
                                   hint: '••••••••',
@@ -507,13 +584,11 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'กรุณากรอกรหัสผ่าน';
+                                    return loc.t('auth_password_required');
                                   }
                                   return null;
                                 },
                               ),
-                              if (_showPasswordSuggestions)
-                                _buildAccountsDropdown(_savedAccounts),
                             ],
                           ),
                         ),
@@ -540,9 +615,9 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  const Text(
-                                    'จดจำฉัน',
-                                    style: TextStyle(
+                                  Text(
+                                    loc.t('auth_remember_me'),
+                                    style: const TextStyle(
                                       color: Colors.black87,
                                       fontSize: 14,
                                     ),
@@ -560,9 +635,9 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 );
                               },
-                              child: const Text(
-                                'ลืมรหัสผ่าน?',
-                                style: TextStyle(color: Colors.blue),
+                              child: Text(
+                                loc.t('auth_forgot_password'),
+                                style: const TextStyle(color: Colors.blue),
                               ),
                             ),
                           ],
@@ -590,9 +665,9 @@ class _LoginPageState extends State<LoginPage> {
                                       strokeWidth: 2.5,
                                     ),
                                   )
-                                : const Text(
-                                    'เข้าสู่ระบบ',
-                                    style: TextStyle(
+                                : Text(
+                                    loc.t('auth_login_title'),
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       color: Colors.white,
                                     ),
@@ -603,13 +678,13 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 20),
 
                         Row(
-                          children: const [
-                            Expanded(child: Divider()),
+                          children: [
+                            const Expanded(child: Divider()),
                             Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10),
-                              child: Text('หรือ'),
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(loc.t('auth_or_divider')),
                             ),
-                            Expanded(child: Divider()),
+                            const Expanded(child: Divider()),
                           ],
                         ),
 
@@ -618,7 +693,7 @@ class _LoginPageState extends State<LoginPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text('ยังไม่มีบัญชี? '),
+                            Text(loc.t('auth_no_account')),
                             GestureDetector(
                               onTap: () {
                                 Navigator.push(
@@ -628,9 +703,9 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 );
                               },
-                              child: const Text(
-                                'สมัครสมาชิก',
-                                style: TextStyle(
+                              child: Text(
+                                loc.t('auth_signup'),
+                                style: const TextStyle(
                                   color: Colors.blue,
                                   fontWeight: FontWeight.bold,
                                 ),

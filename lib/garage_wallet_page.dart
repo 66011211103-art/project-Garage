@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // ✅ Clipboard.setData ให้อู่กดคัดลอกเลขบัญชีได้
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'app_locale.dart';
+import 'request_repair_page.dart' show problemCategoryDisplayLabel;
 
 class GarageWalletPage extends StatefulWidget {
   final int garageId;
@@ -52,6 +54,17 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
   void initState() {
     super.initState();
     _fetchAll();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchAll() async {
@@ -78,7 +91,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
         // แทนที่จะปล่อยให้ขึ้น "ไม่มีค่าคอมค้างจ่าย" หลอกๆ เหมือนก่อนหน้านี้
         _unpaidLoadError = unpaidResult.message.isNotEmpty
             ? unpaidResult.message
-            : 'โหลดรายการค่าคอมมิชชั่นที่ค้างจ่ายไม่สำเร็จ';
+            : AppLocale.instance.t('gw_load_unpaid_failed');
       }
       if (topupsResult.success && topupsResult.data != null) {
         _topups = List<Map<String, dynamic>>.from(topupsResult.data as List);
@@ -108,7 +121,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
   void _copyToClipboard(String value, String label) {
     Clipboard.setData(ClipboardData(text: value));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('คัดลอก$labelแล้ว'), duration: const Duration(seconds: 1)),
+      SnackBar(content: Text(AppLocale.instance.t('gw_copied_msg').replaceAll('%s', label)), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -129,13 +142,13 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
   Future<void> _submitTopup() async {
     if (_selectedCommissionIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกรายการค่าคอมมิชชั่นที่ต้องการจ่ายอย่างน้อย 1 งาน'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('gw_select_commission_required')), backgroundColor: Colors.red),
       );
       return;
     }
     if (_slipBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาแนบสลิปการโอนเงิน'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('gw_slip_required')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -167,11 +180,11 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
   String _topupStatusLabel(String? status) {
     switch (status) {
       case 'confirmed':
-        return 'ยืนยันแล้ว';
+        return AppLocale.instance.t('qc_status_confirmed');
       case 'rejected':
-        return 'ถูกปฏิเสธ';
+        return AppLocale.instance.t('track_status_rejected');
       default:
-        return 'รอตรวจสอบ';
+        return AppLocale.instance.t('php_status_pending');
     }
   }
 
@@ -219,9 +232,10 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
     final grossAmount = double.tryParse(c['gross_amount']?.toString() ?? '0') ?? 0;
     final commissionAmount = double.tryParse(c['commission_amount']?.toString() ?? '0') ?? 0;
     final rate = c['commission_rate']?.toString() ?? '-';
+    final loc = AppLocale.instance;
     final category = (c['problem_category']?.toString() ?? '').isNotEmpty
-        ? c['problem_category'].toString()
-        : 'งานซ่อม';
+        ? problemCategoryDisplayLabel(c['problem_category'].toString())
+        : loc.t('gw_repair_job_fallback');
 
     return InkWell(
       onTap: () => _toggleCommission(id),
@@ -245,10 +259,10 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('งานซ่อม #${c['repair_request_id']} · $category',
+                  Text(loc.t('gw_job_number_prefix').replaceAll('%id', '${c['repair_request_id']}').replaceAll('%category', category),
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                   const SizedBox(height: 3),
-                  Text('ยอดลูกค้าจ่าย ฿${grossAmount.toStringAsFixed(2)} · หัก $rate% · ${_formatDate(c['created_at']?.toString())}',
+                  Text(loc.t('gw_gross_amount_line').replaceAll('%amount', grossAmount.toStringAsFixed(2)).replaceAll('%rate', rate).replaceAll('%date', _formatDate(c['created_at']?.toString())),
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 11.5)),
                 ],
               ),
@@ -263,6 +277,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final isNegative = _walletBalance < 0;
 
     final body = RefreshIndicator(
@@ -285,13 +300,13 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                   ),
                   child: Column(
                     children: [
-                      const Text('ยอดเครดิตคงเหลือใน Wallet',
-                          style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      Text(loc.t('gw_wallet_balance_label'),
+                          style: const TextStyle(color: Colors.white70, fontSize: 13)),
                       const SizedBox(height: 6),
                       Text('฿${_walletBalance.toStringAsFixed(2)}',
                           style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      Text('อัตราค่าคอมมิชชั่น ${_commissionRate.toStringAsFixed(1)}% ต่องาน',
+                      Text(loc.t('gw_commission_rate_label').replaceAll('%s', _commissionRate.toStringAsFixed(1)),
                           style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       if (isNegative) ...[
                         const SizedBox(height: 12),
@@ -301,14 +316,14 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                             color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
-                              SizedBox(width: 6),
+                              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+                              const SizedBox(width: 6),
                               Flexible(
-                                child: Text('เครดิตติดลบ กรุณาชำระค่าคอมมิชชั่นที่ค้างก่อนรับงานใหม่',
-                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                child: Text(loc.t('gw_negative_credit_warning'),
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
                               ),
                             ],
                           ),
@@ -326,14 +341,14 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(12)),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Color(0xffE65100), size: 18),
-                        SizedBox(width: 8),
+                        const Icon(Icons.error_outline, color: Color(0xffE65100), size: 18),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'ระบบยังไม่ได้ตั้งค่าบัญชีรับเงินของแพลตฟอร์ม กรุณาติดต่อผู้ดูแลระบบก่อนโอนเงิน',
-                            style: TextStyle(color: Color(0xffE65100), fontSize: 12.5),
+                            loc.t('gw_no_platform_account'),
+                            style: const TextStyle(color: Color(0xffE65100), fontSize: 12.5),
                           ),
                         ),
                       ],
@@ -347,16 +362,16 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('โอนเงินเข้าบัญชีนี้', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text(loc.t('gw_transfer_to_account_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         const SizedBox(height: 12),
-                        _bankRow('ธนาคาร', _platformBankAccount!['bank_name']?.toString() ?? '-'),
+                        _bankRow(loc.t('bsp_bank_label'), _platformBankAccount!['bank_name']?.toString() ?? '-'),
                         const SizedBox(height: 8),
-                        _bankRow('เลขที่บัญชี', _platformBankAccount!['bank_account_number']?.toString() ?? '-', copyable: true),
+                        _bankRow(loc.t('bsp_account_number_label'), _platformBankAccount!['bank_account_number']?.toString() ?? '-', copyable: true),
                         const SizedBox(height: 8),
-                        _bankRow('ชื่อบัญชี', _platformBankAccount!['bank_account_name']?.toString() ?? '-'),
+                        _bankRow(loc.t('bsp_account_name_label'), _platformBankAccount!['bank_account_name']?.toString() ?? '-'),
                         if ((_platformBankAccount!['promptpay_id']?.toString() ?? '').isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          _bankRow('พร้อมเพย์', _platformBankAccount!['promptpay_id'].toString(), copyable: true),
+                          _bankRow(loc.t('gw_promptpay_label'), _platformBankAccount!['promptpay_id'].toString(), copyable: true),
                         ],
                       ],
                     ),
@@ -372,9 +387,9 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('ค่าคอมมิชชั่นที่ค้างจ่าย', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(loc.t('gw_unpaid_commissions_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                       const SizedBox(height: 4),
-                      Text('เลือกงานที่จะชำระ โอนเงินตามยอดที่เลือกเข้าบัญชีแพลตฟอร์ม แล้วแนบสลิปเพื่อรอแอดมินตรวจสอบ',
+                      Text(loc.t('gw_unpaid_instructions'),
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                       const SizedBox(height: 14),
 
@@ -390,7 +405,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                               const Icon(Icons.error_outline, color: Color(0xffC62828), size: 18),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text('โหลดรายการค่าคอมมิชชั่นที่ค้างจ่ายไม่สำเร็จ ($_unpaidLoadError) ลองปัดหน้าจอลงเพื่อรีเฟรช',
+                                child: Text(loc.t('gw_load_unpaid_failed_banner').replaceAll('%s', '$_unpaidLoadError'),
                                     style: const TextStyle(color: Color(0xffC62828), fontSize: 12.5)),
                               ),
                             ],
@@ -401,9 +416,9 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           decoration: BoxDecoration(color: const Color(0xffE8F5E9), borderRadius: BorderRadius.circular(12)),
-                          child: const Center(
-                            child: Text('🎉 ไม่มีค่าคอมมิชชั่นค้างจ่าย',
-                                style: TextStyle(color: Color(0xff2E7D32), fontWeight: FontWeight.w600)),
+                          child: Center(
+                            child: Text(loc.t('gw_no_unpaid_commissions'),
+                                style: const TextStyle(color: Color(0xff2E7D32), fontWeight: FontWeight.w600)),
                           ),
                         )
                       else ...[
@@ -415,9 +430,9 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('เลือกแล้ว ${_selectedCommissionIds.length} งาน',
+                              Text(loc.t('gw_selected_count').replaceAll('%s', '${_selectedCommissionIds.length}'),
                                   style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
-                              Text('รวม ฿${_selectedTotal.toStringAsFixed(2)}',
+                              Text(loc.t('gw_selected_total_prefix').replaceAll('%s', _selectedTotal.toStringAsFixed(2)),
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff1976D2))),
                             ],
                           ),
@@ -439,7 +454,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                                     children: [
                                       Icon(Icons.upload_file, color: Colors.grey.shade600, size: 18),
                                       const SizedBox(width: 8),
-                                      Text('แนบสลิปการโอนเงิน', style: TextStyle(color: Colors.grey.shade600)),
+                                      Text(loc.t('gw_attach_slip_label'), style: TextStyle(color: Colors.grey.shade600)),
                                     ],
                                   )
                                 : ClipRRect(
@@ -462,7 +477,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                                 ? const SizedBox(
                                     width: 18, height: 18,
                                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('ส่งชำระค่าคอมมิชชั่น', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                : Text(loc.t('gw_submit_payment_button'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
@@ -471,13 +486,13 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                 ),
 
                 const SizedBox(height: 20),
-                const Text('ประวัติการชำระค่าคอมมิชชั่น', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(loc.t('gw_history_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 10),
 
                 if (_topups.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 30),
-                    child: Center(child: Text('ยังไม่มีประวัติการชำระค่าคอมมิชชั่น', style: TextStyle(color: Colors.grey))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 30),
+                    child: Center(child: Text(loc.t('gw_history_empty'), style: const TextStyle(color: Colors.grey))),
                   )
                 else
                   ..._topups.map((t) {
@@ -498,12 +513,12 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                 if (jobCount != null) ...[
                                   const SizedBox(height: 2),
-                                  Text('$jobCount งาน · ${_formatDate(t['submitted_at']?.toString())}',
+                                  Text(loc.t('gw_history_job_count_date').replaceAll('%count', '$jobCount').replaceAll('%date', _formatDate(t['submitted_at']?.toString())),
                                       style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                                 ],
                                 if (status == 'rejected' && (t['rejection_reason'] ?? '').toString().isNotEmpty) ...[
                                   const SizedBox(height: 2),
-                                  Text('เหตุผล: ${t['rejection_reason']}',
+                                  Text(loc.t('myreq_rejection_reason_prefix').replaceAll('%s', '${t['rejection_reason']}'),
                                       style: const TextStyle(color: Color(0xffE53935), fontSize: 12)),
                                 ],
                               ],
@@ -534,7 +549,7 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('Wallet ของอู่', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('gw_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

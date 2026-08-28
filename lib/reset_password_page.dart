@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 class ResetPasswordPage extends StatefulWidget {
   final String email;
@@ -17,7 +18,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _otpController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -55,13 +67,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF2F4F7),
         elevation: 0,
         foregroundColor: Colors.black,
-        title: const Text('ยืนยัน OTP'),
+        title: Text(loc.t('reset_pw_title')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -71,7 +84,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Text(
-                  'เราได้ส่งรหัส OTP ไปที่ ${widget.email}\nกรุณากรอกรหัสและตั้งรหัสผ่านใหม่',
+                  '${loc.t('reset_pw_sent_to').replaceAll('%s', widget.email)}\n${loc.t('reset_pw_enter_and_set')}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.grey),
                 ),
@@ -96,7 +109,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('รหัส OTP'),
+                      Text(loc.t('reset_pw_otp_label')),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _otpController,
@@ -104,7 +117,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         maxLength: 6,
                         decoration: InputDecoration(
                           counterText: '',
-                          hintText: '6 หลัก',
+                          hintText: loc.t('reset_pw_otp_hint'),
                           prefixIcon: const Icon(Icons.pin_outlined),
                           filled: true,
                           fillColor: const Color(0xFFF5F6FA),
@@ -115,14 +128,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().length != 6) {
-                            return 'กรุณากรอกรหัส OTP 6 หลัก';
+                            return loc.t('reset_pw_otp_required');
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
 
-                      const Text('รหัสผ่านใหม่'),
+                      Text(loc.t('reset_pw_new_password_label')),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _newPasswordController,
@@ -138,14 +151,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         validator: (value) {
                           if (value == null || value.length < 6) {
-                            return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                            return loc.t('reset_pw_min_length');
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
 
-                      const Text('ยืนยันรหัสผ่านใหม่'),
+                      Text(loc.t('reset_pw_confirm_label')),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _confirmPasswordController,
@@ -161,7 +174,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         validator: (value) {
                           if (value != _newPasswordController.text) {
-                            return 'รหัสผ่านไม่ตรงกัน';
+                            return loc.t('reset_pw_mismatch');
                           }
                           return null;
                         },
@@ -188,9 +201,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                     strokeWidth: 2.5,
                                   ),
                                 )
-                              : const Text(
-                                  'ตั้งรหัสผ่านใหม่',
-                                  style: TextStyle(
+                              : Text(
+                                  loc.t('reset_pw_submit'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     color: Colors.white,
                                   ),

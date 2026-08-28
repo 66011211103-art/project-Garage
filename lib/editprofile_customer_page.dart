@@ -5,6 +5,7 @@ import 'profile_avatar_picker.dart';
 import 'address_picker_sheet.dart'; // ✅ ค้นหาที่อยู่แบบแชท + geocoding ฟรีผ่าน OpenStreetMap
 import 'address_map_page.dart'; // ✅ หน้าแผนที่กลาง ใช้ได้ทั้งลูกค้าและอู่
 import 'change_email_sheet.dart'; // ✅ เปลี่ยนอีเมลผ่าน OTP
+import 'app_locale.dart';
 
 /// หน้าแก้ไขข้อมูลส่วนตัวสำหรับ "ลูกค้า"
 class EditProfileCustomerPage extends StatefulWidget {
@@ -38,6 +39,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     final u = widget.userData;
     _firstNameController = TextEditingController(text: u['first_name'] ?? '');
     _lastNameController = TextEditingController(text: u['last_name'] ?? '');
@@ -51,12 +53,17 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   String get _displayInitial {
@@ -109,7 +116,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
       context,
       MaterialPageRoute(
         builder: (context) => AddressMapPage(
-          title: name.isEmpty ? 'ที่อยู่ของฉัน' : name,
+          title: name.isEmpty ? AppLocale.instance.t('epc_my_address_fallback') : name,
           subtitle: _addressController.text.trim(),
           latitude: _latitude!,
           longitude: _longitude!,
@@ -128,7 +135,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
         _emailChangedSuccessfully = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เปลี่ยนอีเมลสำเร็จ'), backgroundColor: Colors.green),
+        SnackBar(content: Text(AppLocale.instance.t('epc_email_change_success')), backgroundColor: Colors.green),
       );
     }
   }
@@ -150,7 +157,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('อัปโหลดรูปไม่สำเร็จ: ${avatarResult.message}'),
+            content: Text(AppLocale.instance.t('ep_avatar_upload_failed').replaceAll('%s', avatarResult.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -189,11 +196,12 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แก้ไขโปรไฟล์', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('ep_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context, _emailChangedSuccessfully ? true : null),
@@ -229,15 +237,15 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('ชื่อ'),
+                          Text(loc.t('reg_first_name_label')),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _firstNameController,
                             onChanged: (_) => setState(() {}),
                             decoration: profileInputDeco(
-                                hint: 'ชื่อ', icon: Icons.person_outline),
+                                hint: loc.t('reg_first_name_label'), icon: Icons.person_outline),
                             validator: (v) => v == null || v.trim().isEmpty
-                                ? 'กรุณากรอกชื่อ'
+                                ? loc.t('reg_first_name_required')
                                 : null,
                           ),
                         ],
@@ -248,14 +256,14 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('นามสกุล'),
+                          Text(loc.t('reg_last_name_label')),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _lastNameController,
                             decoration: profileInputDeco(
-                                hint: 'นามสกุล', icon: Icons.person_outline),
+                                hint: loc.t('reg_last_name_label'), icon: Icons.person_outline),
                             validator: (v) => v == null || v.trim().isEmpty
-                                ? 'กรุณากรอกนามสกุล'
+                                ? loc.t('reg_last_name_required')
                                 : null,
                           ),
                         ],
@@ -266,7 +274,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
 
                 const SizedBox(height: 16),
 
-                const Text('เบอร์โทรศัพท์'),
+                Text(loc.t('reg_phone_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
@@ -277,13 +285,13 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
 
                 const SizedBox(height: 16),
 
-                const Text('ที่อยู่'),
+                Text(loc.t('garage_address_prefix')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _addressController,
                   maxLines: 2,
                   decoration: profileInputDeco(
-                      hint: 'ที่อยู่สำหรับติดต่อ',
+                      hint: loc.t('epc_address_hint'),
                       icon: Icons.location_on_outlined),
                 ),
                 const SizedBox(height: 8),
@@ -293,7 +301,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                       child: OutlinedButton.icon(
                         onPressed: _handlePickAddress,
                         icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                        label: const Text('ค้นหาที่อยู่/พิกัด'),
+                        label: Text(loc.t('epc_find_address_button')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xff2196F3),
                           side: const BorderSide(color: Color(0xff2196F3)),
@@ -310,7 +318,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                             ? _openAddressOnMap
                             : null,
                         icon: const Icon(Icons.map_outlined, size: 18),
-                        label: const Text('ดูบนแผนที่'),
+                        label: Text(loc.t('epc_view_on_map_button')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.grey.shade700,
                           side: BorderSide(color: Colors.grey.shade400),
@@ -325,7 +333,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
 
                 const SizedBox(height: 16),
 
-                const Text('อีเมล'),
+                Text(loc.t('auth_email_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
@@ -337,7 +345,7 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                   ).copyWith(
                     suffixIcon: TextButton(
                       onPressed: _handleChangeEmail,
-                      child: const Text('เปลี่ยน'),
+                      child: Text(loc.t('epc_change_button')),
                     ),
                   ),
                 ),
@@ -357,8 +365,8 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                             side: const BorderSide(color: Colors.grey),
                           ),
                         ),
-                        child: const Text('ยกเลิก',
-                            style: TextStyle(color: Colors.grey, fontSize: 16)),
+                        child: Text(loc.t('cancel'),
+                            style: const TextStyle(color: Colors.grey, fontSize: 16)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -380,9 +388,9 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2),
                               )
-                            : const Text(
-                                'บันทึกการเปลี่ยนแปลง',
-                                style: TextStyle(
+                            : Text(
+                                loc.t('ep_save_changes_button'),
+                                style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold),

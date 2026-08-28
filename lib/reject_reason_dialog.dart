@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_locale.dart';
 
 /// เหตุผลปฏิเสธงานสำเร็จรูป ให้อู่เลือกเร็วๆ ไม่ต้องพิมพ์เอง
 const List<String> kRejectionReasonPresets = [
@@ -10,6 +11,23 @@ const List<String> kRejectionReasonPresets = [
   'ต้องการข้อมูลเพิ่มเติมจากลูกค้าก่อนรับงาน',
   'ราคา/งบประมาณไม่ตรงกับที่ลูกค้าต้องการ',
 ];
+
+// ✅ kRejectionReasonPresets ยังคงเป็นภาษาไทยเสมอ (คือค่าจริงที่ถูกส่งไปเก็บเป็น
+// rejection_reason ให้ลูกค้าเห็น) — ฟังก์ชันนี้ใช้แค่แปลข้อความที่โชว์บน picker
+// ฝั่งอู่เท่านั้น (อู่อาจตั้งภาษาแอปเป็นอังกฤษ)
+String _rejectionReasonDisplayLabel(String reason) {
+  const map = {
+    'คิวงานเต็ม ไม่สามารถรับงานเพิ่มได้ในขณะนี้': 'reject_preset_1',
+    'อู่ไม่มีความชำนาญในการซ่อมประเภทนี้': 'reject_preset_2',
+    'อยู่นอกพื้นที่ให้บริการของอู่': 'reject_preset_3',
+    'ไม่มีอะไหล่ที่ต้องใช้ในขณะนี้': 'reject_preset_4',
+    'ช่วงเวลาที่ลูกค้าต้องการไม่ตรงกับคิวที่ว่าง': 'reject_preset_5',
+    'ต้องการข้อมูลเพิ่มเติมจากลูกค้าก่อนรับงาน': 'reject_preset_6',
+    'ราคา/งบประมาณไม่ตรงกับที่ลูกค้าต้องการ': 'reject_preset_7',
+  };
+  final key = map[reason];
+  return key != null ? AppLocale.instance.t(key) : reason;
+}
 
 /// เปิด dialog ให้เลือกเหตุผลปฏิเสธ (หรือพิมพ์เอง) แล้วส่งให้ลูกค้า
 /// คืนค่าข้อความเหตุผล หรือ null ถ้ายกเลิก
@@ -36,9 +54,20 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
   final _customController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _customController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   String? get _finalReason {
@@ -48,6 +77,7 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -61,9 +91,9 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
               children: [
                 const Icon(Icons.close, color: Colors.red),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('ปฏิเสธคำขอซ่อม',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(loc.t('reject_dialog_title'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -72,9 +102,9 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text(
-              'เลือกเหตุผล หรือพิมพ์เอง ระบบจะแจ้งให้ลูกค้าทราบ',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+            Text(
+              loc.t('reject_dialog_subtitle'),
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 12),
             Flexible(
@@ -110,7 +140,7 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                                   color: selected ? Colors.red : Colors.grey,
                                 ),
                                 const SizedBox(width: 10),
-                                Expanded(child: Text(reason, style: const TextStyle(fontSize: 13))),
+                                Expanded(child: Text(_rejectionReasonDisplayLabel(reason), style: const TextStyle(fontSize: 13))),
                               ],
                             ),
                           ),
@@ -118,14 +148,14 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                       );
                     }),
                     const SizedBox(height: 8),
-                    const Text('หรือพิมพ์เหตุผลเอง', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    Text(loc.t('reject_custom_label'), style: const TextStyle(fontSize: 13, color: Colors.grey)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _customController,
                       maxLines: 3,
                       onChanged: (_) => setState(() => _selectedPreset = null),
                       decoration: InputDecoration(
-                        hintText: 'ระบุเหตุผลอื่นๆ ที่นี่...',
+                        hintText: loc.t('reject_custom_hint'),
                         filled: true,
                         fillColor: const Color(0xffF5F5F5),
                         border: OutlineInputBorder(
@@ -150,8 +180,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('ยืนยันการปฏิเสธ',
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
+                child: Text(loc.t('reject_confirm_button'),
+                    style: const TextStyle(color: Colors.white, fontSize: 16)),
               ),
             ),
           ],

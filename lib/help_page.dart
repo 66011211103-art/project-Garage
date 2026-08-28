@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'api_service.dart';
+import 'app_locale.dart';
 
-/// ศูนย์ช่วยเหลือ — คำถามที่พบบ่อย ตรงกับฟีเจอร์ที่มีอยู่จริงในแอปตอนนี้เท่านั้น
-class HelpPage extends StatelessWidget {
-  const HelpPage({super.key});
+/// ศูนย์ช่วยเหลือ — คำถามที่พบบ่อย + ฟอร์มแจ้งข้อร้องเรียนจริง (เชื่อม backend)
+class HelpPage extends StatefulWidget {
+  // ✅ เพิ่มใหม่: รับ userData ต่อจากหน้าที่เปิดมา (ตั้งค่า/โปรไฟล์) เพื่อใช้แจ้งข้อร้องเรียน
+  // ผูกกับผู้ใช้ที่ล็อกอินอยู่จริง — ไม่มีข้อมูลก็ยังเข้าดู FAQ ได้ปกติ แค่แจ้งข้อร้องเรียนไม่ได้
+  final Map<String, dynamic>? userData;
 
+  const HelpPage({super.key, this.userData});
+
+  @override
+  State<HelpPage> createState() => _HelpPageState();
+}
+
+class _HelpPageState extends State<HelpPage> {
   static const List<Map<String, String>> _faqs = [
     {
       'q': 'ค้นหาอู่ซ่อมรถใกล้ฉันได้อย่างไร',
@@ -42,22 +52,81 @@ class HelpPage extends StatelessWidget {
     },
   ];
 
-  Future<void> _contactSupport(BuildContext context) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: 'support@outeewaiwangjai.example.com',
-      query: 'subject=${Uri.encodeComponent('สอบถามการใช้งานแอปอู่ที่ไว้วางใจ')}',
-    );
-    final launched = await launchUrl(uri);
-    if (!launched && context.mounted) {
+  final _subjectController = TextEditingController();
+  final _detailController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _detailController.dispose();
+    super.dispose();
+  }
+
+  // ✅ เพิ่มใหม่: แจ้งข้อร้องเรียนจริง — ยิงไป POST /api/complaints แล้วแอดมินเห็นทันทีใน
+  // หน้า "รีวิว & ข้อร้องเรียน" ของระบบแอดมิน (เดิมปุ่มติดต่อฝ่ายสนับสนุนในหน้านี้เป็นแค่
+  // mailto ไปโดเมนตัวอย่างที่ไม่มีจริง ไม่มีใครได้รับอีเมลเลย — เอาออกแล้วแทนที่ด้วยฟอร์มนี้)
+  Future<void> _submitComplaint() async {
+    final loc = AppLocale.instance;
+    final subject = _subjectController.text.trim();
+
+    if (subject.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่พบแอปอีเมลในเครื่อง')),
+        SnackBar(content: Text(loc.t('help_complaint_subject_required'))),
       );
+      return;
     }
+
+    final rawId = widget.userData?['id'];
+    final reporterId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+    if (reporterId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('help_complaint_login_required'))),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final detail = _detailController.text.trim();
+    final result = await ApiService.submitComplaint(
+      reporterId: reporterId,
+      subject: subject,
+      detail: detail.isEmpty ? null : detail,
+    );
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.success ? loc.t('help_complaint_success') : result.message),
+        backgroundColor: result.success ? Colors.green : Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    if (result.success) {
+      _subjectController.clear();
+      _detailController.clear();
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  InputDecoration _fieldDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: const Color(0xFFF5F6FA),
+      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
@@ -77,11 +146,10 @@ class HelpPage extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-            ),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: _faqs.asMap().entries.map((entry) {
                 final index = entry.key;
@@ -110,9 +178,9 @@ class HelpPage extends StatelessWidget {
           ),
 
           const SizedBox(height: 24),
-          const Text(
-            'ยังไม่พบคำตอบที่ต้องการ?',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Text(
+            loc.t('help_complaint_title'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           Container(
@@ -125,17 +193,34 @@ class HelpPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ติดต่อฝ่ายสนับสนุนของเราได้โดยตรง เราจะตอบกลับภายใน 1-2 วันทำการ',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                Text(
+                  loc.t('help_complaint_subtitle'),
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _subjectController,
+                  decoration: _fieldDecoration(loc.t('help_complaint_subject_hint')),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _detailController,
+                  maxLines: 4,
+                  decoration: _fieldDecoration(loc.t('help_complaint_detail_hint')),
+                ),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => _contactSupport(context),
-                    icon: const Icon(Icons.mail_outline, size: 18),
-                    label: const Text('ส่งอีเมลถึงฝ่ายสนับสนุน'),
+                    onPressed: _isSubmitting ? null : _submitComplaint,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.report_gmailerrorred_outlined, size: 18),
+                    label: Text(loc.t('help_complaint_submit')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xff2196F3),
                       padding: const EdgeInsets.symmetric(vertical: 14),

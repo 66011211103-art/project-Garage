@@ -1,10 +1,13 @@
 // ============================================================
 // 📄 ไฟล์: garage_review_page.dart
 // 📌 หน้า/ฟีเจอร์: หน้า "รีวิวอู่ซ่อมรถ" แบบเต็มหน้าจอ (ตาม Figma ที่ลูกค้าส่งมา)
-// 📝 คำอธิบาย: ใช้ 2 โหมดในไฟล์เดียวกัน —
+// 📝 คำอธิบาย: ใช้ 3 โหมดในไฟล์เดียวกัน —
 //   1) โหมดเขียนรีวิว (ยังไม่เคยรีวิวงานนี้): กดดาวรวม + ดาวรายด้าน (คุณภาพงาน/
 //      ราคา/บริการ) + เขียนความเห็น + แนบรูปได้ แล้วกด "ส่งรีวิว"
-//   2) โหมดดูรายละเอียด (รีวิวไปแล้ว): โชว์ค่าที่ส่งไปแบบอ่านอย่างเดียว ไม่มีปุ่มส่ง
+//   2) โหมดดูรายละเอียด (รีวิวไปแล้ว): โชว์ค่าที่ส่งไปแบบอ่านอย่างเดียว มีปุ่ม "แก้ไขรีวิว"
+//   3) ✅ โหมดแก้ไข (ใหม่ — กดปุ่ม "แก้ไขรีวิว" จากโหมด 2): แก้คะแนน/ความเห็น/รูปได้
+//      เหมือนโหมดเขียนใหม่ทุกอย่าง แต่ลบรูปเดิมที่เคยแนบไว้ได้ด้วย แล้วกด "บันทึกการแก้ไข"
+//      (เดิมรีวิวที่ส่งไปแล้วแก้ไขไม่ได้เลย ลูกค้าขอให้แก้ไขได้)
 //   เข้าถึงได้จากปุ่ม "ให้คะแนนอู่ซ่อม" / "ดูรายละเอียด" ในการ์ดรีวิวของหน้า
 //   ประวัติคำขอซ่อม (my_repair_requests_page.dart ผ่าน review_card.dart)
 // ============================================================
@@ -13,6 +16,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_service.dart';
+import 'network_image_helper.dart';
+import 'app_locale.dart';
 
 const int kMaxReviewPhotos = 5;
 
@@ -38,7 +43,9 @@ class GarageReviewPage extends StatefulWidget {
 
 class _GarageReviewPageState extends State<GarageReviewPage> {
   bool _isLoading = true;
-  bool _isReadOnly = false;
+  bool _isReadOnly = false; // true = มีรีวิวอยู่แล้วในระบบ (ไม่ว่าจะกำลังแก้ไขอยู่หรือไม่)
+  bool _isEditing = false; // ✅ ใหม่ — true เฉพาะตอนกดปุ่ม "แก้ไขรีวิว" จากโหมดดูอย่างเดียว
+  int? _reviewId; // ✅ ใหม่ — เก็บ id รีวิวไว้ใช้ตอนเรียก PUT แก้ไข
 
   int _rating = 0;
   int _qualityRating = 0;
@@ -46,7 +53,8 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
   int _serviceRating = 0;
   final _commentController = TextEditingController();
 
-  // รูปที่เพิ่งเลือก (โหมดเขียน) VS รูปที่รีวิวไว้แล้ว (โหมดอ่าน เป็น URL จาก server)
+  // รูปที่เพิ่งเลือก (โหมดเขียน/แก้ไข) VS รูปที่รีวิวไว้แล้ว (มาจาก server เป็น URL เต็ม)
+  // ✅ ตอนนี้ _existingPhotoUrls ใช้เป็น "รูปเดิมที่จะเก็บไว้" ด้วย — ลบออกจากลิสต์นี้ได้ตอนแก้ไข
   final List<Uint8List> _newPhotos = [];
   final List<String> _newPhotoNames = [];
   List<String> _existingPhotoUrls = [];
@@ -57,9 +65,13 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
 
   bool _isSubmitting = false;
 
+  // ✅ โหมดที่แก้ไขข้อมูลได้จริง (ดาว/ความเห็น/รูป) — true ทั้งตอนเขียนรีวิวใหม่และตอนแก้ไขรีวิวเดิม
+  bool get _editable => !_isReadOnly || _isEditing;
+
   @override
   void initState() {
     super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
     _fetchExistingReview();
   }
 
@@ -75,6 +87,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
       _isLoading = false;
       _isReadOnly = existing != null;
       if (existing != null) {
+        _reviewId = (existing['id'] as num?)?.toInt();
         _rating = (existing['rating'] as num?)?.toInt() ?? 0;
         _qualityRating = (existing['quality_rating'] as num?)?.toInt() ?? 0;
         _priceRating = (existing['price_rating'] as num?)?.toInt() ?? 0;
@@ -90,22 +103,27 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
 
   @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _commentController.dispose();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   String _ratingLabel(int r) {
     switch (r) {
       case 1:
-        return 'แย่มาก';
+        return AppLocale.instance.t('grev_rating_1');
       case 2:
-        return 'ต้องปรับปรุง';
+        return AppLocale.instance.t('grev_rating_2');
       case 3:
-        return 'พอใช้';
+        return AppLocale.instance.t('grev_rating_3');
       case 4:
-        return 'ดีมาก';
+        return AppLocale.instance.t('grev_rating_4');
       case 5:
-        return 'ยอดเยี่ยม';
+        return AppLocale.instance.t('grev_rating_5');
       default:
         return '';
     }
@@ -115,15 +133,19 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inDays >= 7) return '${(diff.inDays / 7).floor()} สัปดาห์ที่แล้ว';
-    if (diff.inDays >= 1) return '${diff.inDays} วันที่แล้ว';
-    if (diff.inHours >= 1) return '${diff.inHours} ชั่วโมงที่แล้ว';
-    if (diff.inMinutes >= 1) return '${diff.inMinutes} นาทีที่แล้ว';
-    return 'เมื่อสักครู่';
+    if (diff.inDays >= 7) {
+      return AppLocale.instance.t('grev_weeks_ago').replaceAll('%s', '${(diff.inDays / 7).floor()}');
+    }
+    if (diff.inDays >= 1) return AppLocale.instance.t('garage_time_days_ago').replaceAll('%s', '${diff.inDays}');
+    if (diff.inHours >= 1) return AppLocale.instance.t('garage_time_hours_ago').replaceAll('%s', '${diff.inHours}');
+    if (diff.inMinutes >= 1) {
+      return AppLocale.instance.t('garage_time_minutes_ago').replaceAll('%s', '${diff.inMinutes}');
+    }
+    return AppLocale.instance.t('garage_time_just_now');
   }
 
   Future<void> _pickPhotos() async {
-    final remaining = kMaxReviewPhotos - _newPhotos.length;
+    final remaining = kMaxReviewPhotos - _existingPhotoUrls.length - _newPhotos.length;
     if (remaining <= 0) return;
 
     final picker = ImagePicker();
@@ -149,26 +171,56 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
     });
   }
 
+  // ✅ ใหม่ — ลบรูปเดิม (ที่เคยแนบไว้ตอนรีวิวครั้งแรก) ออกตอนกำลังแก้ไข
+  void _removeExistingPhoto(String url) {
+    setState(() => _existingPhotoUrls.remove(url));
+  }
+
+  // ✅ ใหม่ — ยกเลิกการแก้ไข กลับไปโหมดดูอย่างเดียว โดยดึงข้อมูลจาก server มาล้างค่าที่แก้ค้างไว้ทั้งหมด
+  void _cancelEdit() {
+    setState(() {
+      _isEditing = false;
+      _newPhotos.clear();
+      _newPhotoNames.clear();
+    });
+    _fetchExistingReview();
+  }
+
   Future<void> _submit() async {
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาให้คะแนนบริการอย่างน้อย 1 ดาว'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocale.instance.t('grev_rating_required')), backgroundColor: Colors.red),
       );
       return;
     }
 
     setState(() => _isSubmitting = true);
-    final result = await ApiService.submitReview(
-      repairRequestId: widget.repairRequestId,
-      customerId: widget.customerId,
-      rating: _rating,
-      qualityRating: _qualityRating == 0 ? null : _qualityRating,
-      priceRating: _priceRating == 0 ? null : _priceRating,
-      serviceRating: _serviceRating == 0 ? null : _serviceRating,
-      comment: _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
-      photos: _newPhotos,
-      photoNames: _newPhotoNames,
-    );
+
+    // ✅ กำลังแก้ไขรีวิวเดิม -> เรียก updateReview (PUT) แทน submitReview (POST)
+    final result = _isEditing
+        ? await ApiService.updateReview(
+            reviewId: _reviewId!,
+            customerId: widget.customerId,
+            rating: _rating,
+            qualityRating: _qualityRating == 0 ? null : _qualityRating,
+            priceRating: _priceRating == 0 ? null : _priceRating,
+            serviceRating: _serviceRating == 0 ? null : _serviceRating,
+            comment: _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
+            keepPhotoUrls: _existingPhotoUrls,
+            newPhotos: _newPhotos,
+            newPhotoNames: _newPhotoNames,
+          )
+        : await ApiService.submitReview(
+            repairRequestId: widget.repairRequestId,
+            customerId: widget.customerId,
+            rating: _rating,
+            qualityRating: _qualityRating == 0 ? null : _qualityRating,
+            priceRating: _priceRating == 0 ? null : _priceRating,
+            serviceRating: _serviceRating == 0 ? null : _serviceRating,
+            comment: _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
+            photos: _newPhotos,
+            photoNames: _newPhotoNames,
+          );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -177,16 +229,29 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
       SnackBar(content: Text(result.message), backgroundColor: result.success ? Colors.green : Colors.red),
     );
 
-    if (result.success) Navigator.pop(context, true);
+    if (result.success) {
+      if (_isEditing) {
+        // ✅ แก้ไขสำเร็จ -> กลับไปโหมดดูอย่างเดียว พร้อมข้อมูลล่าสุดจาก server (ไม่ปิดหน้า)
+        setState(() {
+          _isEditing = false;
+          _newPhotos.clear();
+          _newPhotoNames.clear();
+        });
+        _fetchExistingReview();
+      } else {
+        Navigator.pop(context, true);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('รีวิวอู่ซ่อมรถ', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('grev_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -198,6 +263,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
   }
 
   Widget _buildBody() {
+    final loc = AppLocale.instance;
     return Column(
         children: [
           Expanded(
@@ -211,7 +277,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: widget.garageAvatar != null && widget.garageAvatar!.isNotEmpty
-                            ? Image.network(widget.garageAvatar!, width: 56, height: 56, fit: BoxFit.cover)
+                            ? NetImage(widget.garageAvatar!, width: 56, height: 56, fit: BoxFit.cover)
                             : Container(
                                 width: 56,
                                 height: 56,
@@ -248,12 +314,12 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                 _card(
                   child: Column(
                     children: [
-                      const Text('ให้คะแนนบริการ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      Text(loc.t('grev_rate_service_title'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 14),
                       _starRow(
                         _rating,
                         size: 36,
-                        interactive: !_isReadOnly,
+                        interactive: _editable,
                         onTap: (v) => setState(() => _rating = v),
                       ),
                       if (_rating > 0) ...[
@@ -272,12 +338,12 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('ประเมินด้านต่างๆ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      Text(loc.t('grev_evaluate_title'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 14),
                       _subRatingRow(
                         icon: Icons.thumb_up_outlined,
                         color: const Color(0xff2196F3),
-                        label: 'คุณภาพงานซ่อม',
+                        label: loc.t('grev_label_quality'),
                         value: _qualityRating,
                         onTap: (v) => setState(() => _qualityRating = v),
                       ),
@@ -285,7 +351,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                       _subRatingRow(
                         icon: Icons.attach_money,
                         color: const Color(0xff4CAF50),
-                        label: 'ราคาเหมาะสม',
+                        label: loc.t('grev_label_price'),
                         value: _priceRating,
                         onTap: (v) => setState(() => _priceRating = v),
                       ),
@@ -293,7 +359,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                       _subRatingRow(
                         icon: Icons.support_agent_outlined,
                         color: const Color(0xff9C27B0),
-                        label: 'บริการและพนักงาน',
+                        label: loc.t('grev_label_service'),
                         value: _serviceRating,
                         onTap: (v) => setState(() => _serviceRating = v),
                       ),
@@ -302,14 +368,14 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                 ),
 
                 const SizedBox(height: 20),
-                const Text('เขียนรีวิว', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(loc.t('grev_write_review_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 10),
-                if (_isReadOnly)
+                if (!_editable)
                   _card(
                     child: Text(
                       _commentController.text.trim().isNotEmpty
                           ? _commentController.text.trim()
-                          : 'ไม่มีความเห็นเพิ่มเติม',
+                          : loc.t('grev_no_comment'),
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.5,
@@ -325,7 +391,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                       maxLines: 5,
                       maxLength: 500,
                       decoration: InputDecoration(
-                        hintText: 'บอกเล่าประสบการณ์ของคุณกับอู่แห่งนี้...',
+                        hintText: loc.t('grev_comment_hint'),
                         contentPadding: const EdgeInsets.all(14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -336,26 +402,53 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                   ),
 
                 // ---------- รูปภาพประกอบ ----------
-                if (!_isReadOnly || _existingPhotoUrls.isNotEmpty) ...[
+                if (_editable || _existingPhotoUrls.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  Text(_isReadOnly ? 'รูปภาพที่แนบมา' : 'เพิ่มรูปภาพ (ถ้ามี)',
+                  Text(_editable ? loc.t('grev_add_photos_title') : loc.t('grev_attached_photos_title'),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 88,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      children: _isReadOnly
+                      children: !_editable
                           ? _existingPhotoUrls
                               .map((url) => Padding(
                                     padding: const EdgeInsets.only(right: 10),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(14),
-                                      child: Image.network(url, width: 88, height: 88, fit: BoxFit.cover),
+                                      child: NetImage(url, width: 88, height: 88, fit: BoxFit.cover),
                                     ),
                                   ))
                               .toList()
                           : [
+                              // ✅ รูปเดิม (ตอนแก้ไข) — ลบออกได้เหมือนรูปใหม่
+                              ..._existingPhotoUrls.map((url) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 10),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: NetImage(url, width: 88, height: 88, fit: BoxFit.cover),
+                                      ),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: GestureDetector(
+                                          onTap: () => _removeExistingPhoto(url),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration:
+                                                const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                            child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
                               ..._newPhotos.asMap().entries.map((entry) {
                                 final index = entry.key;
                                 final bytes = entry.value;
@@ -384,7 +477,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                                   ),
                                 );
                               }),
-                              if (_newPhotos.length < kMaxReviewPhotos)
+                              if (_existingPhotoUrls.length + _newPhotos.length < kMaxReviewPhotos)
                                 InkWell(
                                   onTap: _pickPhotos,
                                   borderRadius: BorderRadius.circular(14),
@@ -401,7 +494,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                                       children: [
                                         Icon(Icons.camera_alt_outlined, color: Colors.grey.shade400),
                                         const SizedBox(height: 6),
-                                        Text('เพิ่มรูป',
+                                        Text(loc.t('grev_add_photo_button'),
                                             style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                                       ],
                                     ),
@@ -415,7 +508,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
                 // ---------- คำตอบกลับจากอู่ ----------
                 if (_isReadOnly && (_reply ?? '').isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  const Text('การตอบกลับจากอู่', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(loc.t('grev_reply_section_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
@@ -451,8 +544,57 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
             ),
           ),
 
-          // ===== ปุ่มส่งรีวิว ติดด้านล่างเสมอ (โหมดเขียนเท่านั้น) =====
-          if (!_isReadOnly)
+          // ===== ปุ่มด้านล่าง — โหมดเขียน/แก้ไข: ปุ่มส่ง/บันทึก (+ ยกเลิกถ้ากำลังแก้ไข)
+          //       โหมดดูอย่างเดียว (มีรีวิวแล้ว ยังไม่ได้กดแก้ไข): ปุ่ม "แก้ไขรีวิว" =====
+          if (_editable)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, -2))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isEditing) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : _cancelEdit,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(loc.t('grev_cancel_edit_button')),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSubmitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xff2196F3),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Icon(_isEditing ? Icons.save_outlined : Icons.send, color: Colors.white, size: 18),
+                      label: Text(
+                        _isSubmitting ? loc.t('cqp_saving') : (_isEditing ? loc.t('car_save_edit_button') : loc.t('grev_submit_review_button')),
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (_isReadOnly)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -462,20 +604,16 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
               ),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff2196F3),
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _isEditing = true),
+                  style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    side: const BorderSide(color: Color(0xff2196F3)),
                   ),
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 18, height: 18,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.send, color: Colors.white, size: 18),
-                  label: Text(_isSubmitting ? 'กำลังส่ง...' : 'ส่งรีวิว',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.edit_outlined, color: Color(0xff2196F3), size: 18),
+                  label: Text(loc.t('grev_edit_review_button'),
+                      style: const TextStyle(color: Color(0xff2196F3), fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -508,7 +646,7 @@ class _GarageReviewPageState extends State<GarageReviewPage> {
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 8),
         Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-        _starRow(value, size: 18, interactive: !_isReadOnly, onTap: onTap),
+        _starRow(value, size: 18, interactive: _editable, onTap: onTap),
       ],
     );
   }

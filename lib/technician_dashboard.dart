@@ -14,6 +14,7 @@ import 'api_service.dart';
 import 'socket_notification_service.dart';
 import 'technician_job_detail_page.dart';
 import 'main.dart'; // ✅ ใช้ LoginPage สำหรับปุ่มล็อกเอาท์
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 const List<String> _thaiMonthsAbbr = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -44,6 +45,18 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
     _userData = widget.userData;
     _fetchJobs();
     _setupPushNotifications();
+    // ✅ รีบิลด์แดชบอร์ดช่างอัตโนมัติเมื่อผู้ใช้เปลี่ยนภาษาจากหน้าตั้งค่า
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _setupPushNotifications() async {
@@ -71,9 +84,10 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
   }
 
   Future<void> _callCustomer(String? phone) async {
+    final loc = AppLocale.instance;
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่มีเบอร์โทรลูกค้า'), backgroundColor: Colors.red),
+        SnackBar(content: Text(loc.t('tech_no_customer_phone')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -82,28 +96,32 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
       await launchUrl(uri);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถโทรออกได้: $phone')),
+        SnackBar(content: Text(loc.t('tech_call_failed').replaceAll('%s', phone))),
       );
     }
   }
 
   Future<void> _handleLogout() async {
+    final loc = AppLocale.instance;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ออกจากระบบ'),
-        content: const Text('ต้องการออกจากระบบใช่ไหม?'),
+        title: Text(loc.t('logout')),
+        content: Text(loc.t('tech_logout_confirm_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(loc.t('cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.red)),
+            child: Text(loc.t('logout'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
 
+    // ✅ เพิ่มใหม่: ล้าง session ที่บันทึกไว้ (ดู SessionStore ใน main.dart) ไม่งั้นแอปจะ
+    // auto-login กลับเข้าบัญชีเดิมทันทีตอนเปิดแอปครั้งถัดไป
+    await SessionStore.clear();
     SocketNotificationService.disconnect();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -112,30 +130,32 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
   }
 
   String _vehicleLabel(String? value) {
+    final loc = AppLocale.instance;
     switch (value) {
       case 'sedan':
-        return 'รถเก๋ง';
+        return loc.t('tech_vehicle_sedan');
       case 'suv':
         return 'SUV';
       case 'pickup':
-        return 'กระบะ';
+        return loc.t('tech_vehicle_pickup');
       default:
-        return 'ไม่ระบุ';
+        return loc.t('tech_vehicle_unspecified');
     }
   }
 
   String _statusLabel(String status) {
+    final loc = AppLocale.instance;
     switch (status) {
       case 'assigned':
-        return 'รอเริ่มงาน';
+        return loc.t('tech_status_assigned');
       case 'checking':
-        return 'ช่างกำลังเดินทาง';
+        return loc.t('dash_status_checking');
       case 'in_progress':
-        return 'กำลังซ่อม';
+        return loc.t('dash_status_in_progress');
       case 'waiting_parts':
-        return 'รอรับอะไหล่';
+        return loc.t('dash_status_waiting_parts');
       case 'completed':
-        return 'ซ่อมเสร็จแล้ว';
+        return loc.t('tech_status_completed');
       default:
         return status;
     }
@@ -183,7 +203,8 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final name = _userData['name']?.toString() ?? 'ช่าง';
+    final loc = AppLocale.instance;
+    final name = _userData['name']?.toString() ?? loc.t('tech_name_fallback');
     final avatarUrl = (_userData['avatar_url'] ?? _userData['avatar'])?.toString();
 
     return Scaffold(
@@ -222,7 +243,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('สวัสดี', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          Text(loc.t('dash_greeting'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           Text(name,
                               style: const TextStyle(
                                   color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold)),
@@ -261,11 +282,11 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      Expanded(child: _statCard(Icons.assignment_outlined, 'งานทั้งหมด', _totalActiveCount, const Color(0xff2196F3))),
+                      Expanded(child: _statCard(Icons.assignment_outlined, loc.t('tech_stat_total'), _totalActiveCount, const Color(0xff2196F3))),
                       const SizedBox(width: 10),
-                      Expanded(child: _statCard(Icons.hourglass_bottom, 'กำลังซ่อม', _inProgressCount, const Color(0xffFF9800))),
+                      Expanded(child: _statCard(Icons.hourglass_bottom, loc.t('dash_status_in_progress'), _inProgressCount, const Color(0xffFF9800))),
                       const SizedBox(width: 10),
-                      Expanded(child: _statCard(Icons.check_circle_outline, 'เสร็จแล้ว', _completedCount, const Color(0xff4CAF50))),
+                      Expanded(child: _statCard(Icons.check_circle_outline, loc.t('garage_stat_done'), _completedCount, const Color(0xff4CAF50))),
                     ],
                   ),
                 ),
@@ -277,17 +298,17 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('งานของฉัน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(loc.t('tech_my_jobs_heading'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     PopupMenuButton<String?>(
                       icon: const Icon(Icons.filter_list, color: Color(0xff2196F3)),
                       onSelected: (v) => setState(() => _statusFilter = v),
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: null, child: Text('ทั้งหมด')),
-                        PopupMenuItem(value: 'assigned', child: Text('รอเริ่มงาน')),
-                        PopupMenuItem(value: 'checking', child: Text('ช่างกำลังเดินทาง')),
-                        PopupMenuItem(value: 'in_progress', child: Text('กำลังซ่อม')),
-                        PopupMenuItem(value: 'waiting_parts', child: Text('รอรับอะไหล่')),
-                        PopupMenuItem(value: 'completed', child: Text('เสร็จแล้ว')),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(value: null, child: Text(loc.t('tech_filter_all'))),
+                        PopupMenuItem(value: 'assigned', child: Text(loc.t('tech_status_assigned'))),
+                        PopupMenuItem(value: 'checking', child: Text(loc.t('dash_status_checking'))),
+                        PopupMenuItem(value: 'in_progress', child: Text(loc.t('dash_status_in_progress'))),
+                        PopupMenuItem(value: 'waiting_parts', child: Text(loc.t('dash_status_waiting_parts'))),
+                        PopupMenuItem(value: 'completed', child: Text(loc.t('garage_stat_done'))),
                       ],
                     ),
                   ],
@@ -307,7 +328,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                       children: [
                         Icon(Icons.build_circle_outlined, size: 56, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        const Text('ยังไม่มีงานในหมวดนี้', style: TextStyle(color: Colors.grey)),
+                        Text(loc.t('tech_empty_jobs'), style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
                   ),
@@ -348,6 +369,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
   }
 
   Widget _jobCard(Map<String, dynamic> job) {
+    final loc = AppLocale.instance;
     final status = job['status']?.toString() ?? 'assigned';
     final customerName = '${job['first_name'] ?? ''} ${job['last_name'] ?? ''}'.trim();
 
@@ -367,7 +389,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
               Icon(Icons.person_outline, size: 15, color: Colors.grey.shade600),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(customerName.isEmpty ? 'ไม่ระบุชื่อ' : customerName,
+                child: Text(customerName.isEmpty ? loc.t('profile_name_fallback') : customerName,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
               Container(
@@ -421,7 +443,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.call_outlined, size: 16),
-                  label: const Text('โทร'),
+                  label: Text(loc.t('tech_call_button')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -442,7 +464,7 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> {
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('ดูรายละเอียด', style: TextStyle(color: Colors.white)),
+                  child: Text(loc.t('garage_view_details'), style: const TextStyle(color: Colors.white)),
                 ),
               ),
             ],

@@ -4,9 +4,11 @@ import 'editprofile_shop_page.dart';
 import ' myCarPage.dart'; // ✅ แก้แล้ว: เดิมชื่อไฟล์ผิด (มีช่องว่างนำหน้า) และ import ซ้ำ 2 บรรทัด
 import 'api_service.dart';
 import 'settings_page.dart'; // ✅ เพิ่มใหม่: หน้าตั้งค่า
-import 'help_page.dart'; // ✅ เพิ่มใหม่: ศูนย์ช่วยเหลือ
 import 'payment_history_page.dart'; // ✅ ประวัติการชำระเงิน
 import 'customer_repair_history_page.dart'; // ✅ ประวัติการซ่อมรถ (ลูกค้า)
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
+import 'main.dart'; // ✅ เพิ่มใหม่: SessionStore + LoginPage สำหรับปุ่มออกจากระบบ
+import 'socket_notification_service.dart'; // ✅ เพิ่มใหม่: ตัดการเชื่อมต่อ socket ตอนออกจากระบบ
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -30,16 +32,28 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _userData = Map<String, dynamic>.from(widget.userData);
+    // ✅ รีบิลด์หน้านี้อัตโนมัติเมื่อผู้ใช้เปลี่ยนภาษาจากหน้าตั้งค่า (แม้เปิดหน้านี้ค้างไว้อยู่)
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   String get _displayName {
     if (_userData['userType'] == 'repair') {
-      return _userData['shop_name'] ?? 'ไม่ระบุชื่อร้าน';
+      return _userData['shop_name'] ?? AppLocale.instance.t('profile_shop_fallback');
     }
     final first = _userData['first_name'] ?? '';
     final last = _userData['last_name'] ?? '';
     return '$first $last'.trim().isEmpty
-        ? 'ไม่ระบุชื่อ'
+        ? AppLocale.instance.t('profile_name_fallback')
         : '$first $last'.trim();
   }
 
@@ -76,6 +90,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final isRepair = _userData['userType'] == 'repair';
     final avatarUrl = _userData['avatar'];
 
@@ -96,9 +111,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "โปรไฟล์",
-                      style: TextStyle(
+                    Text(
+                      loc.t('profile_title'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -157,15 +172,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
 
                     Text(
-                      isRepair ? 'อู่ซ่อมรถ' : 'ลูกค้า',
+                      isRepair ? loc.t('profile_type_repair') : loc.t('profile_type_customer'),
                       style: const TextStyle(color: Colors.grey),
                     ),
 
                     const SizedBox(height: 16),
 
-                    _infoRow(Icons.phone, _userData['phone'] ?? 'ไม่ระบุเบอร์'),
+                    _infoRow(Icons.phone, _userData['phone'] ?? loc.t('profile_phone_fallback')),
                     const SizedBox(height: 10),
-                    _infoRow(Icons.email, _userData['email'] ?? 'ไม่ระบุอีเมล'),
+                    _infoRow(Icons.email, _userData['email'] ?? loc.t('profile_email_fallback')),
 
                     if (_userData['address'] != null &&
                         _userData['address'].toString().isNotEmpty) ...[
@@ -199,7 +214,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 10),
                       _infoRow(
                         Icons.person_outline,
-                        'เจ้าของ: ${_userData['owner_name']}',
+                        '${loc.t('profile_owner_prefix')}: ${_userData['owner_name']}',
                       ),
                     ],
                   ],
@@ -219,7 +234,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                     _menuItem(
                       Icons.person_outline,
-                      isRepair ? "แก้ไขข้อมูลอู่" : "แก้ไขข้อมูลส่วนตัว",
+                      isRepair ? loc.t('profile_edit_shop') : loc.t('profile_edit_personal'),
                       onTap: () async {
                         final result = await Navigator.push(
                           context,
@@ -242,7 +257,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     if (!isRepair)
                       _menuItem(
                         Icons.history,
-                        "ประวัติการซ่อม",
+                        loc.t('profile_repair_history'),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -254,7 +269,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     _menuItem(
                       Icons.receipt_long_outlined,
-                      "ประวัติการชำระเงิน",
+                      loc.t('profile_payment_history'),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -271,7 +286,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     if (!isRepair)
                       _menuItem(
                         Icons.directions_car,
-                        "รถของฉัน",
+                        loc.t('profile_my_cars'),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -284,20 +299,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     _menuItem(
                       Icons.settings,
-                      "ตั้งค่า",
+                      loc.t('settings_title'),
                       onTap: _openSettings, // ✅ เชื่อมแล้ว
-                    ),
-                    _menuItem(
-                      Icons.help_outline,
-                      "ช่วยเหลือ",
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HelpPage(),
-                          ),
-                        ); // ✅ เชื่อมแล้ว
-                      },
                     ),
                   ],
                 ),
@@ -317,22 +320,29 @@ class _ProfilePageState extends State<ProfilePage> {
                       borderRadius: BorderRadius.circular(15),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/',
+                  onPressed: () async {
+                    // ✅ แก้บั๊ก: เดิมใช้ pushNamedAndRemoveUntil('/', ...) แต่แอปไม่เคย
+                    // ลงทะเบียน named route ไว้เลย (ดู main.dart) กดออกจากระบบแล้ว
+                    // เนวิเกตไม่ไปไหน/พังเงียบๆ — เปลี่ยนมาเปิด LoginPage ตรงๆ แบบเดียว
+                    // กับที่ technician_dashboard.dart ใช้อยู่แล้ว พร้อมล้าง session ที่
+                    // บันทึกไว้และตัดการเชื่อมต่อ socket เดิมด้วย
+                    await SessionStore.clear();
+                    SocketNotificationService.disconnect();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginPage()),
                       (route) => false,
                     );
                   },
                   icon: const Icon(Icons.logout),
-                  label: const Text("ออกจากระบบ"),
+                  label: Text(loc.t('logout')),
                 ),
               ),
 
               const SizedBox(height: 20),
-              const Text(
-                "เวอร์ชัน 1.0.0",
-                style: TextStyle(color: Colors.grey),
+              Text(
+                '${loc.t('version')} 1.0.0',
+                style: const TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 20),
             ],

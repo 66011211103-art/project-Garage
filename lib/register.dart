@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -31,7 +32,18 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true; // ✅ ควบคุมการซ่อน/แสดงยืนยันรหัสผ่าน
 
   @override
+  void initState() {
+    super.initState();
+    AppLocale.instance.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    AppLocale.instance.removeListener(_onLocaleChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _shopNameController.dispose();
@@ -130,6 +142,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     final isRepair = selectedUserType == 'repair';
 
     return Scaffold(
@@ -138,7 +151,7 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: const Color(0xFFEAF5FF),
         elevation: 0,
         title: Text(
-          isRepair ? 'สมัครสมาชิกอู่ซ่อมรถ' : 'สมัครสมาชิกลูกค้า',
+          isRepair ? loc.t('reg_title_repair') : loc.t('reg_title_customer'),
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -164,19 +177,19 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 10),
 
                 // ===== เลือกประเภทก่อน =====
-                const Text('ประเภทผู้ใช้', style: TextStyle(fontSize: 16)),
+                Text(loc.t('reg_user_type_label'), style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     userTypeCard(
                       value: 'customer',
                       icon: Icons.person_outline,
-                      label: 'ลูกค้า',
+                      label: loc.t('profile_type_customer'),
                     ),
                     userTypeCard(
                       value: 'repair',
                       icon: Icons.home_repair_service_outlined,
-                      label: 'อู่ซ่อม',
+                      label: loc.t('reg_type_repair'),
                     ),
                   ],
                 ),
@@ -192,12 +205,12 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ชื่อ'),
+                            Text(loc.t('reg_first_name_label')),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _firstNameController,
-                              decoration: customInput(hint: 'ชื่อ', icon: Icons.person_outline),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อ' : null,
+                              decoration: customInput(hint: loc.t('reg_first_name_label'), icon: Icons.person_outline),
+                              validator: (v) => v == null || v.trim().isEmpty ? loc.t('reg_first_name_required') : null,
                             ),
                           ],
                         ),
@@ -207,12 +220,12 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('นามสกุล'),
+                            Text(loc.t('reg_last_name_label')),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _lastNameController,
-                              decoration: customInput(hint: 'นามสกุล', icon: Icons.person_outline),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกนามสกุล' : null,
+                              decoration: customInput(hint: loc.t('reg_last_name_label'), icon: Icons.person_outline),
+                              validator: (v) => v == null || v.trim().isEmpty ? loc.t('reg_last_name_required') : null,
                             ),
                           ],
                         ),
@@ -223,26 +236,26 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 // ===== ฟอร์มอู่ซ่อม =====
                 if (isRepair) ...[
-                  const Text('ชื่อร้านอู่ซ่อมรถ'),
+                  Text(loc.t('reg_shop_name_label')),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _shopNameController,
-                    decoration: customInput(hint: 'ชื่ออู่ซ่อมรถ', icon: Icons.store_outlined),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อร้าน' : null,
+                    decoration: customInput(hint: loc.t('reg_shop_name_hint'), icon: Icons.store_outlined),
+                    validator: (v) => v == null || v.trim().isEmpty ? loc.t('reg_shop_name_required') : null,
                   ),
                   const SizedBox(height: 16),
-                  const Text('ชื่อเจ้าของอู่'),
+                  Text(loc.t('reg_owner_name_label')),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _ownerNameController,
-                    decoration: customInput(hint: 'ชื่อ-นามสกุล', icon: Icons.person_outline),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกชื่อเจ้าของ' : null,
+                    decoration: customInput(hint: loc.t('reg_owner_name_hint'), icon: Icons.person_outline),
+                    validator: (v) => v == null || v.trim().isEmpty ? loc.t('reg_owner_name_required') : null,
                   ),
                 ],
 
                 // ===== ใช้ร่วมกัน =====
                 const SizedBox(height: 16),
-                const Text('เบอร์โทรศัพท์'),
+                Text(loc.t('reg_phone_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
@@ -250,32 +263,32 @@ class _RegisterPageState extends State<RegisterPage> {
                   decoration: customInput(hint: '0xx-xxx-xxxx', icon: Icons.phone_outlined),
                   // ✅ เดิมไม่มี validator เลย ทำให้ฟอร์มผ่านและสมัครได้ทั้งที่เบอร์โทรว่าง
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'กรุณากรอกเบอร์โทรศัพท์';
+                    if (v == null || v.trim().isEmpty) return loc.t('reg_phone_required');
                     if (!RegExp(r'^[0-9]{9,10}$').hasMatch(v.trim().replaceAll('-', ''))) {
-                      return 'เบอร์โทรศัพท์ไม่ถูกต้อง';
+                      return loc.t('reg_phone_invalid');
                     }
                     return null;
                   },
                 ),
 
                 const SizedBox(height: 16),
-                const Text('อีเมล'),
+                Text(loc.t('auth_email_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: customInput(hint: 'example@email.com', icon: Icons.email_outlined),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'กรุณากรอกอีเมล';
+                    if (v == null || v.trim().isEmpty) return loc.t('auth_email_required');
                     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) {
-                      return 'รูปแบบอีเมลไม่ถูกต้อง';
+                      return loc.t('reg_email_format_invalid');
                     }
                     return null;
                   },
                 ),
 
                 const SizedBox(height: 16),
-                const Text('รหัสผ่าน'),
+                Text(loc.t('auth_password_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   obscureText: _obscurePassword,
@@ -300,14 +313,14 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'กรุณากรอกรหัสผ่าน';
-                    if (v.length < 6) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                    if (v == null || v.isEmpty) return loc.t('auth_password_required');
+                    if (v.length < 6) return loc.t('reset_pw_min_length');
                     return null;
                   },
                 ),
 
                 const SizedBox(height: 16),
-                const Text('ยืนยันรหัสผ่าน'),
+                Text(loc.t('reg_confirm_password_label')),
                 const SizedBox(height: 8),
                 TextFormField(
                   obscureText: _obscureConfirmPassword,
@@ -332,8 +345,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'กรุณายืนยันรหัสผ่าน';
-                    if (v != _passwordController.text) return 'รหัสผ่านไม่ตรงกัน';
+                    if (v == null || v.isEmpty) return loc.t('reg_confirm_password_required');
+                    if (v != _passwordController.text) return loc.t('reset_pw_mismatch');
                     return null;
                   },
                 ),
@@ -357,9 +370,9 @@ class _RegisterPageState extends State<RegisterPage> {
                             height: 24,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                           )
-                        : const Text(
-                            'สมัครสมาชิก',
-                            style: TextStyle(fontSize: 18, color: Colors.white),
+                        : Text(
+                            loc.t('auth_signup'),
+                            style: const TextStyle(fontSize: 18, color: Colors.white),
                           ),
                   ),
                 ),
@@ -370,12 +383,12 @@ class _RegisterPageState extends State<RegisterPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('มีบัญชีอยู่แล้ว? '),
+                      Text(loc.t('reg_have_account')),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Text(
-                          'เข้าสู่ระบบ',
-                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                        child: Text(
+                          loc.t('auth_login_title'),
+                          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

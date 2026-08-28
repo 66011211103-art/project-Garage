@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'chat_screen.dart';
+import 'app_locale.dart';
 
 class GarageChatListPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -32,12 +33,18 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
+    AppLocale.instance.addListener(_onLocaleChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    AppLocale.instance.removeListener(_onLocaleChanged);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
   }
 
   List<Map<String, dynamic>> get _filteredConversations {
@@ -65,19 +72,20 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
     final dt = DateTime.tryParse(isoString ?? '')?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inDays >= 1) return '${diff.inDays} วันที่แล้ว';
-    if (diff.inHours >= 1) return '${diff.inHours} ชม.ที่แล้ว';
-    if (diff.inMinutes >= 1) return '${diff.inMinutes} นาทีที่แล้ว';
-    return 'เมื่อสักครู่';
+    if (diff.inDays >= 1) return AppLocale.instance.t('garage_time_days_ago').replaceAll('%s', '${diff.inDays}');
+    if (diff.inHours >= 1) return AppLocale.instance.t('cl_hours_ago').replaceAll('%s', '${diff.inHours}');
+    if (diff.inMinutes >= 1) return AppLocale.instance.t('garage_time_minutes_ago').replaceAll('%s', '${diff.inMinutes}');
+    return AppLocale.instance.t('garage_time_just_now');
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocale.instance;
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xff2196F3),
-        title: const Text('แชทลูกค้า', style: TextStyle(color: Colors.white)),
+        title: Text(loc.t('gcl_page_title'), style: const TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -91,7 +99,7 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'ค้นหาแชท',
+                hintText: loc.t('cl_search_hint'),
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
                 fillColor: Colors.white,
@@ -110,15 +118,15 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : _conversations.isEmpty
                       ? ListView(
-                          children: const [
+                          children: [
                             Padding(
-                              padding: EdgeInsets.symmetric(vertical: 80),
-                              child: Center(child: Text('ยังไม่มีบทสนทนากับลูกค้า', style: TextStyle(color: Colors.grey))),
+                              padding: const EdgeInsets.symmetric(vertical: 80),
+                              child: Center(child: Text(loc.t('gcl_empty_state'), style: const TextStyle(color: Colors.grey))),
                             ),
                           ],
                         )
                       : _filteredConversations.isEmpty
-                          ? const Center(child: Text('ไม่พบแชทที่ค้นหา', style: TextStyle(color: Colors.grey)))
+                          ? Center(child: Text(loc.t('cl_no_search_results'), style: const TextStyle(color: Colors.grey)))
                           : ListView.separated(
                               itemCount: _filteredConversations.length,
                               separatorBuilder: (_, __) => const Divider(height: 1, indent: 84),
@@ -139,7 +147,7 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
                                           conversationId: c['id'],
                                           myId: widget.userData['id'],
                                           myType: 'repair',
-                                          otherPartyName: name.isEmpty ? 'ลูกค้า' : name,
+                                          otherPartyName: name.isEmpty ? loc.t('profile_type_customer') : name,
                                           otherPartyAvatar: c['customer_avatar']?.toString(),
                                         ),
                                       ),
@@ -174,7 +182,7 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(name.isEmpty ? 'ลูกค้า' : name,
+                                              Text(name.isEmpty ? loc.t('profile_type_customer') : name,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(
@@ -183,7 +191,7 @@ class _GarageChatListPageState extends State<GarageChatListPage> {
                                                   )),
                                               const SizedBox(height: 2),
                                               Text(
-                                                lastMessage.isNotEmpty ? lastMessage : (hasImage ? '📷 รูปภาพ' : 'เริ่มการสนทนา'),
+                                                lastMessage.isNotEmpty ? lastMessage : (hasImage ? loc.t('cl_photo_placeholder') : loc.t('cl_start_conversation')),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
