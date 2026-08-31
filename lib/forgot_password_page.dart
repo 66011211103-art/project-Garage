@@ -13,6 +13,8 @@ class ForgotPasswordPage extends StatefulWidget {
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController(); // ✅ ใหม่ — รองรับขอ OTP ทางเบอร์โทร
+  bool _isPhone = false; // ✅ ใหม่ — false = ส่งทางอีเมล, true = ส่งทาง SMS
   bool _isLoading = false;
 
   @override
@@ -29,6 +31,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   void dispose() {
     AppLocale.instance.removeListener(_onLocaleChanged);
     _emailController.dispose();
+    _phoneController.dispose(); // ✅ ใหม่
     super.dispose();
   }
 
@@ -38,9 +41,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
     setState(() => _isLoading = true);
 
-    final result = await ApiService.forgotPassword(
-      email: _emailController.text.trim(),
-    );
+    // ✅ ใหม่ — เลือกช่องทางตาม _isPhone แทนที่จะใช้อีเมลตายตัวเหมือนเดิม
+    final identifier = _isPhone
+        ? _phoneController.text.trim()
+        : _emailController.text.trim();
+
+    final result = _isPhone
+        ? await ApiService.forgotPassword(phone: identifier)
+        : await ApiService.forgotPassword(email: identifier);
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -58,10 +66,48 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         context,
         MaterialPageRoute(
           builder: (context) =>
-              ResetPasswordPage(email: _emailController.text.trim()),
+              ResetPasswordPage(identifier: identifier, isPhone: _isPhone),
         ),
       );
     }
+  }
+
+  // ✅ ใหม่ — การ์ดปุ่มสลับช่องทาง (อีเมล/เบอร์โทร) แบบ pill ให้เข้าชุดกับดีไซน์เดิม
+  Widget _buildChannelTab({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xffE3F2FD) : const Color(0xffF5F6FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? const Color(0xff2196F3) : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: selected ? const Color(0xff2196F3) : Colors.grey.shade500),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
+                color: selected ? const Color(0xff2196F3) : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -110,31 +156,80 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(loc.t('auth_email_label')),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          hintText: 'example@email.com',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          filled: true,
-                          fillColor: const Color(0xFFF5F6FA),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                      // ✅ ใหม่ — สลับช่องทางรับ OTP ระหว่างอีเมล/เบอร์โทร
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildChannelTab(
+                              label: loc.t('forgot_pw_channel_email'),
+                              icon: Icons.email_outlined,
+                              selected: !_isPhone,
+                              onTap: () => setState(() => _isPhone = false),
+                            ),
                           ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return loc.t('auth_email_required');
-                          }
-                          if (!value.contains('@')) {
-                            return loc.t('auth_email_invalid');
-                          }
-                          return null;
-                        },
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildChannelTab(
+                              label: loc.t('forgot_pw_channel_phone'),
+                              icon: Icons.phone_outlined,
+                              selected: _isPhone,
+                              onTap: () => setState(() => _isPhone = true),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 16),
+                      Text(_isPhone ? loc.t('auth_phone_label') : loc.t('auth_email_label')),
+                      const SizedBox(height: 8),
+                      if (!_isPhone)
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            hintText: 'example@email.com',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F6FA),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return loc.t('auth_email_required');
+                            }
+                            if (!value.contains('@')) {
+                              return loc.t('auth_email_invalid');
+                            }
+                            return null;
+                          },
+                        )
+                      else
+                        TextFormField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(
+                            hintText: '0812345678',
+                            prefixIcon: const Icon(Icons.phone_outlined),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F6FA),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return loc.t('auth_phone_required');
+                            }
+                            final digits = value.trim().replaceAll(RegExp(r'[^0-9]'), '');
+                            if (digits.length < 9 || digits.length > 10) {
+                              return loc.t('auth_phone_invalid');
+                            }
+                            return null;
+                          },
+                        ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,

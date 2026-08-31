@@ -196,7 +196,12 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'userId': userId, 'newEmail': newEmail}),
           )
-          .timeout(const Duration(seconds: 45));
+          // ✅ แก้บั๊ก: endpoint นี้ต้องรอทั้งเซิร์ฟเวอร์ Render ตื่นจากโหมดหลับ
+          // (แพ็กเกจฟรี หลับหลังไม่มีคนใช้ 15 นาที) และรอส่งอีเมลจริงผ่าน SMTP เสร็จ
+          // ก่อนตอบกลับ รวมกันแล้วบางทีเกิน 45 วินาทีเดิม ทำให้ timeout ก่อนได้คำตอบ
+          // จริงจากเซิร์ฟเวอร์ ขึ้น "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้" ทั้งที่จริงๆ
+          // เซิร์ฟเวอร์กำลังตื่น/กำลังส่งอีเมลอยู่ ขยายเป็น 90 วินาทีให้พอรอไหว
+          .timeout(const Duration(seconds: 90));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -955,16 +960,25 @@ class ApiService {
     }
   }
 
-  // ===== FORGOT PASSWORD (ขอ OTP) =====
-  static Future<ApiResult> forgotPassword({required String email}) async {
+  // ===== FORGOT PASSWORD (ขอ OTP) — ระบุ email หรือ phone มาอย่างใดอย่างหนึ่ง =====
+  static Future<ApiResult> forgotPassword({String? email, String? phone}) async {
+    assert(
+      (email != null && email.isNotEmpty) != (phone != null && phone.isNotEmpty),
+      'ต้องระบุ email หรือ phone มาอย่างใดอย่างหนึ่งเท่านั้น',
+    );
     try {
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/forgot-password'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}),
+            body: jsonEncode(
+              email != null ? {'email': email} : {'phone': phone},
+            ),
           )
-          .timeout(const Duration(seconds: 45));
+          // ✅ แก้บั๊ก: เหตุผลเดียวกับ requestEmailChange ด้านบน — endpoint นี้ต้อง
+          // รอทั้งเซิร์ฟเวอร์ตื่นจากโหมดหลับและรอส่งอีเมล/SMS OTP จริงเสร็จก่อนตอบกลับ
+          // ขยาย timeout เป็น 90 วินาทีกันตัดก่อนได้คำตอบจริง
+          .timeout(const Duration(seconds: 90));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResult(
@@ -980,19 +994,26 @@ class ApiService {
     }
   }
 
-  // ===== RESET PASSWORD (ยืนยัน OTP + ตั้งรหัสผ่านใหม่) =====
+  // ===== RESET PASSWORD (ยืนยัน OTP + ตั้งรหัสผ่านใหม่) — ระบุ email หรือ phone
+  // มาอย่างใดอย่างหนึ่ง ต้องตรงกับตอนขอ OTP ใน forgotPassword() ด้านบน =====
   static Future<ApiResult> resetPassword({
-    required String email,
+    String? email,
+    String? phone,
     required String otp,
     required String newPassword,
   }) async {
+    assert(
+      (email != null && email.isNotEmpty) != (phone != null && phone.isNotEmpty),
+      'ต้องระบุ email หรือ phone มาอย่างใดอย่างหนึ่งเท่านั้น',
+    );
     try {
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/reset-password'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'email': email,
+              if (email != null) 'email': email,
+              if (phone != null) 'phone': phone,
               'otp': otp,
               'newPassword': newPassword,
             }),

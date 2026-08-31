@@ -3,8 +3,13 @@ import 'api_service.dart';
 import 'app_locale.dart'; // ✅ ระบบสลับภาษาไทย/อังกฤษ
 
 class ResetPasswordPage extends StatefulWidget {
-  final String email;
-  const ResetPasswordPage({super.key, required this.email});
+  final String identifier; // ✅ เปลี่ยนจาก email ตายตัว — เก็บได้ทั้งอีเมล/เบอร์โทร
+  final bool isPhone; // ✅ ใหม่ — true = identifier คือเบอร์โทร, false = อีเมล
+  const ResetPasswordPage({
+    super.key,
+    required this.identifier,
+    this.isPhone = false,
+  });
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -42,11 +47,17 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     setState(() => _isLoading = true);
 
-    final result = await ApiService.resetPassword(
-      email: widget.email,
-      otp: _otpController.text.trim(),
-      newPassword: _newPasswordController.text,
-    );
+    final result = widget.isPhone
+        ? await ApiService.resetPassword(
+            phone: widget.identifier,
+            otp: _otpController.text.trim(),
+            newPassword: _newPasswordController.text,
+          )
+        : await ApiService.resetPassword(
+            email: widget.identifier,
+            otp: _otpController.text.trim(),
+            newPassword: _newPasswordController.text,
+          );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -84,7 +95,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Text(
-                  '${loc.t('reset_pw_sent_to').replaceAll('%s', widget.email)}\n${loc.t('reset_pw_enter_and_set')}',
+                  '${loc.t('reset_pw_sent_to').replaceAll('%s', widget.identifier)}\n${loc.t('reset_pw_enter_and_set')}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.grey),
                 ),

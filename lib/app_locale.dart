@@ -281,11 +281,17 @@ class AppLocale extends ChangeNotifier {
     // ===== forgot_password_page.dart =====
     'forgot_pw_title': {'th': 'ลืมรหัสผ่าน', 'en': 'Forgot Password'},
     'forgot_pw_instructions': {
-      'th': 'กรอกอีเมลที่ใช้สมัครสมาชิก\nเราจะส่งรหัส OTP ไปให้ทางอีเมล',
-      'en': 'Enter the email you registered with\nWe will send an OTP code to that email',
+      'th': 'เลือกช่องทางที่ใช้สมัครสมาชิก\nเราจะส่งรหัส OTP ไปให้ทางช่องทางนั้น',
+      'en': 'Choose the contact method you registered with\nWe will send an OTP code there',
     },
     'auth_email_invalid': {'th': 'อีเมลไม่ถูกต้อง', 'en': 'Invalid email address'},
     'forgot_pw_send_otp': {'th': 'ส่งรหัส OTP', 'en': 'Send OTP'},
+    // ✅ เพิ่มใหม่ — สลับช่องทางรับ OTP ระหว่างอีเมล/เบอร์โทร
+    'forgot_pw_channel_email': {'th': 'อีเมล', 'en': 'Email'},
+    'forgot_pw_channel_phone': {'th': 'เบอร์โทร', 'en': 'Phone'},
+    'auth_phone_label': {'th': 'เบอร์โทรศัพท์', 'en': 'Phone number'},
+    'auth_phone_required': {'th': 'กรุณากรอกเบอร์โทรศัพท์', 'en': 'Please enter your phone number'},
+    'auth_phone_invalid': {'th': 'เบอร์โทรศัพท์ไม่ถูกต้อง', 'en': 'Invalid phone number'},
 
     // ===== reset_password_page.dart =====
     'reset_pw_title': {'th': 'ยืนยัน OTP', 'en': 'Verify OTP'},
