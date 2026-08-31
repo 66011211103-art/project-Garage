@@ -134,7 +134,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const int _maxSavedAccounts = 5;
+  // ✅ แก้ตามคำขอ — เดิมจำกัดไว้แค่ 5 บัญชีล่าสุด (เกินแล้วตัดทิ้ง) ตอนนี้ไม่จำกัด
+  // จำนวนแล้ว เก็บทุกบัญชีที่เคยติ๊ก "จดจำฉัน" ไว้ ให้ขึ้นในดรอปดาวน์ทั้งหมด
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -149,7 +150,7 @@ class _LoginPageState extends State<LoginPage> {
   // ที่เดียวตามที่ขอ (เดิมแตะช่องไหนก็ขึ้น dropdown ได้ทั้งคู่ ดูซ้ำซ้อน)
   bool _showEmailSuggestions = false;
 
-  // ✅ รายการบัญชีที่เคยบันทึกไว้ (สูงสุด 5 บัญชีล่าสุด)
+  // ✅ รายการบัญชีที่เคยบันทึกไว้ (ไม่จำกัดจำนวนแล้ว)
   List<Map<String, String>> _savedAccounts = [];
 
   @override
@@ -194,9 +195,6 @@ class _LoginPageState extends State<LoginPage> {
 
     if (_rememberMe) {
       updated.insert(0, {'email': email, 'password': password});
-      if (updated.length > _maxSavedAccounts) {
-        updated.removeRange(_maxSavedAccounts, updated.length);
-      }
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -517,19 +515,14 @@ class _LoginPageState extends State<LoginPage> {
                                   return null;
                                 },
                               ),
+                              // ✅ แก้บั๊ก: เดิมกรองรายชื่อในดรอปดาวน์ด้วยข้อความที่ค้าง
+                              // อยู่ในช่องอีเมล (เช่น พิมพ์อีเมลผิดค้างไว้) ทำให้บัญชีที่
+                              // เคยบันทึกไว้ไม่ตรงกับข้อความนั้นถูกซ่อนไปหมด ต้องลบข้อความ
+                              // ในช่องให้ว่างก่อนถึงจะเห็นรายชื่อครบ — ตอนนี้โชว์รายชื่อ
+                              // บัญชีที่เคยบันทึกไว้ทั้งหมดเสมอ กดเลือกแล้วสลับอีเมล/
+                              // รหัสผ่านให้ทันทีโดยไม่ต้องลบข้อความเดิมก่อน
                               if (_showEmailSuggestions)
-                                _buildAccountsDropdown(
-                                  _savedAccounts
-                                      .where(
-                                        (a) => (a['email'] ?? '')
-                                            .toLowerCase()
-                                            .contains(
-                                              _emailController.text
-                                                  .toLowerCase(),
-                                            ),
-                                      )
-                                      .toList(),
-                                ),
+                                _buildAccountsDropdown(_savedAccounts),
                             ],
                           ),
                         ),
