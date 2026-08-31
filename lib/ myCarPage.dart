@@ -12,12 +12,14 @@ class VehicleTypeOption {
   String get label => AppLocale.instance.t(labelKey);
 }
 
+// ✅ แก้ตามคำขอ — เอา "มอเตอร์ไซค์" ออก เพราะแอปนี้เป็นอู่รับซ่อมรถยนต์ ไม่รับมอเตอร์ไซค์
+// (ลิสต์นี้ใช้ร่วมกันทั้งหน้า "รถของฉัน" และฟอร์มเพิ่มรถแบบ inline ใน
+// request_repair_page.dart เอาออกจากตรงนี้ที่เดียวก็หายไปทั้งสองที่)
 const List<VehicleTypeOption> kVehicleTypes = [
   VehicleTypeOption('sedan', 'tech_vehicle_sedan', Icons.directions_car),
   VehicleTypeOption('suv', 'car_type_suv', Icons.airport_shuttle),
   VehicleTypeOption('pickup', 'tech_vehicle_pickup', Icons.local_shipping),
   VehicleTypeOption('van', 'car_type_van', Icons.airport_shuttle),
-  VehicleTypeOption('motorcycle', 'car_type_motorcycle', Icons.two_wheeler),
   VehicleTypeOption('other', 'car_type_other', Icons.directions_car_filled),
 ];
 
