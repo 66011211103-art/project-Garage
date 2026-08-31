@@ -428,6 +428,7 @@ class AppLocale extends ChangeNotifier {
     'car_delete_failed': {'th': 'ลบรถไม่สำเร็จ', 'en': 'Failed to delete car'},
     'car_empty_state': {'th': 'ยังไม่มีรถที่บันทึกไว้', 'en': 'No cars saved yet'},
     'car_add_button': {'th': 'เพิ่มรถของฉัน', 'en': 'Add My Car'},
+    'car_add_another': {'th': 'เพิ่มรถอีกคัน', 'en': 'Add another car'}, // ✅ ใหม่ — label ปุ่ม FAB ตอนมีรถอยู่แล้ว
     'car_model_unspecified': {'th': 'ไม่ระบุรุ่น', 'en': 'Model not specified'},
     'car_plate_unspecified': {'th': 'ไม่ระบุทะเบียน', 'en': 'Plate not specified'},
     'car_edit_title': {'th': 'แก้ไขข้อมูลรถ', 'en': 'Edit Car Info'},

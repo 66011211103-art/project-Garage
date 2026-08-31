@@ -147,11 +147,25 @@ class _MyCarPageState extends State<MyCarPage> {
               : RefreshIndicator(
                   onRefresh: _loadCars,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(20),
+                    // ✅ เผื่อ padding ล่างกัน FloatingActionButton บังการ์ดรถคันสุดท้าย
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
                     itemCount: _cars.length,
                     itemBuilder: (context, index) => _carCard(_cars[index]),
                   ),
                 ),
+      // ✅ แก้บั๊ก: เดิมปุ่มเพิ่มรถอยู่แค่ตอนลิสต์ว่าง (_emptyState()) พอมีรถคันแรก
+      // แล้วไม่มีทางเพิ่มคันที่ 2 ได้เลยในหน้านี้ (backend รองรับหลายคันต่อ user
+      // อยู่แล้ว แค่ UI ไม่มีปุ่มให้กด) เพิ่ม FAB ให้กดเพิ่มได้เรื่อยๆ เมื่อมีรถแล้ว
+      // อย่างน้อย 1 คัน (ตอนลิสต์ว่างใช้ปุ่มกลางจอใน _emptyState() แทน ไม่ต้องมีซ้ำ)
+      floatingActionButton: _cars.isEmpty
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openCarForm(),
+              icon: const Icon(Icons.add),
+              label: Text(loc.t('car_add_another')),
+              backgroundColor: const Color(0xff2196F3),
+              foregroundColor: Colors.white,
+            ),
     );
   }
 
