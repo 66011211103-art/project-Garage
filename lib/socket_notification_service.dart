@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:socket_io_client/socket_io_client.dart' as socket_io;
@@ -45,6 +46,17 @@ class SocketNotificationService {
         _onNotificationTapCallback?.call(data);
       },
     );
+
+    // ✅ แก้บั๊กจริง: "ไม่แจ้งเตือนเลย" — Android 13 (API 33) ขึ้นไปถือว่าการแจ้งเตือนเป็น
+    // สิทธิ์ที่ต้องขอผู้ใช้ตอน runtime (เหมือนกล้อง/ตำแหน่ง) ไม่ใช่แค่ประกาศใน manifest
+    // เฉยๆ — ถ้าไม่ขอ ตัวปลั๊กอินจะเรียก .show() สำเร็จแบบไม่มี error แต่ OS จะไม่โชว์
+    // อะไรให้เห็นเลยสักครั้งเดียว ต้องขอสิทธิ์นี้ก่อนอย่างน้อยหนึ่งครั้งต่อการติดตั้ง
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
+
     _localNotifInitialized = true;
   }
 

@@ -7,6 +7,12 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- ✅ แก้บั๊กจริง: "ไม่แจ้งเตือนเลย" — ตั้งแต่ Android 13 (API 33) การแจ้งเตือนทุกชนิด
+         (รวมถึง local notification จาก flutter_local_notifications ที่ใช้แทน Firebase)
+         ต้องขอสิทธิ์นี้ก่อน ไม่งั้น OS จะเงียบๆ ไม่โชว์การแจ้งเตือนให้เลยแม้โค้ดจะรันไม่มี error
+         (ต้องคู่กับการขอสิทธิ์ runtime ใน socket_notification_service.dart ด้วย ประกาศใน
+         manifest อย่างเดียวไม่พอ) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Good garage"
         android:name="${applicationName}"
