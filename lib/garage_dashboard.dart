@@ -252,7 +252,7 @@ class _GarageDashboardState extends State<GarageDashboard> {
       _buildDashboard(shopName),
       AllRepairRequestsPage(userData: _userData, embedded: true), // ✅ แท็บ "งาน" ตอนนี้โชว์ของจริงแล้ว
       GarageCompletedJobsPage(userData: _userData, embedded: true),
-      GarageReviewsPage(garageId: _userData['id'], embedded: true),
+      GarageReviewsPage(garageId: _userData['id'], embedded: true, canReply: true),
       ProfilePage(
         userData: _userData,
         onUserDataChanged: _handleUserDataUpdated, // ✅ ส่ง callback ไปให้

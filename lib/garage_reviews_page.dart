@@ -17,12 +17,17 @@ class GarageReviewsPage extends StatefulWidget {
   final String? shopName;
   /// ✅ true = ใช้ฝังอยู่ในแท็บอื่น (เช่น garage_dashboard.dart) ซ่อน AppBar ของตัวเอง
   final bool embedded;
+  /// ✅ true = หน้านี้เปิดโดยอู่เจ้าของร้านเอง (ผ่านแท็บ "รีวิว" ในแดชบอร์ดของอู่) —
+  ///     ให้ตอบกลับ/แก้ไขคำตอบรีวิวได้ ส่วนตอนลูกค้าเปิดดูรีวิวจาก garage_detail_page.dart
+  ///     (ไม่ใช่เจ้าของร้าน) จะเป็น false เสมอ เห็นได้อย่างเดียว ตอบไม่ได้
+  final bool canReply;
 
   const GarageReviewsPage({
     super.key,
     required this.garageId,
     this.shopName,
     this.embedded = false,
+    this.canReply = false,
   });
 
   @override
@@ -36,6 +41,11 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
   int _totalReviews = 0;
   Map<String, dynamic> _ratingCounts = {};
 
+  // ✅ สถานะกล่องตอบกลับรีวิว (แยกตาม reviewId เผื่ออนาคตอยากเปิดตอบหลายรีวิวพร้อมกัน)
+  final Set<int> _editingReviewIds = {};
+  final Map<int, TextEditingController> _replyControllers = {};
+  final Set<int> _submittingReviewIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +56,9 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
   @override
   void dispose() {
     AppLocale.instance.removeListener(_onLocaleChanged);
+    for (final c in _replyControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -92,6 +105,54 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
             color: const Color(0xffFFC107),
             size: size,
           )),
+    );
+  }
+
+  TextEditingController _replyControllerFor(int reviewId, String initialText) {
+    return _replyControllers.putIfAbsent(reviewId, () => TextEditingController(text: initialText));
+  }
+
+  void _startEditingReply(int reviewId, String? existingReply) {
+    setState(() {
+      _editingReviewIds.add(reviewId);
+      // ✅ set ค่า .text ตรงๆ ทุกครั้งที่เปิดกล่อง (ไม่พึ่ง putIfAbsent อย่างเดียว) กัน
+      // กรณีเคยพิมพ์ร่างไว้ก่อนหน้าแล้วกด "ยกเลิก" — คอนโทรลเลอร์เดิมยังอยู่ในแคช
+      // ถ้าไม่ set ซ้ำ เปิดใหม่จะเห็นข้อความร่างเก่าค้างอยู่แทนคำตอบปัจจุบันจริงๆ
+      _replyControllerFor(reviewId, existingReply ?? '').text = existingReply ?? '';
+    });
+  }
+
+  void _cancelEditingReply(int reviewId) {
+    setState(() => _editingReviewIds.remove(reviewId));
+  }
+
+  // ✅ เรียก PUT /api/reviews/:id/reply ที่มีอยู่แล้วในฝั่ง backend (ตอบใหม่หรือแก้ไขคำตอบเดิมก็ endpoint เดียวกัน)
+  Future<void> _submitReply(int reviewId) async {
+    final loc = AppLocale.instance;
+    final text = _replyControllers[reviewId]?.text.trim() ?? '';
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('grp_reply_empty_error')), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _submittingReviewIds.add(reviewId));
+    final result = await ApiService.replyToReview(reviewId: reviewId, garageId: widget.garageId, reply: text);
+    if (!mounted) return;
+
+    setState(() {
+      _submittingReviewIds.remove(reviewId);
+      if (result.success) {
+        _editingReviewIds.remove(reviewId);
+        // ✅ อัปเดตข้อมูลในลิสต์ทันที ไม่ต้องรอ fetch ใหม่ทั้งหน้า ผู้ใช้เห็นผลทันที
+        final idx = _reviews.indexWhere((r) => (r['id'] as num?)?.toInt() == reviewId);
+        if (idx != -1) _reviews[idx] = {..._reviews[idx], 'reply': text};
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message), backgroundColor: result.success ? Colors.green : Colors.red),
     );
   }
 
@@ -183,6 +244,9 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                         final avatar = r['customer_avatar']?.toString();
                         final photos = (r['photos'] is List) ? List<dynamic>.from(r['photos']) : [];
                         final reply = r['reply']?.toString();
+                        final reviewId = (r['id'] as num?)?.toInt();
+                        final isEditing = reviewId != null && _editingReviewIds.contains(reviewId);
+                        final isSubmitting = reviewId != null && _submittingReviewIds.contains(reviewId);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -235,7 +299,8 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                   ),
                                 ),
                               ],
-                              if (reply != null && reply.isNotEmpty) ...[
+                              // ✅ โชว์กล่องคำตอบเดิม เฉพาะตอนที่ "ไม่ได้" กำลังแก้ไขอยู่
+                              if (!isEditing && reply != null && reply.isNotEmpty) ...[
                                 const SizedBox(height: 10),
                                 Container(
                                   width: double.infinity,
@@ -251,15 +316,79 @@ class _GarageReviewsPageState extends State<GarageReviewsPage> {
                                         children: [
                                           const Icon(Icons.reply, size: 14, color: Color(0xff2196F3)),
                                           const SizedBox(width: 4),
-                                          Text(loc.t('grp_reply_from_prefix').replaceAll('%s', _shopLabel),
-                                              style: const TextStyle(
-                                                  fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xff2196F3))),
+                                          Expanded(
+                                            child: Text(loc.t('grp_reply_from_prefix').replaceAll('%s', _shopLabel),
+                                                style: const TextStyle(
+                                                    fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xff2196F3))),
+                                          ),
+                                          // ✅ อู่เจ้าของร้านแก้ไขคำตอบเดิมได้ (ลูกค้าที่เปิดดูจาก garage_detail_page.dart จะไม่เห็นปุ่มนี้)
+                                          if (widget.canReply && reviewId != null)
+                                            InkWell(
+                                              onTap: () => _startEditingReply(reviewId, reply),
+                                              child: Text(loc.t('grp_reply_edit_button'),
+                                                  style: const TextStyle(
+                                                      fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.grey)),
+                                            ),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
                                       Text(reply, style: const TextStyle(fontSize: 12.5, height: 1.4)),
                                     ],
                                   ),
+                                ),
+                              ],
+                              // ✅ ยังไม่เคยตอบกลับ + เป็นอู่เจ้าของร้าน + ไม่ได้กำลังพิมพ์อยู่ -> โชว์ปุ่มเริ่มตอบ
+                              if (widget.canReply && reviewId != null && !isEditing && (reply == null || reply.isEmpty)) ...[
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () => _startEditingReply(reviewId, null),
+                                    icon: const Icon(Icons.reply, size: 16),
+                                    label: Text(loc.t('grp_reply_button')),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xff2196F3),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              // ✅ กล่องพิมพ์ตอบกลับ/แก้ไขคำตอบ (ใช้ endpoint เดียวกันทั้งตอบใหม่และแก้ไขของเดิม)
+                              if (widget.canReply && reviewId != null && isEditing) ...[
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _replyControllerFor(reviewId, reply ?? ''),
+                                  autofocus: true,
+                                  maxLines: 3,
+                                  minLines: 2,
+                                  decoration: InputDecoration(
+                                    hintText: loc.t('grp_reply_hint'),
+                                    isDense: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    contentPadding: const EdgeInsets.all(10),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed: isSubmitting ? null : () => _cancelEditingReply(reviewId),
+                                      child: Text(loc.t('grp_reply_cancel')),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    ElevatedButton(
+                                      onPressed: isSubmitting ? null : () => _submitReply(reviewId),
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff2196F3)),
+                                      child: isSubmitting
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                            )
+                                          : Text(loc.t('grp_reply_send')),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ],
