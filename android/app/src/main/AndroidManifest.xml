@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ✅ แก้บั๊ก: เดิมไฟล์นี้ไม่มีสิทธิ์ INTERNET เลย ทำให้แอป Android เชื่อมต่อ
+         เซิร์ฟเวอร์ไม่ได้ตั้งแต่หน้า Login (ยิง API อะไรก็ fail หมด ขึ้น "ไม่สามารถ
+         เชื่อมต่อเซิร์ฟเวอร์ได้" ทุกครั้ง) — ไม่เคยเจอตอนทดสอบเพราะทดสอบผ่าน iOS
+         Simulator มาตลอด ซึ่ง iOS ไม่ต้องขอสิทธิ์นี้ พอลง apk บนเครื่อง Android จริง
+         ครั้งแรกถึงเจอ -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
@@ -38,10 +44,28 @@
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <!-- ✅ แก้บั๊ก: ปุ่ม "นำทาง" (เปิดแอปแผนที่) กด "แต่เข้าไม่ได้" ขึ้น "เปิดแอปแผนที่ไม่สำเร็จ"
+         บนเครื่อง Android จริง (แม้เครื่องนั้นมี Google Maps ติดตั้งอยู่) — สาเหตุคือ
+         Android 11 (API 30) ขึ้นไปบังคับให้แอปประกาศ <queries> ล่วงหน้าว่าจะเปิดแอปแบบไหนบ้าง
+         (package visibility) ไม่งั้น canLaunchUrl()/launchUrl() ของ url_launcher จะมองไม่เห็น
+         แอปแผนที่เลยและคืนค่า "เปิดไม่ได้" เสมอ ทั้งที่จริงๆ เครื่องมีแอปติดตั้งอยู่
+         เพิ่ม geo: (ปุ่มนำทาง), tel: (ปุ่มโทรหาลูกค้า/ช่าง) และ https ที่เปิดผ่านเบราว์เซอร์ได้ -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>
