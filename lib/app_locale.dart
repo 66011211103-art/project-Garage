@@ -868,6 +868,7 @@ class AppLocale extends ChangeNotifier {
   'gw_no_unpaid_commissions': {'th': '🎉 ไม่มีค่าคอมมิชชั่นค้างจ่าย', 'en': '🎉 No outstanding commissions'},
   'gw_selected_count': {'th': 'เลือกแล้ว %s งาน', 'en': '%s jobs selected'},
   'gw_selected_total_prefix': {'th': 'รวม ฿%s', 'en': 'Total ฿%s'},
+  'gw_unpaid_total_prefix': {'th': 'ยอดค้างจ่ายทั้งหมด ฿%s', 'en': 'Total outstanding ฿%s'},
   'gw_attach_slip_label': {'th': 'แนบสลิปการโอนเงิน', 'en': 'Attach Transfer Slip'},
   'gw_submit_payment_button': {'th': 'ส่งชำระค่าคอมมิชชั่น', 'en': 'Submit Commission Payment'},
   'gw_history_title': {'th': 'ประวัติการชำระค่าคอมมิชชั่น', 'en': 'Commission Payment History'},

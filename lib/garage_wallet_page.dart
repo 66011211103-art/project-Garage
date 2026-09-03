@@ -108,6 +108,15 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
         .fold(0.0, (sum, c) => sum + (double.tryParse(c['commission_amount']?.toString() ?? '0') ?? 0));
   }
 
+  // ✅ ยอดค้างจ่าย "ทั้งหมด" (ไม่ใช่แค่ที่ติ๊กเลือกไว้) — เดิมหน้านี้โชว์ยอดรวมให้เห็นก็
+  // ต่อเมื่อติ๊กเลือกงานแล้วเท่านั้น อู่เลยไม่มีทางเทียบเลขนี้กับ "ยอดเครดิตคงเหลือใน
+  // Wallet" ด้านบนได้ง่ายๆ ว่าตรงกันไหม (สองยอดนี้ควรจะใกล้เคียงกันเสมอ เพราะทั้งคู่มา
+  // จากค่าคอมที่ยังไม่ได้จ่ายเหมือนกัน) — โชว์ไว้ตลอดให้เทียบกันได้ทันทีที่เข้าหน้า
+  double get _unpaidTotal {
+    return _unpaidCommissions
+        .fold(0.0, (sum, c) => sum + (double.tryParse(c['commission_amount']?.toString() ?? '0') ?? 0));
+  }
+
   void _toggleCommission(int id) {
     setState(() {
       if (_selectedCommissionIds.contains(id)) {
@@ -391,6 +400,22 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
                       const SizedBox(height: 4),
                       Text(loc.t('gw_unpaid_instructions'),
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+
+                      // ✅ โชว์ยอดรวมค้างจ่ายทั้งหมดไว้ตลอด (ไม่ต้องรอติ๊กเลือกก่อน) — ให้เทียบ
+                      // กับ "ยอดเครดิตคงเหลือใน Wallet" ด้านบนได้ทันที เห็นความผิดปกติได้ไว
+                      if (_unpaidLoadError == null && _unpaidCommissions.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(color: const Color(0xffFFF3E0), borderRadius: BorderRadius.circular(10)),
+                          child: Text(
+                            loc.t('gw_unpaid_total_prefix').replaceAll('%s', _unpaidTotal.toStringAsFixed(2)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xffE65100)),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 14),
 
                       if (_unpaidLoadError != null)
