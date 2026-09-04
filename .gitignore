@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# ✅ โฟลเดอร์พักไฟล์ build เก่าที่ย้ายไปรอพี่ลบทิ้งเอง (จาก disk cleanup) — ไม่ใช่ source code
+# ของโปรเจกต์ ไม่ต้องให้ git แทร็ก (เดิมไม่มีบรรทัดนี้ ทำให้ git เห็นเป็นไฟล์ untracked เป็นหมื่นไฟล์)
+/_to_delete/
+
 # Symbolication related
 app.*.symbols
 

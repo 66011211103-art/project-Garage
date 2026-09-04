@@ -319,9 +319,10 @@ class _EditProfileCustomerPageState extends State<EditProfileCustomerPage> {
                             : null,
                         icon: const Icon(Icons.map_outlined, size: 18),
                         label: Text(loc.t('epc_view_on_map_button')),
+                        // ✅ ปรับให้เป็นสีฟ้าเดียวกับปุ่ม "ค้นหาที่อยู่/พิกัด" ด้านซ้าย (เดิมเป็นสีเทา ดูไม่เข้าชุดกัน)
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.grey.shade700,
-                          side: BorderSide(color: Colors.grey.shade400),
+                          foregroundColor: const Color(0xff2196F3),
+                          side: const BorderSide(color: Color(0xff2196F3)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),

@@ -9,6 +9,18 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  # ✅ กันไม่ให้ analyzer ไปสแกนโฟลเดอร์ที่ไม่ใช่ source code ของโปรเจกต์เราเอง
+  # - build/ มีไฟล์ .dart ของ Firebase (flutterfire) ที่ CocoaPods/SPM checkout มาตอน build
+  #   ฝั่ง macOS อยู่เป็นพัน ไฟล์ (build/macos/SourcePackages/checkouts/flutterfire/...) พอ
+  #   analyzer ไปสแกนเจอ error ในไฟล์พวกนั้น (ที่ไม่เกี่ยวกับโค้ดเราเลย) เลยทำให้โฟลเดอร์ build
+  #   ขึ้นแดงทั้งโฟลเดอร์ใน IDE ทั้งที่โค้ดจริงในโปรเจกต์ไม่มี error
+  # - _to_delete/ เป็นโฟลเดอร์ build เก่าที่ย้ายไปพักไว้รอพี่ลบทิ้งเอง (จาก disk cleanup) มีปัญหา
+  #   เดียวกันเป๊ะ (มีไฟล์ .dart ของ flutterfire ซ้ำอยู่ข้างในเหมือนกัน)
+  exclude:
+    - build/**
+    - _to_delete/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

@@ -81,9 +81,17 @@ class _GarageWalletPageState extends State<GarageWalletPage> {
         _commissionRate = double.tryParse(walletResult.data!['commission_rate']?.toString() ?? '0') ?? 0;
       }
       if (unpaidResult.success && unpaidResult.data != null) {
-        _unpaidCommissions = List<Map<String, dynamic>>.from(unpaidResult.data as List);
+        final allUnpaid = List<Map<String, dynamic>>.from(unpaidResult.data as List);
+        // ✅ ซ่อนงานที่ตั้งค่าคอมมิชชั่นเป็น 0 ออกจากรายการค้างจ่าย — เฉพาะกรณีค่าคอมเป็น
+        // 0 เป๊ะเท่านั้น (งานที่มีค่าคอมแม้เพียงเล็กน้อยยังต้องแสดงและให้จ่ายตามปกติ)
+        // เพราะ 0 บาทไม่มีอะไรให้อู่ต้องโอนจ่ายจริงๆ อยู่แล้ว
+        _unpaidCommissions = allUnpaid.where((c) {
+          final amount = double.tryParse(c['commission_amount']?.toString() ?? '0') ?? 0;
+          return amount != 0;
+        }).toList();
         _unpaidLoadError = null;
-        // ✅ กันเลือกค้างรายการที่ไม่อยู่ในลิสต์แล้ว (เช่น จ่ายไปแล้วจากอีกเครื่อง)
+        // ✅ กันเลือกค้างรายการที่ไม่อยู่ในลิสต์แล้ว (เช่น จ่ายไปแล้วจากอีกเครื่อง หรือถูกกรอง
+        // ออกเพราะค่าคอมเป็น 0)
         final validIds = _unpaidCommissions.map((c) => c['id'] as int).toSet();
         _selectedCommissionIds.removeWhere((id) => !validIds.contains(id));
       } else if (!unpaidResult.success) {

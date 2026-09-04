@@ -39,6 +39,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- ✅ เพิ่มใหม่: บอก Firebase Cloud Messaging ว่าตอนแอปปิดสนิท/เบื้องหลัง ให้ใช้
+             notification channel เดียวกับที่ flutter_local_notifications ใช้ตอนแอปเปิดอยู่
+             (ดู 'garage_app_channel' ใน socket_notification_service.dart) ไม่งั้นแจ้งเตือน
+             จาก FCM ตอนปิดแอปจะไปโผล่ใน channel เริ่มต้น "Miscellaneous" แทน -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="garage_app_channel" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

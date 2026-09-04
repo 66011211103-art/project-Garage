@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -27,9 +28,23 @@ Future<Position> getCurrentPosition() async {
     throw Exception(AppLocale.instance.t('loc_permission_denied_forever'));
   }
 
-  return Geolocator.getCurrentPosition(
-    locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-  );
+  // ✅ แก้บั๊ก: เดิมไม่ใส่ timeLimit เลย — ถ้า GPS จับสัญญาณไม่ได้ (เช่นอยู่ในตึก/ในอู่ที่
+  // สัญญาณ GPS อ่อน) Future นี้จะค้างรอไม่มีกำหนด ทำให้หน้าที่เรียกใช้ (เช่นหน้าค้นหาอู่)
+  // ค้างอยู่ที่ "กำลังขอตำแหน่ง..." ตลอดไป ไม่มีทาง fallback ไปใช้พิกัดที่บันทึกไว้ในโปรไฟล์
+  // ได้เลย เพราะไม่มี exception โยนออกมาให้ catch — ใส่ timeLimit ไว้ 10 วินาที พอเกินเวลา
+  // จะโยน TimeoutException ออกมาแทน ให้โค้ดฝั่งเรียกใช้ (มี try/catch อยู่แล้วทุกจุด) ตกไป
+  // fallback ใช้พิกัดที่บันทึกไว้แทนได้ตามที่ตั้งใจไว้แต่แรก
+  try {
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      ),
+    );
+  } on TimeoutException {
+    // ✅ แปลงเป็นข้อความที่อ่านรู้เรื่อง แทนข้อความ TimeoutException ดิบๆ ที่หลุดขึ้นจอผู้ใช้
+    throw Exception(AppLocale.instance.t('loc_gps_timeout'));
+  }
 }
 
 /// แปลงพิกัด (lat, lon) กลับเป็นที่อยู่แบบอ่านได้ (reverse geocoding) ผ่าน Nominatim (OSM)

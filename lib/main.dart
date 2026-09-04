@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart'; // ✅ เพิ่มใหม่: FCM — แจ้งเตือนได้แม้ปิดแอปสนิท
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dashboard.dart';
 import 'garage_dashboard.dart';
 import 'technician_dashboard.dart'; // ✅ หน้าหลักฝั่งช่าง
@@ -51,14 +53,34 @@ class SessionStore {
   }
 }
 
+// ✅ เพิ่มใหม่: ต้องเป็นฟังก์ชันระดับบนสุด (top-level) แบบนี้เท่านั้น ห้ามอยู่ในคลาส/เป็น
+// closure — เวลาแอปถูกปิดสนิท ระบบปฏิบัติการ (Android) จะรันฟังก์ชันนี้ในอีก isolate
+// แยกต่างหาก ไม่มี state อื่นของแอปติดมาด้วยเลย จึงต้อง initializeApp() ใหม่ในนี้เสมอ
+// (ข้อความที่มี "notification" field ระบบจะโชว์ในทีเครื่องให้เองอัตโนมัติอยู่แล้วโดยไม่
+// ต้องพึ่งฟังก์ชันนี้ — ฟังก์ชันนี้มีไว้เผื่อกรณีอนาคตอยากประมวลผลข้อความแบบ data-only เพิ่ม)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  // ignore: avoid_print
+  print('[FCM] background message: ${message.messageId}');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ เพิ่มใหม่: ต้อง initializeApp() ก่อนใช้ FirebaseMessaging ตัวไหนก็ตาม (ทั้งใน main
+  // isolate นี้ และก่อนลงทะเบียน background handler ด้านล่าง)
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // ✅ โหลดภาษาที่ผู้ใช้เคยเลือกไว้ก่อนเริ่ม runApp เสมอ ไม่งั้นต้องรอเข้าหน้าตั้งค่าก่อนถึงจะโหลด
   await AppLocale.instance.load();
 
-  // ✅ เพิ่มใหม่: เช็ค session ที่เคยล็อกอินไว้ก่อนตัดสินใจว่าจะเปิดหน้าไหน (ดู SessionStore ด้านบน)
-  final savedUser = await SessionStore.load();
+  // ✅ แก้ตามคำขอ: ต้องการให้ผู้ใช้ล็อกอินทุกครั้งที่เข้าแอป ไม่ต้องการให้แอป auto-login
+  // ข้ามการเปิดปิดแอปอีกต่อไป — เดิมตรงนี้เรียก SessionStore.load() แล้วเอาผลไปตัดสินใจ
+  // เปิดหน้า dashboard เลยถ้าเคยมี session ค้างอยู่ ตอนนี้ตัดขั้นตอนนั้นออก ให้เปิดแอปมา
+  // เจอหน้า login เสมอ (ยังคงคลาส SessionStore ไว้เผื่อใช้งานอื่นในอนาคต แค่ไม่เอาผลมา
+  // ตัดสินหน้าแรกของแอปอีกต่อไป)
 
   // ✅ กันไม่ให้แอปโชว์ "หน้าจอแดง" (Flutter error screen) เวลามี widget พัง
   //     ไม่ว่าจะเกิดที่หน้าไหนก็ตาม — โชว์การ์ดข้อความสุภาพแทน
@@ -87,27 +109,11 @@ void main() async {
     );
   };
 
-  runApp(MyApp(savedUser: savedUser));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final Map<String, dynamic>? savedUser;
-
-  const MyApp({super.key, this.savedUser});
-
-  // ✅ เพิ่มใหม่: เลือกหน้าแรกจาก session ที่บันทึกไว้ ให้ตรงกับ userType เดิม
-  // (ไม่มี session บันทึกไว้ -> ไปหน้า login ตามปกติ)
-  Widget _resolveHome() {
-    final user = savedUser;
-    if (user == null) return const LoginPage();
-    final userType = user['userType'] ?? 'customer';
-    if (userType == 'repair') {
-      return GarageDashboard(userData: user);
-    } else if (userType == 'technician') {
-      return TechnicianDashboard(userData: user);
-    }
-    return HomePage(userData: user);
-  }
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -117,9 +123,10 @@ class MyApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: AppLocale.instance,
       builder: (context, _) {
-        return MaterialApp(
+        return const MaterialApp(
           debugShowCheckedModeBanner: false,
-          home: _resolveHome(),
+          // ✅ แก้ตามคำขอ: เปิดแอปมาเจอหน้า login เสมอ ไม่ auto-login จาก session เก่า
+          home: LoginPage(),
         );
       },
     );

@@ -455,6 +455,34 @@ class ApiService {
     }
   }
 
+  // ===== บันทึก FCM token ของอุปกรณ์นี้ไว้กับผู้ใช้ที่ล็อกอินอยู่ =====
+  // ✅ เพิ่มใหม่: เรียกจาก SocketNotificationService หลังล็อกอินสำเร็จ (และตอน token
+  // รีเฟรชระหว่างใช้งาน) เพื่อให้ backend รู้ว่าจะส่งแจ้งเตือนผ่าน Firebase Cloud
+  // Messaging (FCM) ไปที่อุปกรณ์ไหน — ทำให้ได้รับแจ้งเตือนแม้ปิดแอปสนิท
+  static Future<ApiResult> updateFcmToken({
+    required int userId,
+    required String fcmToken,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/users/$userId/fcm-token'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'fcmToken': fcmToken}),
+          )
+          .timeout(const Duration(seconds: 20));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResult(
+        success: body['success'] == true,
+        message: body['message'] ?? '',
+      );
+    } catch (e) {
+      // ✅ เงียบๆ พอ ไม่ต้องโชว์ error ให้ผู้ใช้เห็น — ถ้าบันทึก token ไม่สำเร็จ
+      // แค่แปลว่าตอนนี้จะยังพึ่ง Socket.IO อย่างเดียว (ใช้งานได้ปกติตอนเปิดแอปอยู่)
+      return ApiResult(success: false, message: 'บันทึก FCM token ไม่สำเร็จ');
+    }
+  }
+
   // ===== นับจำนวนคำขอที่อู่ตอบกลับแล้ว แต่ลูกค้ายังไม่ได้เปิดดู (โชว์ที่กระดิ่ง) =====
   // ===== เพิ่มบัญชีช่างใหม่ (ฝั่งอู่) =====
   static Future<ApiResult> createTechnician({

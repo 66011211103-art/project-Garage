@@ -3,6 +3,10 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // ✅ เพิ่มใหม่: ต้อง apply ตัวนี้ (ไม่ใส่ version ซ้ำ — ประกาศ version ไว้ที่
+    // settings.gradle.kts แล้ว) ไม่งั้น build จะหา google-services.json ไม่เจอ/ไม่ generate
+    // Firebase config ให้แอป ทำให้ FCM ใช้งานไม่ได้ทั้งที่ไฟล์ google-services.json อยู่ตรงนั้นแล้ว
+    id("com.google.gms.google-services")
 }
 
 android {

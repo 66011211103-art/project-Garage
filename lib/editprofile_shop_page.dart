@@ -204,7 +204,7 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         child: Container(
                           width: 40,
                           height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
+                          margin: const EdgeInsets.only(bottom: 18),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade300,
                             borderRadius: BorderRadius.circular(2),
@@ -214,51 +214,94 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            existing != null ? AppLocale.instance.t('esp_edit_service') : AppLocale.instance.t('esp_add_service'),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffE3F2FD),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.build_circle_outlined,
+                                    color: Color(0xff2196F3), size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                existing != null ? AppLocale.instance.t('esp_edit_service') : AppLocale.instance.t('esp_add_service'),
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close),
+                            icon: Icon(Icons.close, color: Colors.grey.shade600),
+                            splashRadius: 20,
                             onPressed: () => Navigator.pop(sheetContext, false),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(AppLocale.instance.t('esp_select_category'),
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 14),
+                      // ✅ ปรับดีไซน์ฟอร์มเพิ่ม/แก้ไขบริการใหม่ทั้งหมด — เดิมทุกช่องมี
+                      // label ตัวหนาแยกบรรทัดลอยอยู่เหนือช่อง กดแล้วดูเป็นกองตัวหนังสือ
+                      // เรียงกันแน่นๆ รกตา เปลี่ยนมาใช้ floating label ในตัวช่องแทน (มาตรฐาน
+                      // Material) เพิ่มขอบบางๆ ให้ช่องดูมีมิติขึ้นแทนพื้นเรียบเฉยๆ โค้งมน
+                      // สม่ำเสมอ 14 ทุกช่อง และห่อแถบเปิด/ปิดบริการด้วยกล่องที่เปลี่ยนสีตาม
+                      // สถานะ (เขียวอ่อน = เปิดใช้งาน, เทา = ปิด) ให้เห็นผลลัพธ์ชัดเจนขึ้น
                       DropdownButtonFormField<String>(
                         value: category,
                         items: kGarageCategories
                             .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                             .toList(),
                         decoration: InputDecoration(
+                          labelText: AppLocale.instance.t('esp_select_category'),
                           filled: true,
                           fillColor: const Color(0xFFF5F6FA),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.4),
                           ),
                         ),
                         onChanged: (v) => setSheetState(() => category = v ?? category),
                       ),
                       const SizedBox(height: 14),
-                      Text(AppLocale.instance.t('esp_service_name_label'),
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
                       TextFormField(
                         controller: nameCtrl,
-                        decoration: profileInputDeco(
-                            hint: AppLocale.instance.t('esp_service_name_hint'), icon: Icons.build_outlined),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? AppLocale.instance.t('esp_service_name_required') : null,
+                        decoration: InputDecoration(
+                          labelText: AppLocale.instance.t('esp_service_name_label'),
+                          hintText: AppLocale.instance.t('esp_service_name_hint'),
+                          prefixIcon: const Icon(Icons.build_outlined, color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0xFFF5F6FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.4),
+                          ),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? AppLocale.instance.t('esp_service_name_required')
+                            : null,
                       ),
                       const SizedBox(height: 14),
-                      Text(AppLocale.instance.t('esp_estimated_price_label'),
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      Text(
+                        AppLocale.instance.t('esp_estimated_price_label'),
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                      ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
@@ -266,20 +309,52 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                             child: TextFormField(
                               controller: minCtrl,
                               keyboardType: TextInputType.number,
-                              decoration: profileInputDeco(
-                                  hint: AppLocale.instance.t('esp_price_min_hint'), icon: Icons.sell_outlined),
+                              decoration: InputDecoration(
+                                hintText: AppLocale.instance.t('esp_price_min_hint'),
+                                filled: true,
+                                fillColor: const Color(0xFFF5F6FA),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.4),
+                                ),
+                              ),
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('-'),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text('-', style: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.bold)),
                           ),
                           Expanded(
                             child: TextFormField(
                               controller: maxCtrl,
                               keyboardType: TextInputType.number,
-                              decoration: profileInputDeco(
-                                  hint: AppLocale.instance.t('esp_price_max_hint'), icon: Icons.sell_outlined),
+                              decoration: InputDecoration(
+                                hintText: AppLocale.instance.t('esp_price_max_hint'),
+                                filled: true,
+                                fillColor: const Color(0xFFF5F6FA),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.4),
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -287,32 +362,66 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                       const SizedBox(height: 4),
                       Text(
                         AppLocale.instance.t('esp_price_hint_numeric'),
-                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                       ),
                       const SizedBox(height: 14),
-                      Text(AppLocale.instance.t('esp_additional_details_label'),
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
                       TextFormField(
                         controller: detailsCtrl,
                         maxLines: 2,
-                        decoration: profileInputDeco(
-                            hint: AppLocale.instance.t('esp_service_details_hint'), icon: Icons.notes_outlined),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(AppLocale.instance.t('esp_service_enabled_label'),
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          Switch(
-                            value: active,
-                            activeColor: const Color(0xff2196F3),
-                            onChanged: (v) => setSheetState(() => active = v),
+                        decoration: InputDecoration(
+                          labelText: AppLocale.instance.t('esp_additional_details_label'),
+                          hintText: AppLocale.instance.t('esp_service_details_hint'),
+                          filled: true,
+                          fillColor: const Color(0xFFF5F6FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
                           ),
-                        ],
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xff2196F3), width: 1.4),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: active ? const Color(0xffE8F5E9) : const Color(0xFFF5F6FA),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: active ? const Color(0xff81C784) : Colors.grey.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  active ? Icons.check_circle : Icons.radio_button_unchecked,
+                                  size: 18,
+                                  color: active ? const Color(0xff43A047) : Colors.grey.shade400,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(AppLocale.instance.t('esp_service_enabled_label'),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            Switch(
+                              value: active,
+                              activeColor: const Color(0xff43A047),
+                              onChanged: (v) => setSheetState(() => active = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -327,8 +436,9 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xff2196F3),
                             padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(14)),
                           ),
                         ),
                       ),
@@ -919,15 +1029,26 @@ class _EditProfileShopPageState extends State<EditProfileShopPage> {
                         const SizedBox(height: 8),
                       ],
 
-                      OutlinedButton.icon(
-                        onPressed: () => _openServiceForm(),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: Text(AppLocale.instance.t('esp_add_service')),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xff2196F3),
-                          side: const BorderSide(color: Color(0xff2196F3)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      // ✅ ปรับดีไซน์ปุ่ม "เพิ่มบริการใหม่" ใหม่ — เดิมเป็นปุ่ม outline
+                      // เส้นบางๆ ตัวเล็กชิดซ้าย ดูโดดเดี่ยวไม่เข้าธีมกับปุ่มหมวดบริการ/การ์ด
+                      // ด้านบน เปลี่ยนเป็นเต็มความกว้าง พื้นสีฟ้าอ่อนตัดขอบ ให้เข้าชุดสี
+                      // เดียวกับปุ่มหมวดบริการและแบนเนอร์คำอธิบายด้านล่าง ดูเป็นชุดเดียวกันทั้งหน้า
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openServiceForm(),
+                          icon: const Icon(Icons.add_circle_outline, size: 20),
+                          label: Text(
+                            AppLocale.instance.t('esp_add_service'),
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xff2196F3),
+                            backgroundColor: const Color(0xffE3F2FD),
+                            side: BorderSide.none,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
                         ),
                       ),
 

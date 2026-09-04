@@ -3,7 +3,8 @@
 // 📌 หน้า/ฟีเจอร์: หน้า "ชำระเงิน" ฝั่งลูกค้า (ตาม Figma ที่ส่งมา)
 // 📝 คำอธิบาย: เปิดได้เมื่องานซ่อมสถานะ "completed" แล้วเท่านั้น — ดึงยอดจริงจาก
 //     ใบเสนอราคาที่ยืนยันแล้ว (คำนวณเองรวม VAT 7%) ให้เลือกวิธีชำระเงิน
-//     (โอนผ่านธนาคาร / QR พร้อมเพย์ ใช้งานได้จริงทั้งคู่ / บัตรเครดิต เป็น "เร็วๆ นี้")
+//     (โอนผ่านธนาคาร / QR พร้อมเพย์ ใช้งานได้จริงทั้งคู่ — เอาตัวเลือกบัตรเครดิต/เดบิต
+//     ออกไปแล้วตามที่ขอ)
 //     แนบสลิปแล้วส่งให้อู่ตรวจสอบ มี 3 สถานะการแสดงผล:
 //       - ยังไม่จ่าย → ฟอร์มให้กรอก
 //       - จ่ายแล้วรออู่ยืนยัน (pending_confirmation) → หน้าจอรอผล
@@ -133,7 +134,7 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
   }
 
   Future<void> _submit() async {
-    if (_selectedMethod != 'bank_transfer' && _selectedMethod != 'qr') return; // กันไว้ (บัตรเครดิตยังปิดอยู่)
+    if (_selectedMethod != 'bank_transfer' && _selectedMethod != 'qr') return; // กันไว้เผื่อกรณีผิดปกติ (ตอนนี้มีแค่ 2 วิธีให้เลือก)
     if (_slipBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocale.instance.t('gw_slip_required')), backgroundColor: Colors.red),
@@ -235,13 +236,6 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
           title: loc.t('php_method_qr'),
           subtitle: loc.t('cpp_qr_subtitle'),
         ),
-        const SizedBox(height: 10),
-        _methodOption(
-          value: 'credit_card',
-          icon: Icons.credit_card,
-          title: loc.t('cpp_credit_card_label'),
-          subtitle: loc.t('cpp_credit_card_subtitle'),
-        ),
 
         if (_selectedMethod == 'bank_transfer') ...[
           const SizedBox(height: 20),
@@ -261,23 +255,6 @@ class _CustomerPaymentPageState extends State<CustomerPaymentPage> {
           Text(loc.t('cpp_upload_slip_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
           _slipUploadBox(),
-        ] else ...[
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-            child: Row(
-              children: [
-                const Icon(Icons.hourglass_top, color: Colors.grey, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(loc.t('cpp_coming_soon_msg'),
-                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                ),
-              ],
-            ),
-          ),
         ],
 
         const SizedBox(height: 16),

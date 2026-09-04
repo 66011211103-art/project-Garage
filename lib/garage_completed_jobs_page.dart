@@ -109,10 +109,19 @@ class _GarageCompletedJobsPageState extends State<GarageCompletedJobsPage> {
     return '${dt.day}/${dt.month}/${buddhistYear2Digit.toString().padLeft(2, '0')}';
   }
 
+  // ✅ เดิมย่อยอดเกิน 1,000 เป็น "1K" ทำให้อู่งงว่าได้เงินจริงเท่าไหร่ (เช่น ฿1,498 ก็
+  // ปัดโชว์แค่ "1K" ซึ่งไม่บอกตัวเลขจริงเลย) — เปลี่ยนมาโชว์ยอดเต็มพร้อมคอมม่าคั่นหลักพัน
+  // แทน ให้อู่เห็นตัวเลขจริงชัดเจนเหมือนใน _jobCard ที่โชว์ยอดรายงานเต็มอยู่แล้ว
   String _formatCompact(double value) {
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(0)}K';
-    return value.toStringAsFixed(0);
+    final isNegative = value < 0;
+    final rounded = value.abs().round();
+    final str = rounded.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(str[i]);
+    }
+    return '${isNegative ? '-' : ''}$buffer';
   }
 
   @override

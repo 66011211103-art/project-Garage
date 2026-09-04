@@ -4,9 +4,10 @@
 //     (ใช้แสดงในหน้า customer_payment_page.dart ของฝั่งลูกค้า)
 // ============================================================
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
-import 'garage_wallet_page.dart'; // ✅ ลิงก์ไปหน้า Wallet — เตือนเรื่องค่าคอมมิชชั่นตรงนี้เลย
 import 'app_locale.dart';
 
 // ✅ ชื่อธนาคารใน _thaiBanks ยังคงเป็นภาษาไทยเสมอ (เก็บ/เทียบเป็น bank_name ที่ส่งไป
@@ -57,6 +58,12 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
     'ธนาคารยูโอบี',
   ];
 
+  // ✅ ใหม่ — เก็บ "ฉบับร่าง" ของสิ่งที่พิมพ์ไว้ในเครื่องนี้ (SharedPreferences) แยกเป็นราย
+  // อู่ (ผูกกับ userId) ให้ข้อความที่พิมพ์ไม่หายแม้ยังไม่ได้กดบันทึก/ออกจากหน้านี้ไปก่อน/
+  // ปิดแอปไปกลางคัน — พอกดบันทึกสำเร็จแล้วจะล้างฉบับร่างทิ้ง (ให้ข้อมูลจริงจาก backend
+  // เป็นเจ้าของค่าต่อจากนั้น) ทุกช่องยังพิมพ์แก้ไขได้ตามปกติเสมอ ไม่มีการล็อกใดๆ
+  String get _draftKey => 'bank_settings_draft_${widget.userData['id']}';
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +75,90 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
     _promptPayController =
         TextEditingController(text: widget.userData['promptpay_id']?.toString() ?? '');
     AppLocale.instance.addListener(_onLocaleChanged);
+
+    // ✅ ทุกครั้งที่ข้อความในช่องไหนเปลี่ยน (พิมพ์เอง หรือเลือกธนาคารจาก dropdown) ให้บันทึก
+    // ฉบับร่างลงเครื่องทันที กันข้อความหายถ้าออกจากหน้านี้/ปิดแอปไปก่อนจะกดบันทึกจริง
+    _bankNameController.addListener(_saveDraft);
+    _accountNumberController.addListener(_saveDraft);
+    _accountNameController.addListener(_saveDraft);
+    _promptPayController.addListener(_saveDraft);
+
+    // ✅ โหลดฉบับร่างที่เคยพิมพ์ค้างไว้ในเครื่องนี้ก่อน (ถ้ามี — ถือเป็นสิ่งล่าสุดที่ผู้ใช้
+    // ตั้งใจจะกรอก) แล้วค่อยดึงข้อมูลจาก backend มาเติมเฉพาะช่องที่ยังว่างอยู่อีกที
+    _loadDraft().then((_) => _refreshFromServer());
+  }
+
+  Future<void> _loadDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_draftKey);
+      if (raw == null || raw.isEmpty) return;
+      final draft = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      if (!mounted) return;
+      setState(() {
+        final bankName = draft['bank_name']?.toString() ?? '';
+        if (bankName.isNotEmpty) _bankNameController.text = bankName;
+        final accNum = draft['bank_account_number']?.toString() ?? '';
+        if (accNum.isNotEmpty) _accountNumberController.text = accNum;
+        final accName = draft['bank_account_name']?.toString() ?? '';
+        if (accName.isNotEmpty) _accountNameController.text = accName;
+        final promptpay = draft['promptpay_id']?.toString() ?? '';
+        if (promptpay.isNotEmpty) _promptPayController.text = promptpay;
+      });
+    } catch (e) {
+      // ✅ อ่านฉบับร่างไม่สำเร็จก็แค่ข้าม ไม่ต้องกวนผู้ใช้ (ยังใช้ค่าจาก userData/backend ตามปกติ)
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _draftKey,
+        jsonEncode({
+          'bank_name': _bankNameController.text,
+          'bank_account_number': _accountNumberController.text,
+          'bank_account_name': _accountNameController.text,
+          'promptpay_id': _promptPayController.text,
+        }),
+      );
+    } catch (e) {
+      // เงียบๆ พอ — บันทึกฉบับร่างไม่ได้ไม่ใช่เรื่องคอขวด แค่เสียความสะดวกเล็กน้อย
+    }
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftKey);
+    } catch (e) {
+      // เงียบๆ พอ
+    }
+  }
+
+  Future<void> _refreshFromServer() async {
+    final result = await ApiService.getProfile(
+      userId: widget.userData['id'],
+      userType: 'repair',
+    );
+    if (!mounted || !result.success || result.data == null) return;
+
+    final fresh = Map<String, dynamic>.from(result.data!['user'] ?? {});
+
+    void fillIfEmpty(TextEditingController controller, String key) {
+      if (controller.text.trim().isNotEmpty) return; // ผู้ใช้เห็น/พิมพ์อะไรอยู่แล้ว ไม่ทับ
+      final value = fresh[key]?.toString();
+      if (value != null && value.isNotEmpty) {
+        controller.text = value;
+      }
+    }
+
+    setState(() {
+      fillIfEmpty(_bankNameController, 'bank_name');
+      fillIfEmpty(_accountNumberController, 'bank_account_number');
+      fillIfEmpty(_accountNameController, 'bank_account_name');
+      fillIfEmpty(_promptPayController, 'promptpay_id');
+    });
   }
 
   @override
@@ -107,7 +198,13 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
       SnackBar(content: Text(result.message), backgroundColor: result.success ? Colors.green : Colors.red),
     );
 
-    if (result.success) Navigator.pop(context, true);
+    if (result.success) {
+      // ✅ บันทึกขึ้น backend สำเร็จแล้ว ไม่ต้องเก็บฉบับร่างในเครื่องต่อ (backend คือเจ้าของ
+      // ค่าตัวจริงแล้ว กันฉบับร่างเก่าค้างมาทับข้อมูลใหม่ที่อาจแก้จากที่อื่นในอนาคต)
+      await _clearDraft();
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -145,46 +242,6 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          // ✅ ลิงก์ไปหน้า Wallet — หน้านี้กับ Wallet เป็นเรื่อง "การเงินของอู่" คู่กัน
-          // (บัญชีนี้ = รับเงินจากลูกค้า / Wallet = จ่ายค่าคอมมิชชั่นให้แพลตฟอร์ม)
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GarageWalletPage(garageId: widget.userData['id'])),
-            ),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xffF3E5F5), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xff9C27B0), size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(loc.t('bsp_wallet_card_title'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                        Text(loc.t('bsp_wallet_card_subtitle'), style: const TextStyle(color: Colors.grey, fontSize: 11.5)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
-              ),
-            ),
-          ),
-
           const SizedBox(height: 20),
 
           Text(loc.t('bsp_bank_label'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
@@ -192,6 +249,11 @@ class _BankSettingsPageState extends State<BankSettingsPage> {
           Container(
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
             child: DropdownButtonFormField<String>(
+              // ✅ แก้บั๊ก: เดิมไม่ใส่ isExpanded ทำให้ Row ภายใน dropdown (ข้อความ +
+              // ไอคอนลูกศร) กว้างเกินพื้นที่ที่มีไปเล็กน้อย เกิด "RIGHT OVERFLOWED BY
+              // X PIXELS" ที่ขอบขวา — ใส่ isExpanded: true ให้ dropdown ยืดเต็มความกว้าง
+              // ที่มี ข้อความยาวเกินจะตัดด้วย ... แทนการล้นจอ
+              isExpanded: true,
               value: _thaiBanks.contains(_bankNameController.text) ? _bankNameController.text : null,
               hint: Text(loc.t('bsp_bank_hint')),
               decoration: InputDecoration(

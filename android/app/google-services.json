@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "213070084733",
-    "project_id": "good-garage-which-trust",
-    "storage_bucket": "good-garage-which-trust.firebasestorage.app"
+    "project_number": "4635817758",
+    "project_id": "good-garage-e9a16",
+    "storage_bucket": "good-garage-e9a16.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:213070084733:android:fd5e6c1a946a110210cf14",
+        "mobilesdk_app_id": "1:4635817758:android:b052c46be32213ac29fb0f",
         "android_client_info": {
           "package_name": "com.example.flutter_goodgarage"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA5f4Exm6sjirqvF7PJJAYBNscS3Dic8y0"
+          "current_key": "AIzaSyD56NH2Dqij8nsBTKddlXRgqilDKkb0u4I"
         }
       ],
       "services": {

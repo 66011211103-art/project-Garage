@@ -21,6 +21,9 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // ✅ เพิ่มใหม่: ปลั๊กอินสำหรับ Firebase Cloud Messaging (FCM) — อ่านค่าใน
+    // android/app/google-services.json แล้วสร้างไฟล์ config ให้ Firebase SDK ใช้ตอน build
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")

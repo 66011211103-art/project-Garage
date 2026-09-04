@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'app_locale.dart';
 
 /// หน้าจอแสดงตำแหน่งอู่บนแผนที่ (ใช้ OpenStreetMap ผ่าน flutter_map)
 ///
@@ -42,22 +41,6 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
   );
 
   @override
-  void initState() {
-    super.initState();
-    AppLocale.instance.addListener(_onLocaleChanged);
-  }
-
-  @override
-  void dispose() {
-    AppLocale.instance.removeListener(_onLocaleChanged);
-    super.dispose();
-  }
-
-  void _onLocaleChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -82,10 +65,12 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
               initialZoom: 16,
             ),
             children: [
-              // ✅ CartoDB Voyager — ต้องตรงกับ garage_detail_page.dart และ address_map_page.dart เสมอ
+              // ✅ OpenStreetMap มาตรฐาน — ไม่ต้องใช้ API key (ของเดิมใช้ CartoDB Voyager
+              // แต่ตอนนี้ CARTO เปลี่ยนนโยบายบังคับต้องมี API key ถึงจะโชว์แผนที่ได้ ไม่งั้น
+              // จะเจอ tile ที่มีข้อความ "API KEY REQUIRED" ทับเต็มจอแทนแผนที่จริง) —
+              // ต้องตรงกับ garage_detail_page.dart และ address_map_page.dart เสมอ
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.goodgarage.app',
               ),
               // เลเยอร์หมุดปักตำแหน่งอู่
@@ -103,11 +88,10 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
                   ),
                 ],
               ),
-              // ✅ เครดิตตามข้อกำหนดการใช้งานฟรีของ CARTO + OpenStreetMap
+              // ✅ เครดิตตามข้อกำหนดการใช้งานฟรีของ OpenStreetMap
               RichAttributionWidget(
                 attributions: [
                   TextSourceAttribution('© OpenStreetMap contributors'),
-                  TextSourceAttribution('© CARTO'),
                 ],
               ),
             ],
@@ -161,7 +145,7 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
                       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
                       if (!launched && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(AppLocale.instance.t('gd_open_maps_failed')), backgroundColor: Colors.red),
+                          const SnackBar(content: Text('เปิดแอปแผนที่ไม่สำเร็จ'), backgroundColor: Colors.red),
                         );
                       }
                     },
@@ -172,7 +156,7 @@ class _GarageLocationPageState extends State<GarageLocationPage> {
                       ),
                     ),
                     icon: const Icon(Icons.directions, size: 18),
-                    label: Text(AppLocale.instance.t('common_navigate')),
+                    label: const Text('นำทาง'),
                   ),
                 ],
               ),

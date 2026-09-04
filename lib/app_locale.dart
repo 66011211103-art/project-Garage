@@ -397,6 +397,12 @@ class AppLocale extends ChangeNotifier {
       'th': 'ตำแหน่งถูกปฏิเสธถาวร กรุณาไปเปิดสิทธิ์ในตั้งค่าเบราว์เซอร์/อุปกรณ์',
       'en': 'Location access permanently denied. Please enable it in your browser/device settings',
     },
+    // ✅ เพิ่มใหม่: ข้อความตอน GPS หาสัญญาณไม่เจอภายในเวลาที่กำหนด (ดู timeLimit ใน
+    // getCurrentPosition() — เดิมเคสนี้ไม่มีข้อความอธิบายเลยเพราะไม่เคย throw ออกมา)
+    'loc_gps_timeout': {
+      'th': 'ค้นหาตำแหน่งไม่สำเร็จ (สัญญาณ GPS อ่อนหรือหาไม่เจอ)',
+      'en': 'Could not get your location (weak or no GPS signal)',
+    },
 
     'common_navigate': {'th': 'นำทาง', 'en': 'Navigate'},
 
@@ -406,6 +412,7 @@ class AppLocale extends ChangeNotifier {
     'addr_picker_use_current': {'th': 'ใช้ตำแหน่งปัจจุบันของฉัน', 'en': 'Use My Current Location'},
     'addr_picker_or_type': {'th': 'หรือพิมพ์/วางที่อยู่เอง', 'en': 'Or type/paste an address'},
     'addr_picker_placeholder': {'th': 'พิมพ์หรือวางที่อยู่ที่ต้องการค้นหาด้านล่าง', 'en': 'Type or paste the address to search below'},
+    'addr_picker_placeholder_title': {'th': 'ค้นหาที่อยู่ของคุณ', 'en': 'Search your address'},
     'addr_picker_not_found': {
       'th': 'ไม่พบที่อยู่นี้ในฐานข้อมูลแผนที่ฟรี (OpenStreetMap) — ที่อยู่แบบ'
           ' "บ้านเลขที่ + หมู่ที่" ในพื้นที่ชนบทมักไม่มีข้อมูลระดับบ้านในฐานข้อมูลนี้'

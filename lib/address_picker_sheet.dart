@@ -387,14 +387,38 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
       ),
       child: Container(
         height: MediaQuery.of(context).size.height * 0.75,
-        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ✅ แถบจับ (grab handle) มาตรฐานของ bottom sheet ให้รู้ว่าลากปิดได้
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+
             Row(
               children: [
-                const Icon(Icons.place_outlined, color: Color(0xff2196F3)),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffE3F2FD),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.place_outlined, color: Color(0xff2196F3), size: 20),
+                ),
+                const SizedBox(width: 10),
                 Text(
                   loc.t('addr_picker_title'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -402,45 +426,52 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xffF5F6FA),
+                    shape: const CircleBorder(),
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             // ===== ปุ่มใช้ตำแหน่งปัจจุบัน =====
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: _isLocating ? null : _handleUseCurrentLocation,
                 icon: _isLocating
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Color(0xff2196F3)),
                       )
                     : const Icon(Icons.my_location, size: 18),
                 label: Text(
                   _isLocating
                       ? loc.t('addr_picker_locating')
                       : loc.t('addr_picker_use_current'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                style: OutlinedButton.styleFrom(
+                style: ElevatedButton.styleFrom(
                   foregroundColor: const Color(0xff2196F3),
-                  side: const BorderSide(color: Color(0xff2196F3)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: const Color(0xffE3F2FD),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
               children: [
-                const Expanded(child: Divider()),
+                Expanded(child: Divider(color: Colors.grey.shade300)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Text(
@@ -448,10 +479,10 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
-                const Expanded(child: Divider()),
+                Expanded(child: Divider(color: Colors.grey.shade300)),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
 
             // ===== พื้นที่แสดงผลลัพธ์ (เหมือนข้อความในแชท) =====
             Expanded(
@@ -459,13 +490,53 @@ class _AddressChatSheetState extends State<_AddressChatSheet> {
                   ? const Center(child: CircularProgressIndicator())
                   : _results.isEmpty
                   ? Center(
-                      child: Text(
-                        _errorText ??
-                            loc.t('addr_picker_placeholder'),
-                        style: TextStyle(
-                          color: _errorText != null ? Colors.red : Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 88,
+                            height: 88,
+                            decoration: BoxDecoration(
+                              color: _errorText != null
+                                  ? const Color(0xffFFEBEE)
+                                  : const Color(0xffF5F6FA),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _errorText != null
+                                  ? Icons.search_off_rounded
+                                  : Icons.location_searching_rounded,
+                              size: 40,
+                              color: _errorText != null
+                                  ? Colors.red.shade300
+                                  : Colors.grey.shade400,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (_errorText == null)
+                            Text(
+                              loc.t('addr_picker_placeholder_title'),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xff424242),
+                              ),
+                            ),
+                          if (_errorText == null) const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Text(
+                              _errorText ?? loc.t('addr_picker_placeholder'),
+                              style: TextStyle(
+                                color: _errorText != null
+                                    ? Colors.red.shade400
+                                    : Colors.grey,
+                                fontSize: 13,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : ListView.separated(
